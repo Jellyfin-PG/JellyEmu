@@ -1,0 +1,81 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish --configuration Release --no-build --output ./publish
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Zip release artifacts
+        run: |
+          cd publish
+          zip -j ../JellyEmu_${{ steps.version.outputs.VERSION }}.zip \
+            JellyEmu.dll
+
+      - name: Compute MD5 checksum
+        id: checksum
+        run: |
+          echo "MD5=$(md5sum JellyEmu_${{ steps.version.outputs.VERSION }}.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Get previous tag
+        id: previoustag
+        run: |
+          PREV=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -n1)
+          echo "PREV=${PREV}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ -n "${{ steps.previoustag.outputs.PREV }}" ]; then
+            LOG=$(git log ${{ steps.previoustag.outputs.PREV }}..${{ github.ref_name }} --pretty=format:"- %s" --no-merges)
+          else
+            LOG=$(git log --pretty=format:"- %s" --no-merges)
+          fi
+          echo "LOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: JellyEmu v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## JellyEmu v${{ steps.version.outputs.VERSION }}
+
+            ### Installation
+            Download `JellyEmu_${{ steps.version.outputs.VERSION }}.zip`, extract, and copy the DLLs to your Jellyfin plugins folder.
+
+            **MD5:** `${{ steps.checksum.outputs.MD5 }}`
+
+            Update this value in `manifest.json` for the plugin catalogue.
+          files: JellyEmu_${{ steps.version.outputs.VERSION }}.zip
