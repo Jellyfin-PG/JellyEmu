@@ -10,6 +10,13 @@ namespace JellyEmu
 {
     public class RomResolver : IItemResolver
     {
+        private readonly PlatformResolver _platformResolver;
+
+        public RomResolver(PlatformResolver platformResolver)
+        {
+            _platformResolver = platformResolver;
+        }
+
         public ResolverPriority Priority => ResolverPriority.First;
 
         public BaseItem? ResolvePath(ItemResolveArgs args)
@@ -18,15 +25,17 @@ namespace JellyEmu
 
             if (RomExtensions.IsRomPath(args.Path))
             {
-                var consoleTag = RomExtensions.GetConsoleTag(args.Path);
+                var consoleTag  = _platformResolver.Resolve(args.Path);
+                var displayName = PlatformResolver.CleanDisplayName(
+                    Path.GetFileNameWithoutExtension(args.Path) ?? string.Empty);
 
                 return new Book
                 {
-                    Name = RomExtensions.CleanName(Path.GetFileNameWithoutExtension(args.Path)),
-                    Path = args.Path,
+                    Name            = RomExtensions.CleanName(displayName),
+                    Path            = args.Path,
                     IsInMixedFolder = true,
-                    SeriesName = Path.GetFileName(Path.GetDirectoryName(args.Path)),
-                    Tags = new[] { "Game", consoleTag }
+                    SeriesName      = Path.GetFileName(Path.GetDirectoryName(args.Path)),
+                    Tags            = new[] { "Game", consoleTag }
                 };
             }
 
@@ -37,10 +46,12 @@ namespace JellyEmu
     public class RomMetadataProvider : ILocalMetadataProvider<Book>, IRemoteImageProvider
     {
         private readonly ILogger<RomMetadataProvider> _logger;
+        private readonly PlatformResolver _platformResolver;
 
-        public RomMetadataProvider(ILogger<RomMetadataProvider> logger)
+        public RomMetadataProvider(ILogger<RomMetadataProvider> logger, PlatformResolver platformResolver)
         {
             _logger = logger;
+            _platformResolver = platformResolver;
         }
 
         public string Name => "Retro Games Local Metadata";
@@ -59,7 +70,7 @@ namespace JellyEmu
 
             if (File.Exists(nfoPath))
             {
-                var consoleTag = RomExtensions.GetConsoleTag(info.Path);
+                var consoleTag = _platformResolver.Resolve(info.Path);
 
                 result.HasMetadata = true;
                 result.Item = new Book

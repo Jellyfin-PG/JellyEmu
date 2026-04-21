@@ -44,6 +44,7 @@ namespace JellyEmu.Services
                 (function() {
                     if (window.__jellyEmuLoaded) return;
                     window.__jellyEmuLoaded = true;
+                    console.log('[JellyEmu] UI injection successful.');
 
                     let currentItemId = null;
                     let currentItemIsGame = false;

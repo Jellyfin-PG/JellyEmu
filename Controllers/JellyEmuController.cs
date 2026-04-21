@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using System.Text.Encodings.Web;
+using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -15,6 +16,7 @@ namespace JellyEmu.Controllers
         private readonly ILibraryManager _libraryManager;
         private readonly IApplicationPaths _appPaths;
         private readonly ILogger<JellyEmuController> _logger;
+        private readonly JellyEmuEjsManager _ejsManager;
 
         private static readonly System.Collections.Generic.Dictionary<string, string> CoreMap =
             new(StringComparer.OrdinalIgnoreCase)
@@ -45,11 +47,13 @@ namespace JellyEmu.Controllers
         public JellyEmuController(
             ILibraryManager libraryManager,
             IApplicationPaths appPaths,
-            ILogger<JellyEmuController> logger)
+            ILogger<JellyEmuController> logger,
+            JellyEmuEjsManager ejsManager)
         {
             _libraryManager = libraryManager;
             _appPaths = appPaths;
             _logger = logger;
+            _ejsManager = ejsManager;
         }
 
         // Saves are stored at: {DataPath}/jellyemu-saves/{userId}/{itemId}.state
@@ -79,20 +83,18 @@ namespace JellyEmu.Controllers
             }
 
             var core = ResolveCore(item);
-            // Use relative URLs so the browser resolves them against the page's origin/scheme.
-            // Request.Scheme is unreliable behind reverse proxies that terminate TLS (would yield http://
-            // while the client loaded the page over https://, triggering Mixed Content blocks).
             var romUrl = $"/jellyemu/rom/{itemId}";
 
-            // Save state URLs — only wired up if a userId was provided
             var hasSaves = !string.IsNullOrEmpty(userId);
             var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
             var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
-            // Check if a save already exists for this user+item to auto-load it
             var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId));
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
+            var ejsBase = _ejsManager.IsReady
+                ? $"/jellyemu/ejs"
+                : JellyEmuEjsManager.CdnBase;
 
             var html = $@"<!DOCTYPE html>
 <html>
@@ -127,7 +129,7 @@ namespace JellyEmu.Controllers
         window.EJS_core          = '{core}';
         window.EJS_gameUrl       = '{romUrl}';
         window.EJS_gameName      = '{gameName}';
-        window.EJS_pathtodata    = 'https://cdn.emulatorjs.org/latest/data/';
+        window.EJS_pathtodata    = '{ejsBase}/';
         window.EJS_startOnLoaded = true;
         window.EJS_askBeforeExit = false;
         window.EJS_color         = '#00a4dc';
@@ -158,7 +160,7 @@ namespace JellyEmu.Controllers
             }});
         }};" : "")}
     </script>
-    <script src=""https://cdn.emulatorjs.org/latest/data/loader.js""></script>
+    <script src=""{ejsBase}/loader.js""></script>
 </body>
 </html>";
 
@@ -230,6 +232,78 @@ namespace JellyEmu.Controllers
                 itemId, userId, fs.Length);
 
             return Ok();
+        }
+
+        /// <summary>
+        /// Serves EmulatorJS assets from the local disk cache when available.
+        /// If the local cache is not ready yet (still downloading or failed),
+        /// proxies the request transparently to the CDN so the player always works.
+        /// Route: GET /jellyemu/ejs/{*path}  e.g. /jellyemu/ejs/loader.js
+        /// </summary>
+        [HttpGet("/jellyemu/ejs/{*path}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> EjsAsset(string path,
+            [FromServices] IHttpClientFactory httpClientFactory)
+        {
+            if (string.IsNullOrEmpty(path))
+                return NotFound();
+
+            path = path.Replace('\\', '/').TrimStart('/');
+            if (path.Contains(".."))
+                return BadRequest();
+
+            var contentType = path switch
+            {
+                var p when p.EndsWith(".js", StringComparison.OrdinalIgnoreCase) => "application/javascript",
+                var p when p.EndsWith(".wasm", StringComparison.OrdinalIgnoreCase) => "application/wasm",
+                var p when p.EndsWith(".css", StringComparison.OrdinalIgnoreCase) => "text/css",
+                var p when p.EndsWith(".json", StringComparison.OrdinalIgnoreCase) => "application/json",
+                var p when p.EndsWith(".png", StringComparison.OrdinalIgnoreCase) => "image/png",
+                var p when p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) => "image/svg+xml",
+                _ => "application/octet-stream"
+            };
+
+            Response.Headers["Cache-Control"] = "public, max-age=86400";
+
+            // Local cache
+            if (_ejsManager.IsReady)
+            {
+                var localPath = Path.Combine(_ejsManager.LocalRoot, path.Replace('/', Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(localPath))
+                {
+                    _logger.LogDebug("[JellyEmu] Serving EJS asset locally: {Path}", path);
+                    var stream = System.IO.File.OpenRead(localPath);
+                    return File(stream, contentType);
+                }
+
+                _logger.LogWarning("[JellyEmu] EJS asset missing from local cache, proxying: {Path}", path);
+            }
+
+            // CDN proxy fallback
+            var cdnUrl = $"{JellyEmuEjsManager.CdnBase}/{path}";
+            _logger.LogDebug("[JellyEmu] Proxying EJS asset from CDN: {Url}", cdnUrl);
+
+            try
+            {
+                var client = httpClientFactory.CreateClient("JellyEmuEjs");
+                using var cdnResponse = await client.GetAsync(cdnUrl, HttpCompletionOption.ResponseHeadersRead);
+
+                if (!cdnResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("[JellyEmu] CDN returned {Status} for {Url}",
+                        (int)cdnResponse.StatusCode, cdnUrl);
+                    return NotFound();
+                }
+
+                var bytes = await cdnResponse.Content.ReadAsByteArrayAsync();
+                return File(bytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[JellyEmu] Failed to proxy EJS asset from CDN: {Url}", cdnUrl);
+                return StatusCode(502);
+            }
         }
 
         private static string ResolveCore(BaseItem item)

@@ -8,14 +8,20 @@ namespace JellyEmu.Services
     public class JellyEmuInjectorService : IHostedService
     {
         private readonly ILogger<JellyEmuInjectorService> _logger;
+        private readonly JellyEmuEjsManager _ejsManager;
 
-        public JellyEmuInjectorService(ILogger<JellyEmuInjectorService> logger)
+        public JellyEmuInjectorService(
+            ILogger<JellyEmuInjectorService> logger,
+            JellyEmuEjsManager ejsManager)
         {
             _logger = logger;
+            _ejsManager = ejsManager;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            _ejsManager.EnsureAssetsAsync();
+
             _logger.LogInformation("[JellyEmu] Registering UI injection with File Transformation...");
 
             try
