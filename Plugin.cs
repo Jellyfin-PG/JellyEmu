@@ -24,7 +24,7 @@ namespace JellyEmu
 
         public override string Name => "JellyEmu";
 
-        public override Guid Id => Guid.Parse("a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d");
+        public override Guid Id => Guid.Parse("9bab105e-9af0-4e25-a87d-876713b60962");
 
         public static Plugin? Instance { get; private set; }
 
