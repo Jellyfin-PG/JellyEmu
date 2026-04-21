@@ -106,3 +106,36 @@ Once the library is established and the providers are enabled:
 * Click the three dots on your game library and select **Scan Library Files**.
 * Jellyfin will begin matching your files against IGDB and RAWG to download box art and descriptions.
 * Once the scan finishes, your games will appear on the home screen, ready to be browsed and played.
+
+---
+
+## Installation
+
+JellyEmu depends on the **File Transformation** plugin to inject CSS and JavaScript into Jellyfin's web interface. Both plugins must be installed from the same plugin catalogue — install them in the order below.
+
+### Step 1 — Add the plugin catalogue
+
+1. Open your Jellyfin dashboard
+2. Go to **Administration → Plugins → Repositories**
+3. Click **Add** and enter the following URL:
+
+```
+https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifest.json
+```
+
+4. Click **Save**
+
+### Step 2 — Install File Transformation
+
+1. Go to **Administration → Plugins → Catalogue**
+2. Find **File Transformation** and click **Install**
+3. When prompted, confirm the installation
+
+### Step 3 — Install JellyEmu
+
+1. Still in the **Catalogue**, find **JellyEmu** and click **Install**
+2. When prompted, confirm the installation
+
+### Step 4 — Restart Jellyfin
+
+Restart your Jellyfin server. Both plugins must be active at the same time — File Transformation handles the page injection, JellyEmu manages your roms.
