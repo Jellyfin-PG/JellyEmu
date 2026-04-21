@@ -1,0 +1,6 @@
+bin/
+obj/
+.vscode/settings.json
+*.user
+*.suo
+.DS_Store

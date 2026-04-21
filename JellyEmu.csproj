@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Plugin Metadata -->
+    <AssemblyName>JellyEmu</AssemblyName>
+    <RootNamespace>JellyEmu</RootNamespace>
+    <Version>1.0.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Authors>Jellyfin-PG</Authors>
+    <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Description>JellyEmu — A retro ROM scanner and EmulatorJS wrapper for Jellyfin.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.0" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Configuration\configPage.html" LogicalName="JellyEmu.Configuration.configPage.html" />
+  </ItemGroup>
+
+</Project>
