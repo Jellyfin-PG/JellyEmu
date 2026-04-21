@@ -56,12 +56,33 @@ namespace JellyEmu.Controllers
             _ejsManager = ejsManager;
         }
 
-        // Saves are stored at: {DataPath}/jellyemu-saves/{userId}/{itemId}.state
-        private string GetSavePath(string userId, string itemId)
+        // Saves are stored at: {DataPath}/jellyemu-saves/{userId}/slot{slot}/{itemId}.state
+        // Active slot preference: {DataPath}/jellyemu-saves/{userId}/active-slot.json
+        private string GetSavePath(string userId, string itemId, int slot)
+        {
+            var dir = Path.Combine(_appPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, $"{itemId}.state");
+        }
+
+        private string GetSlotFilePath(string userId)
         {
             var dir = Path.Combine(_appPaths.DataPath, "jellyemu-saves", userId);
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, $"{itemId}.state");
+            return Path.Combine(dir, "active-slot.json");
+        }
+
+        private int ReadActiveSlot(string userId)
+        {
+            var path = GetSlotFilePath(userId);
+            if (!System.IO.File.Exists(path)) return 1;
+            try
+            {
+                var json = System.IO.File.ReadAllText(path);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                return doc.RootElement.TryGetProperty("slot", out var s) ? Math.Max(1, s.GetInt32()) : 1;
+            }
+            catch { return 1; }
         }
 
         /// <summary>
@@ -86,10 +107,11 @@ namespace JellyEmu.Controllers
             var romUrl = $"/jellyemu/rom/{itemId}";
 
             var hasSaves = !string.IsNullOrEmpty(userId);
+            var activeSlot = hasSaves ? ReadActiveSlot(userId!) : 1;
             var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
             var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
-            var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId));
+            var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId, activeSlot));
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
             var ejsBase = _ejsManager.IsReady
@@ -199,14 +221,15 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetSave(string itemId, string userId)
         {
-            var path = GetSavePath(userId, itemId);
+            var slot = ReadActiveSlot(userId);
+            var path = GetSavePath(userId, itemId, slot);
             if (!System.IO.File.Exists(path))
             {
-                _logger.LogInformation("[JellyEmu] No save found for item {ItemId} user {UserId}", itemId, userId);
+                _logger.LogInformation("[JellyEmu] No save found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slot);
                 return NotFound();
             }
 
-            _logger.LogInformation("[JellyEmu] Serving save for item {ItemId} user {UserId}", itemId, userId);
+            _logger.LogInformation("[JellyEmu] Serving save for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slot);
             var stream = System.IO.File.OpenRead(path);
             return File(stream, "application/octet-stream", $"{itemId}.state");
         }
@@ -223,19 +246,44 @@ namespace JellyEmu.Controllers
             if (Request.ContentLength == 0 || Request.ContentLength == null)
                 return BadRequest("Empty save body.");
 
-            var path = GetSavePath(userId, itemId);
+            var slot = ReadActiveSlot(userId);
+            var path = GetSavePath(userId, itemId, slot);
 
             using var fs = System.IO.File.Create(path);
             await Request.Body.CopyToAsync(fs);
 
-            _logger.LogInformation("[JellyEmu] Saved state for item {ItemId} user {UserId} ({Bytes} bytes)",
-                itemId, userId, fs.Length);
+            _logger.LogInformation("[JellyEmu] Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                itemId, userId, slot, fs.Length);
 
             return Ok();
         }
 
-        /// <summary>
-        /// Serves EmulatorJS assets from the local disk cache when available.
+        [HttpGet("/jellyemu/slot/{userId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult GetSlot(string userId)
+        {
+            var slot = ReadActiveSlot(userId);
+            return Ok(new { userId, slot });
+        }
+
+        [HttpPost("/jellyemu/slot/{userId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult SetSlot(string userId, [FromQuery] int slot)
+        {
+            if (slot < 1 || slot > 99)
+                return BadRequest("Slot must be between 1 and 99.");
+
+            var path = GetSlotFilePath(userId);
+            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new { slot }));
+
+            _logger.LogInformation("[JellyEmu] User {UserId} active slot set to {Slot}", userId, slot);
+            return Ok(new { userId, slot });
+        }
+
+        
         /// If the local cache is not ready yet (still downloading or failed),
         /// proxies the request transparently to the CDN so the player always works.
         /// Route: GET /jellyemu/ejs/{*path}  e.g. /jellyemu/ejs/loader.js

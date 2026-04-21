@@ -11,6 +11,9 @@ namespace JellyEmu
     ///   3. File extension                          — .nes → "NES" (unambiguous only)
     ///                                                .chd → "Unknown" (ambiguous — needs folder/token)
     ///
+    /// Region tags in the filename (e.g. (USA), (Europe), (Japan)) are also parsed and
+    /// exposed via <see cref="ResolveRegion"/> so providers can surface them as metadata.
+    ///
     /// IGDB and RAWG are intentionally excluded from platform resolution.
     /// Their platform lists are unreliable (multi-platform entries, inconsistent ordering).
     /// Those providers are used only for game metadata: name, description, artwork, genres.
@@ -19,6 +22,67 @@ namespace JellyEmu
     {
         private static readonly Regex TokenRegex =
             new(@"[\[\(]([^\]\)]+)[\]\)]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// Canonical region labels keyed by every common abbreviation / full form
+        /// found in No-Intro, Redump, and GoodTools naming conventions.
+        /// </summary>
+        public static readonly Dictionary<string, string> RegionAliases =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                // North America / USA
+                { "usa",        "USA" }, { "us",          "USA" }, { "ntsc-u",    "USA" },
+                { "u",          "USA" }, { "america",      "USA" }, { "north america", "USA" },
+                // Europe
+                { "europe",     "Europe" }, { "eur",       "Europe" }, { "pal",     "Europe" },
+                { "e",          "Europe" },
+                // Japan
+                { "japan",      "Japan" }, { "jpn",        "Japan" }, { "jp",      "Japan" },
+                { "j",          "Japan" }, { "ntsc-j",     "Japan" },
+                // World / Multi-region
+                { "world",      "World" }, { "w",          "World" },
+                // Other regions
+                { "australia",  "Australia" }, { "aus",    "Australia" },
+                { "brazil",     "Brazil" },    { "bra",    "Brazil" },
+                { "canada",     "Canada" },    { "can",    "Canada" },
+                { "china",      "China" },     { "chn",    "China" },
+                { "france",     "France" },    { "fra",    "France" }, { "f", "France" },
+                { "germany",    "Germany" },   { "ger",    "Germany" }, { "deu", "Germany" },
+                { "italy",      "Italy" },     { "ita",    "Italy" },
+                { "korea",      "Korea" },     { "kor",    "Korea" }, { "k", "Korea" },
+                { "netherlands","Netherlands" },{ "ned",   "Netherlands" },
+                { "russia",     "Russia" },    { "rus",    "Russia" },
+                { "spain",      "Spain" },     { "spa",    "Spain" }, { "esp", "Spain" },
+                { "sweden",     "Sweden" },    { "swe",    "Sweden" },
+                { "asia",       "Asia" },
+                { "scandinavia","Scandinavia" },
+                // Unlicensed / special
+                { "unlicensed", "Unlicensed" }, { "unl", "Unlicensed" },
+                { "proto",      "Prototype" }, { "prototype", "Prototype" },
+                { "demo",       "Demo" },
+                { "sample",     "Sample" },
+            };
+
+        /// <summary>
+        /// Attempts to extract the first recognisable region tag from a ROM filename.
+        /// Returns <c>null</c> when no known region token is present.
+        /// </summary>
+        public static string? ResolveRegion(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var fileName = Path.GetFileNameWithoutExtension(path) ?? string.Empty;
+            foreach (Match m in TokenRegex.Matches(fileName))
+            {
+                var inner = m.Groups[1].Value.Trim();
+                // Region tokens can be comma-separated, e.g. (USA, Europe)
+                foreach (var part in inner.Split(',', StringSplitOptions.TrimEntries))
+                {
+                    if (RegionAliases.TryGetValue(part, out var region))
+                        return region;
+                }
+            }
+            return null;
+        }
 
         public static readonly Dictionary<string, string> Aliases =
             new(StringComparer.OrdinalIgnoreCase)
@@ -178,10 +242,11 @@ namespace JellyEmu
 
         /// <summary>
         /// Strips JellyEmu-specific tokens from a raw filename so the display
-        /// name is clean. Removes [Platform], (Platform), [igdb-NNN], [rawg-slug].
-        /// Non-platform bracket content (region flags, revision codes) is kept.
-        /// e.g. "Sonic Adventure [igdb-3273][Sega CD]" → "Sonic Adventure"
-        ///      "Castlevania (USA) [!]"                → "Castlevania (USA) [!]"
+        /// name is clean. Removes [Platform], (Platform), [igdb-NNN], [rawg-slug],
+        /// and known region tokens such as (USA) or (Europe).
+        /// Non-provider, non-platform, non-region bracket content (revision codes, [!]) is kept.
+        /// e.g. "Sonic Adventure [igdb-3273][Sega CD](USA)" → "Sonic Adventure"
+        ///      "Castlevania [!]"                            → "Castlevania [!]"
         /// </summary>
         public static string CleanDisplayName(string raw)
         {
@@ -198,6 +263,11 @@ namespace JellyEmu
                 if (Aliases.ContainsKey(inner))
                     return "";
 
+                // Strip region tokens (including comma-separated ones like "USA, Europe")
+                var allParts = inner.Split(',', StringSplitOptions.TrimEntries);
+                if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p)))
+                    return "";
+
                 return m.Value;
             });
 
@@ -212,6 +282,11 @@ namespace JellyEmu
 
                 if (inner.StartsWith("igdb-", StringComparison.OrdinalIgnoreCase) ||
                     inner.StartsWith("rawg-", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Skip pure region tokens so they don't pollute platform resolution
+                var allParts = inner.Split(',', StringSplitOptions.TrimEntries);
+                if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p)))
                     continue;
 
                 if (Aliases.TryGetValue(inner, out var tag))

@@ -299,7 +299,7 @@ namespace JellyEmu
             try
             {
                 var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
-                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name;", Encoding.UTF8, "text/plain");
+                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;", Encoding.UTF8, "text/plain");
                 var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
@@ -310,12 +310,16 @@ namespace JellyEmu
                         var root = document.RootElement[0];
 
                         var consoleTag = _platformResolver.Resolve(info.Path);
+                        var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+
+                        var tags = new List<string> { "Game", consoleTag };
+                        if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                         var item = new Book
                         {
                             Name = root.GetProperty("name").GetString() ?? string.Empty,
                             Overview = root.TryGetProperty("summary", out var desc) ? (desc.GetString() ?? string.Empty) : string.Empty,
-                            Tags = new[] { "Game", consoleTag }
+                            Tags = tags.ToArray()
                         };
 
                         if (root.TryGetProperty("first_release_date", out var releaseUnix))
@@ -328,6 +332,18 @@ namespace JellyEmu
                         if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
                             foreach (var genre in genresArray.EnumerateArray())
                                 if (genre.TryGetProperty("name", out var genreName)) item.AddGenre(genreName.GetString());
+
+                        if (root.TryGetProperty("involved_companies", out var companies) && companies.ValueKind == JsonValueKind.Array)
+                            foreach (var entry in companies.EnumerateArray())
+                            {
+                                var isDev = entry.TryGetProperty("developer", out var devProp) && devProp.GetBoolean();
+                                var isPub = entry.TryGetProperty("publisher", out var pubProp) && pubProp.GetBoolean();
+                                if ((isDev || isPub) && entry.TryGetProperty("company", out var co) && co.TryGetProperty("name", out var coName))
+                                {
+                                    var name = coName.GetString();
+                                    if (!string.IsNullOrWhiteSpace(name)) item.AddStudio(name);
+                                }
+                            }
 
                         item.SetProviderId("IGDB", gameId);
                         result.HasMetadata = true;
@@ -463,17 +479,31 @@ namespace JellyEmu
                     var root = document.RootElement;
 
                     var consoleTag = _platformResolver.Resolve(info.Path);
+                    var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+
+                    var tags = new List<string> { "Game", consoleTag };
+                    if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                     var item = new Book
                     {
                         Name = root.GetProperty("name").GetString() ?? string.Empty,
                         Overview = root.TryGetProperty("description_raw", out var desc) ? (desc.GetString() ?? string.Empty) : string.Empty,
-                        Tags = new[] { "Game", consoleTag }
+                        Tags = tags.ToArray()
                     };
 
                     if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
                         foreach (var genre in genresArray.EnumerateArray())
                             if (genre.TryGetProperty("name", out var genreName)) item.AddGenre(genreName.GetString());
+
+                    if (root.TryGetProperty("developers", out var devsArray) && devsArray.ValueKind == JsonValueKind.Array)
+                        foreach (var dev in devsArray.EnumerateArray())
+                            if (dev.TryGetProperty("name", out var devName) && !string.IsNullOrWhiteSpace(devName.GetString()))
+                                item.AddStudio(devName.GetString());
+
+                    if (root.TryGetProperty("publishers", out var pubsArray) && pubsArray.ValueKind == JsonValueKind.Array)
+                        foreach (var pub in pubsArray.EnumerateArray())
+                            if (pub.TryGetProperty("name", out var pubName) && !string.IsNullOrWhiteSpace(pubName.GetString()))
+                                item.AddStudio(pubName.GetString());
 
                     item.SetProviderId("RAWG", gameId);
                     result.HasMetadata = true;
@@ -532,4 +562,198 @@ namespace JellyEmu
             return list;
         }
     }
+
+    public abstract class BaseWikipediaProvider
+    {
+        protected readonly IHttpClientFactory HttpClientFactory;
+        protected readonly ILogger Logger;
+
+        protected BaseWikipediaProvider(IHttpClientFactory httpClientFactory, ILogger logger)
+        {
+            HttpClientFactory = httpClientFactory;
+            Logger = logger;
+        }
+
+        protected HttpClient GetHttpClient()
+        {
+            var client = HttpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0 (https://github.com/grimmdev/JellyEmu)");
+            return client;
+        }
+
+        protected async Task<string?> ResolvePageIdAsync(string name, CancellationToken cancellationToken)
+        {
+            var cleanName = RomExtensions.CleanName(name);
+            if (string.IsNullOrEmpty(cleanName)) return null;
+
+            try
+            {
+                var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={Uri.EscapeDataString(cleanName + " video game")}&utf8=&format=json";
+                var response = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("search", out var searchArray) &&
+                        searchArray.GetArrayLength() > 0)
+                    {
+                        return searchArray[0].GetProperty("pageid").GetInt32().ToString();
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
+            }
+            return GetHttpClient().GetAsync(url, cancellationToken);
+        }
+    }
+
+    public class WikipediaMetadataProvider : BaseWikipediaProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
+    {
+        public string Name => "Wikipedia";
+        public int Order => 3;
+
+        private readonly PlatformResolver _platformResolver;
+
+        public WikipediaMetadataProvider(
+            IHttpClientFactory httpClientFactory,
+            ILogger<WikipediaMetadataProvider> logger,
+            PlatformResolver platformResolver)
+            : base(httpClientFactory, logger)
+        {
+            _platformResolver = platformResolver;
+        }
+
+        public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
+        {
+            var results = new List<RemoteSearchResult>();
+            if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            var cleanName = RomExtensions.CleanName(searchInfo.Name);
+            try
+            {
+                var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={Uri.EscapeDataString(cleanName + " video game")}&utf8=&format=json";
+                var response = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("search", out var searchArray))
+                    {
+                        foreach (var page in searchArray.EnumerateArray().Take(5))
+                        {
+                            results.Add(new RemoteSearchResult
+                            {
+                                Name = page.GetProperty("title").GetString() ?? string.Empty,
+                                ProviderIds = new Dictionary<string, string> { { "Wikipedia", page.GetProperty("pageid").GetInt32().ToString() } },
+                                SearchProviderName = Name
+                            });
+                        }
+                    }
+                }
+            }
+            catch { }
+            return results;
+        }
+
+        public async Task<MetadataResult<Book>> GetMetadata(BookInfo info, CancellationToken cancellationToken)
+        {
+            var result = new MetadataResult<Book> { HasMetadata = false };
+            if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
+
+            info.ProviderIds.TryGetValue("Wikipedia", out var pageId);
+            if (string.IsNullOrEmpty(pageId)) pageId = (await GetSearchResults(info, cancellationToken).ConfigureAwait(false)).FirstOrDefault()?.ProviderIds["Wikipedia"];
+            if (string.IsNullOrEmpty(pageId)) return result;
+
+            try
+            {
+                var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids={pageId}&format=json";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("pages", out var pages) &&
+                        pages.TryGetProperty(pageId, out var page))
+                    {
+                        var consoleTag = _platformResolver.Resolve(info.Path);
+                        var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+
+                        var tags = new List<string> { "Game", consoleTag };
+                        if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+
+                        var item = new Book
+                        {
+                            Name = page.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty,
+                            Overview = page.TryGetProperty("extract", out var ext) ? ext.GetString() ?? string.Empty : string.Empty,
+                            Tags = tags.ToArray()
+                        };
+
+                        item.SetProviderId("Wikipedia", pageId);
+                        result.HasMetadata = true;
+                        result.Item = item;
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+    }
+
+    public class WikipediaImageProvider : BaseWikipediaProvider, IRemoteImageProvider, IHasOrder
+    {
+        public string Name => "Wikipedia";
+        public int Order => 3;
+
+        public WikipediaImageProvider(IHttpClientFactory httpClientFactory, ILogger<WikipediaImageProvider> logger) : base(httpClientFactory, logger) { }
+
+        public bool Supports(BaseItem item) => item is Book;
+
+        public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary };
+
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
+        {
+            var list = new List<RemoteImageInfo>();
+            if (!string.IsNullOrEmpty(item.Path) && !RomExtensions.IsRomPath(item.Path)) return list;
+
+            var pageId = item.GetProviderId("Wikipedia") ?? await ResolvePageIdAsync(item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(pageId)) return list;
+
+            try
+            {
+                var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=1000&pageids={pageId}&format=json";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("pages", out var pages) &&
+                        pages.TryGetProperty(pageId, out var page) &&
+                        page.TryGetProperty("thumbnail", out var thumbnail) &&
+                        thumbnail.TryGetProperty("source", out var source))
+                    {
+                        var imgUrl = source.GetString();
+                        if (!string.IsNullOrWhiteSpace(imgUrl))
+                        {
+                            list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = imgUrl });
+                        }
+                    }
+                }
+            }
+            catch { }
+            return list;
+        }
+    }
+
 }

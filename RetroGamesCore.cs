@@ -26,8 +26,12 @@ namespace JellyEmu
             if (RomExtensions.IsRomPath(args.Path))
             {
                 var consoleTag  = _platformResolver.Resolve(args.Path);
+                var regionTag   = PlatformResolver.ResolveRegion(args.Path);
                 var displayName = PlatformResolver.CleanDisplayName(
                     Path.GetFileNameWithoutExtension(args.Path) ?? string.Empty);
+
+                var tags = new List<string> { "Game", consoleTag };
+                if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                 return new Book
                 {
@@ -35,7 +39,7 @@ namespace JellyEmu
                     Path            = args.Path,
                     IsInMixedFolder = true,
                     SeriesName      = Path.GetFileName(Path.GetDirectoryName(args.Path)),
-                    Tags            = new[] { "Game", consoleTag }
+                    Tags            = tags.ToArray()
                 };
             }
 
