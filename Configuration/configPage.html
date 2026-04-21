@@ -1,0 +1,131 @@
+<div id="JellyEmuConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div data-role="content">
+        <div class="content-primary">
+
+            <div class="verticalSection">
+                <h2 class="sectionTitle">JellyEmu — Retro Games Library</h2>
+            </div>
+
+            <div class="paperList"
+                style="padding: 1.5em; text-align: center; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 1.5em;">
+                <p style="margin: 0; color: #aaa; font-size: 0.9em;">ROMs Scanned</p>
+                <h1 id="romCountDisplay" style="font-size: 4em; color: #00a4dc; margin: 4px 0;">...</h1>
+                <p style="color: #aaa; font-size: 0.85em; margin: 0;">Tagged <b>Book</b> items with the
+                    <code>Game</code> tag found in your library.
+                </p>
+            </div>
+
+            <div class="verticalSection">
+                <h2 class="sectionTitle">IGDB Metadata (via Twitch)</h2>
+                <p style="color: #aaa; margin-bottom: 1em;">
+                    Used for game descriptions, release dates, and cover art.
+                    Register your app at <a href="https://dev.twitch.tv/console/apps" target="_blank"
+                        style="color: #00a4dc;">dev.twitch.tv/console/apps</a>
+                    and set the OAuth redirect to <code>http://localhost</code>.
+                </p>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="igdbClientId">Twitch Client ID</label>
+                    <input id="igdbClientId" type="text" is="emby-input" class="emby-input"
+                        placeholder="e.g. 7imyo6cfhtx5pzsoq3lnd7ochv6kle" autocomplete="off" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="igdbClientSecret">Twitch Client Secret</label>
+                    <input id="igdbClientSecret" type="password" is="emby-input" class="emby-input"
+                        placeholder="Your Twitch client secret" autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="verticalSection" style="margin-top: 1.5em;">
+                <h2 class="sectionTitle">RAWG Metadata</h2>
+                <p style="color: #aaa; margin-bottom: 1em;">
+                    Used as a fallback provider for game metadata and screenshots.
+                    Get your free API key at <a href="https://rawg.io/apidocs" target="_blank"
+                        style="color: #00a4dc;">rawg.io/apidocs</a>.
+                </p>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="rawgApiKey">RAWG API Key</label>
+                    <input id="rawgApiKey" type="password" is="emby-input" class="emby-input"
+                        placeholder="Your RAWG API key" autocomplete="off" />
+                </div>
+            </div>
+
+            <div style="margin-top: 2em;">
+                <button id="btnSaveConfig" is="emby-button" type="button"
+                    class="raised button-submit block emby-button">
+                    <span>Save Settings</span>
+                </button>
+            </div>
+
+            <p id="saveStatus" style="margin-top: 1em; color: #52B54B; display: none; text-align: center;"></p>
+
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            var pluginId = "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
+
+            function showStatus(msg, isError) {
+                var el = document.querySelector('#JellyEmuConfigPage #saveStatus');
+                el.textContent = msg;
+                el.style.color = isError ? '#FF4444' : '#52B54B';
+                el.style.display = 'block';
+                setTimeout(function () { el.style.display = 'none'; }, 4000);
+            }
+
+            function loadRomCount(page) {
+                var display = page.querySelector('#romCountDisplay');
+                display.innerText = '...';
+                display.style.color = '#00a4dc';
+                ApiClient.getItems(ApiClient.getCurrentUserId(), {
+                    Recursive: true,
+                    IncludeItemTypes: 'Book',
+                    Fields: 'Tags'
+                }).then(function (result) {
+                    var count = (result.Items || []).filter(function (i) {
+                        return i.Tags && i.Tags.includes('Game');
+                    }).length;
+                    display.innerText = count;
+                    display.style.color = count > 0 ? '#52B54B' : '#00a4dc';
+                }).catch(function () {
+                    display.innerText = 'Error';
+                    display.style.color = '#FF4444';
+                });
+            }
+
+            function loadConfig(page) {
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    page.querySelector('#igdbClientId').value = config.IgdbClientId || '';
+                    page.querySelector('#igdbClientSecret').value = config.IgdbClientSecret || '';
+                    page.querySelector('#rawgApiKey').value = config.RawgApiKey || '';
+                }).catch(function (err) {
+                    console.error('[JellyEmu] Failed to load config:', err);
+                    showStatus('Failed to load settings.', true);
+                });
+            }
+
+            function saveConfig(page) {
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    config.IgdbClientId = page.querySelector('#igdbClientId').value.trim();
+                    config.IgdbClientSecret = page.querySelector('#igdbClientSecret').value.trim();
+                    config.RawgApiKey = page.querySelector('#rawgApiKey').value.trim();
+                    return ApiClient.updatePluginConfiguration(pluginId, config);
+                }).then(function () {
+                    showStatus('Settings saved successfully!', false);
+                }).catch(function (err) {
+                    console.error('[JellyEmu] Failed to save config:', err);
+                    showStatus('Failed to save settings.', true);
+                });
+            }
+
+            document.querySelector('#JellyEmuConfigPage').addEventListener('pageshow', function (e) {
+                var page = e.target;
+                loadRomCount(page);
+                loadConfig(page);
+                page.querySelector('#btnSaveConfig').addEventListener('click', function () {
+                    saveConfig(page);
+                });
+            });
+        })();
+    </script>
+</div>
