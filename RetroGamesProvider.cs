@@ -532,4 +532,193 @@ namespace JellyEmu
             return list;
         }
     }
+
+    public abstract class BaseWikipediaProvider
+    {
+        protected readonly IHttpClientFactory HttpClientFactory;
+        protected readonly ILogger Logger;
+
+        protected BaseWikipediaProvider(IHttpClientFactory httpClientFactory, ILogger logger)
+        {
+            HttpClientFactory = httpClientFactory;
+            Logger = logger;
+        }
+
+        protected HttpClient GetHttpClient()
+        {
+            var client = HttpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0 (https://github.com/grimmdev/JellyEmu)");
+            return client;
+        }
+
+        protected async Task<string?> ResolvePageIdAsync(string name, CancellationToken cancellationToken)
+        {
+            var cleanName = RomExtensions.CleanName(name);
+            if (string.IsNullOrEmpty(cleanName)) return null;
+
+            try
+            {
+                var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={Uri.EscapeDataString(cleanName + " video game")}&utf8=&format=json";
+                var response = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("search", out var searchArray) &&
+                        searchArray.GetArrayLength() > 0)
+                    {
+                        return searchArray[0].GetProperty("pageid").GetInt32().ToString();
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
+            }
+            return GetHttpClient().GetAsync(url, cancellationToken);
+        }
+    }
+
+    public class WikipediaMetadataProvider : BaseWikipediaProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
+    {
+        public string Name => "Wikipedia";
+        public int Order => 3;
+
+        private readonly PlatformResolver _platformResolver;
+
+        public WikipediaMetadataProvider(
+            IHttpClientFactory httpClientFactory,
+            ILogger<WikipediaMetadataProvider> logger,
+            PlatformResolver platformResolver)
+            : base(httpClientFactory, logger)
+        {
+            _platformResolver = platformResolver;
+        }
+
+        public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
+        {
+            var results = new List<RemoteSearchResult>();
+            if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            var cleanName = RomExtensions.CleanName(searchInfo.Name);
+            try
+            {
+                var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={Uri.EscapeDataString(cleanName + " video game")}&utf8=&format=json";
+                var response = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("search", out var searchArray))
+                    {
+                        foreach (var page in searchArray.EnumerateArray().Take(5))
+                        {
+                            results.Add(new RemoteSearchResult
+                            {
+                                Name = page.GetProperty("title").GetString() ?? string.Empty,
+                                ProviderIds = new Dictionary<string, string> { { "Wikipedia", page.GetProperty("pageid").GetInt32().ToString() } },
+                                SearchProviderName = Name
+                            });
+                        }
+                    }
+                }
+            }
+            catch { }
+            return results;
+        }
+
+        public async Task<MetadataResult<Book>> GetMetadata(BookInfo info, CancellationToken cancellationToken)
+        {
+            var result = new MetadataResult<Book> { HasMetadata = false };
+            if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
+
+            info.ProviderIds.TryGetValue("Wikipedia", out var pageId);
+            if (string.IsNullOrEmpty(pageId)) pageId = (await GetSearchResults(info, cancellationToken).ConfigureAwait(false)).FirstOrDefault()?.ProviderIds["Wikipedia"];
+            if (string.IsNullOrEmpty(pageId)) return result;
+
+            try
+            {
+                var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids={pageId}&format=json";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("pages", out var pages) &&
+                        pages.TryGetProperty(pageId, out var page))
+                    {
+                        var consoleTag = _platformResolver.Resolve(info.Path);
+
+                        var item = new Book
+                        {
+                            Name = page.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty,
+                            Overview = page.TryGetProperty("extract", out var ext) ? ext.GetString() ?? string.Empty : string.Empty,
+                            Tags = new[] { "Game", consoleTag }
+                        };
+
+                        item.SetProviderId("Wikipedia", pageId);
+                        result.HasMetadata = true;
+                        result.Item = item;
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+    }
+
+    public class WikipediaImageProvider : BaseWikipediaProvider, IRemoteImageProvider, IHasOrder
+    {
+        public string Name => "Wikipedia";
+        public int Order => 3;
+
+        public WikipediaImageProvider(IHttpClientFactory httpClientFactory, ILogger<WikipediaImageProvider> logger) : base(httpClientFactory, logger) { }
+
+        public bool Supports(BaseItem item) => item is Book;
+
+        public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary };
+
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
+        {
+            var list = new List<RemoteImageInfo>();
+            if (!string.IsNullOrEmpty(item.Path) && !RomExtensions.IsRomPath(item.Path)) return list;
+
+            var pageId = item.GetProviderId("Wikipedia") ?? await ResolvePageIdAsync(item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(pageId)) return list;
+
+            try
+            {
+                var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=1000&pageids={pageId}&format=json";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("query", out var query) &&
+                        query.TryGetProperty("pages", out var pages) &&
+                        pages.TryGetProperty(pageId, out var page) &&
+                        page.TryGetProperty("thumbnail", out var thumbnail) &&
+                        thumbnail.TryGetProperty("source", out var source))
+                    {
+                        var imgUrl = source.GetString();
+                        if (!string.IsNullOrWhiteSpace(imgUrl))
+                        {
+                            list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = imgUrl });
+                        }
+                    }
+                }
+            }
+            catch { }
+            return list;
+        }
+    }
 }
