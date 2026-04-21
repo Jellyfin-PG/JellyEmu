@@ -210,7 +210,9 @@ JellyEmu will automatically hide these platform tags in the user interface so yo
 * `Crash Bandicoot (PS1).chd` ➔ UI Display: **Crash Bandicoot**
 * `Super Mario 64 [Nintendo 64].z64` ➔ UI Display: **Super Mario 64**
 
-*Region and revision flags (like `(USA)` or `[!]`) are intentionally ignored by the platform detector and will remain part of the display name.*
+*region flags are now parsed (like `(USA)`) and added to game details.*
+
+*revision flags (like `[!]`) are intentionally ignored by the platform detector and will remain part of the display name.*
 
 ---
 
