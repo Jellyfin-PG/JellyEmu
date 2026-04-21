@@ -23,7 +23,7 @@ namespace JellyEmu.Services
                 var payloadDefinition = new
                 {
                     id = Guid.NewGuid().ToString(),
-                    fileNamePattern = "index\\.html",
+                    fileNamePattern = "index.html",
                     callbackAssembly = GetType().Assembly.FullName,
                     callbackClass = typeof(JellyEmuUIInjector).FullName,
                     callbackMethod = nameof(JellyEmuUIInjector.InjectMods)
