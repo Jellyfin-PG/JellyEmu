@@ -49,6 +49,63 @@
                 </div>
             </div>
 
+            <div class="verticalSection" style="margin-top: 1.5em;">
+                <h2 class="sectionTitle">RetroArch Integration</h2>
+                <p style="color: #aaa; margin-bottom: 1.25em;">
+                    JellyEmu exposes endpoints so RetroArch can stream ROMs directly from your Jellyfin server.
+                    RetroArch does not support importing playlists from a URL — you need to download the
+                    <code>.lpl</code> file and place it manually in RetroArch's <code>playlists/</code> folder.
+                </p>
+
+                <div class="paperList" style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
+                    <p style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">Full library playlist</p>
+                    <code id="raPlaylistUrl" style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
+                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
+                        Downloads <code>JellyEmu.lpl</code>. Copy it to your RetroArch <code>playlists/</code> folder,
+                        then open RetroArch → <strong>Playlists</strong> to see all ROMs. RetroArch will stream each ROM
+                        over HTTP when you launch it — no local files needed.
+                    </p>
+                </div>
+
+                <div class="paperList" style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
+                    <p style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">Per-system playlists</p>
+                    <code id="raPlaylistSystemUrl" style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
+                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
+                        Replace <code>{system}</code> with a platform tag exactly as stored in Jellyfin, e.g.
+                        <code>NES</code>, <code>SNES</code>, <code>PlayStation</code>. Downloads
+                        <code>JellyEmu-{system}.lpl</code>.
+                    </p>
+                </div>
+
+                <div class="paperList" style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
+                    <p style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">Deep-link launch (Android)</p>
+                    <code id="raLaunchUrl" style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
+                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
+                        Replace <code>{itemId}</code> with a Jellyfin item ID. Opening this URL in a browser on Android
+                        (with RetroArch installed from the Play Store) hands the ROM directly to RetroArch via an intent.
+                        On desktop, RetroArch must be registered as the <code>retroarch://</code> protocol handler.
+                    </p>
+                </div>
+
+                <div class="paperList" style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
+                    <p style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">Server info &amp; system discovery</p>
+                    <code id="raInfoUrl" style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
+                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
+                        Returns JSON listing all detected systems, their ROM counts, and their per-system playlist URLs.
+                        Useful for custom front-ends or scripts that generate playlists automatically.
+                    </p>
+                </div>
+
+                <div class="paperList" style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                    <p style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">ROM streaming</p>
+                    <code id="raRomUrl" style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
+                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
+                        Each playlist entry points here. RetroArch fetches the ROM over HTTP when launching.
+                        You can also use this URL directly with <code>curl</code> or any HTTP client.
+                    </p>
+                </div>
+            </div>
+
             <div style="margin-top: 2em;">
                 <button id="btnSaveConfig" is="emby-button" type="button"
                     class="raised button-submit block emby-button">
@@ -71,6 +128,16 @@
                 el.style.color = isError ? '#FF4444' : '#52B54B';
                 el.style.display = 'block';
                 setTimeout(function () { el.style.display = 'none'; }, 4000);
+            }
+
+            function loadRetroArchUrl(page) {
+                var base = window.location.origin;
+                var set = function (id, val) { var el = page.querySelector('#' + id); if (el) el.textContent = val; };
+                set('raPlaylistUrl',       base + '/jellyemu/retroarch/playlist');
+                set('raPlaylistSystemUrl', base + '/jellyemu/retroarch/playlist/{system}');
+                set('raLaunchUrl',         base + '/jellyemu/retroarch/launch/{itemId}');
+                set('raInfoUrl',           base + '/jellyemu/retroarch/info');
+                set('raRomUrl',            base + '/jellyemu/rom/{itemId}');
             }
 
             function loadRomCount(page) {
@@ -121,6 +188,7 @@
             document.querySelector('#JellyEmuConfigPage').addEventListener('pageshow', function (e) {
                 var page = e.target;
                 loadRomCount(page);
+                loadRetroArchUrl(page);
                 loadConfig(page);
                 page.querySelector('#btnSaveConfig').addEventListener('click', function () {
                     saveConfig(page);

@@ -299,7 +299,7 @@ namespace JellyEmu
             try
             {
                 var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
-                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name;", Encoding.UTF8, "text/plain");
+                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;", Encoding.UTF8, "text/plain");
                 var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
@@ -332,6 +332,18 @@ namespace JellyEmu
                         if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
                             foreach (var genre in genresArray.EnumerateArray())
                                 if (genre.TryGetProperty("name", out var genreName)) item.AddGenre(genreName.GetString());
+
+                        if (root.TryGetProperty("involved_companies", out var companies) && companies.ValueKind == JsonValueKind.Array)
+                            foreach (var entry in companies.EnumerateArray())
+                            {
+                                var isDev = entry.TryGetProperty("developer", out var devProp) && devProp.GetBoolean();
+                                var isPub = entry.TryGetProperty("publisher", out var pubProp) && pubProp.GetBoolean();
+                                if ((isDev || isPub) && entry.TryGetProperty("company", out var co) && co.TryGetProperty("name", out var coName))
+                                {
+                                    var name = coName.GetString();
+                                    if (!string.IsNullOrWhiteSpace(name)) item.AddStudio(name);
+                                }
+                            }
 
                         item.SetProviderId("IGDB", gameId);
                         result.HasMetadata = true;
@@ -482,6 +494,16 @@ namespace JellyEmu
                     if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
                         foreach (var genre in genresArray.EnumerateArray())
                             if (genre.TryGetProperty("name", out var genreName)) item.AddGenre(genreName.GetString());
+
+                    if (root.TryGetProperty("developers", out var devsArray) && devsArray.ValueKind == JsonValueKind.Array)
+                        foreach (var dev in devsArray.EnumerateArray())
+                            if (dev.TryGetProperty("name", out var devName) && !string.IsNullOrWhiteSpace(devName.GetString()))
+                                item.AddStudio(devName.GetString());
+
+                    if (root.TryGetProperty("publishers", out var pubsArray) && pubsArray.ValueKind == JsonValueKind.Array)
+                        foreach (var pub in pubsArray.EnumerateArray())
+                            if (pub.TryGetProperty("name", out var pubName) && !string.IsNullOrWhiteSpace(pubName.GetString()))
+                                item.AddStudio(pubName.GetString());
 
                     item.SetProviderId("RAWG", gameId);
                     result.HasMetadata = true;

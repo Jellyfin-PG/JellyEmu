@@ -88,7 +88,7 @@ namespace JellyEmu.Services
                   }
                   .card:hover .jellyemu-card-play:hover {
                       transform: translate(-50%, -50%) scale(1.15);
-                      color: #00a4dc;
+                      color: #00a4dc !important;
                   }
                   .jellyemu-game-page button[data-action="resume"],
                   .jellyemu-game-page button[data-action="play"],
@@ -193,7 +193,6 @@ namespace JellyEmu.Services
                         const systemTags = cachedTags.filter(t => t !== 'Game' && !knownRegions.has(t));
                         const regionTags = cachedTags.filter(t => knownRegions.has(t));
                         const allTags    = [...systemTags, ...regionTags];
-                        if (allTags.length === 0) return;
 
                         allTags.forEach(tag => {
                             const div = document.createElement('div');
@@ -261,6 +260,11 @@ namespace JellyEmu.Services
                     }
 
                     function tick() {
+                        if (window.location.hash.startsWith(JELLYEMU_PREFS_HASH)) {
+                            hijackJellyEmuPrefsPage();
+                            return;
+                        }
+
                         const detailPage = getVisibleDetailPage();
 
                         if (!detailPage) {
@@ -301,6 +305,13 @@ namespace JellyEmu.Services
                                         : node.querySelector?.('.actionSheetContent');
                                     if (actionSheetContent) {
                                         patchActionSheet(actionSheetContent);
+                                    }
+
+                                    const prefsMenuPage = node.id === 'myPreferencesMenuPage'
+                                        ? node
+                                        : node.querySelector?.('#myPreferencesMenuPage');
+                                    if (prefsMenuPage) {
+                                        injectPrefsMenuEntry(prefsMenuPage);
                                     }
 
                                     const selectEl = node.id === 'selectCollectionType' ? node : (node.querySelector ? node.querySelector('#selectCollectionType') : null);
@@ -390,6 +401,223 @@ namespace JellyEmu.Services
                     });
 
                     observer.observe(document.body, { childList: true, subtree: true });
+
+                    const JELLYEMU_PREFS_HASH = '#/jellyemu-userprefs';
+
+                    function injectPrefsMenuEntry(page) {
+                        if (page.querySelector('.jellyemu-prefs-entry')) return;
+
+                        const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
+                        const href = JELLYEMU_PREFS_HASH + (userId ? '?userId=' + userId : '');
+
+                        const anchor = document.createElement('a');
+                        anchor.className = 'emby-button jellyemu-prefs-entry listItem-border';
+                        anchor.href = href;
+                        anchor.style.cssText = 'display:block; margin:0; padding:0;';
+                        anchor.innerHTML = `
+                            <div class="listItem">
+                                <span class="material-icons listItemIcon listItemIcon-transparent sports_esports" aria-hidden="true"></span>
+                                <div class="listItemBody">
+                                    <div class="listItemBodyText">JellyEmu</div>
+                                </div>
+                            </div>`;
+
+                        anchor.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            window.location.hash = JELLYEMU_PREFS_HASH + (userId ? '?userId=' + userId : '');
+                        });
+
+                        const targetSection = page.querySelector('.verticalSection.verticalSection-extrabottompadding');
+                        if (targetSection) {
+                            targetSection.appendChild(anchor);
+                        } else {
+                            const readOnly = page.querySelector('.readOnlyContent');
+                            if (readOnly) readOnly.appendChild(anchor);
+                        }
+                    }
+
+                    function hijackJellyEmuPrefsPage() {
+                        const activePage = document.querySelector('.page:not(.hide)');
+                        if (!activePage) return;
+
+                        if (activePage.hasAttribute('data-jellyemu-hijacked')) {
+                            const headerTitle = document.querySelector('.skinHeader .pageTitle');
+                            if (headerTitle && headerTitle.textContent !== 'JellyEmu Settings') {
+                                headerTitle.textContent = 'JellyEmu Settings';
+                            }
+                            return;
+                        }
+
+                        activePage.setAttribute('data-jellyemu-hijacked', '1');
+
+                        activePage.className = 'page libraryPage userPreferencesPage noSecondaryNavPage mainAnimatedPage';
+                        activePage.setAttribute('data-title', 'JellyEmu Settings');
+                        activePage.setAttribute('data-backbutton', 'true');
+                        
+                        document.title = 'JellyEmu Settings';
+                        const headerTitle = document.querySelector('.skinHeader .pageTitle');
+                        if (headerTitle) headerTitle.textContent = 'JellyEmu Settings';
+
+                        const PREFS_KEY = 'jellyemu-userprefs';
+                        function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { return {}; } }
+                        function savePrefs(prefs) { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+                        const prefs = loadPrefs();
+
+                        activePage.innerHTML = `
+                            <div class="settingsContainer padded-left padded-right padded-bottom-page">
+                                <form style="margin:0 auto;">
+                                    <div class="verticalSection">
+                                        <h2 class="sectionTitle">Emulator</h2>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-shader">Display Shader</label>
+                                            <select id="jellyemu-pref-shader" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="">None</option>
+                                                <option value="crt-easymode">CRT Easy Mode</option>
+                                                <option value="crt-royale">CRT Royale</option>
+                                                <option value="lcd-grid">LCD Grid</option>
+                                                <option value="scanlines">Scanlines</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-scale">Display Scale</label>
+                                            <select id="jellyemu-pref-scale" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="fit">Fit to screen</option>
+                                                <option value="native">Native resolution</option>
+                                                <option value="2x">2×</option>
+                                                <option value="3x">3×</option>
+                                                <option value="4x">4×</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-mute">Mute on launch</label>
+                                            <select id="jellyemu-pref-mute" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="false">No</option>
+                                                <option value="true">Yes</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="verticalSection">
+                                        <h2 class="sectionTitle">Controls</h2>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-controller">Preferred controller</label>
+                                            <select id="jellyemu-pref-controller" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="auto">Auto-detect</option>
+                                                <option value="keyboard">Keyboard</option>
+                                                <option value="gamepad0">Gamepad 1</option>
+                                                <option value="gamepad1">Gamepad 2</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-haptics">Haptic feedback (mobile)</label>
+                                            <select id="jellyemu-pref-haptics" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="true">On</option>
+                                                <option value="false">Off</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="verticalSection">
+                                        <h2 class="sectionTitle">Save States</h2>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-slot">Active save slot</label>
+                                            <select id="jellyemu-pref-slot" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="1">Slot 1</option>
+                                                <option value="2">Slot 2</option>
+                                                <option value="3">Slot 3</option>
+                                                <option value="4">Slot 4</option>
+                                                <option value="5">Slot 5</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-autosave">Auto-save on exit</label>
+                                            <select id="jellyemu-pref-autosave" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="true">On</option>
+                                                <option value="false">Off</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                    </div>
+
+                                    <button id="jellyemu-prefs-save" is="emby-button" type="submit" class="raised button-submit block emby-button">
+                                        <span>Save Settings</span>
+                                    </button>
+                                    <p id="jellyemu-prefs-status" style="margin-top:1em; text-align:center; display:none;"></p>
+                                </form>
+                            </div>`;
+
+                        const sel = (id) => activePage.querySelector('#' + id);
+
+                        sel('jellyemu-pref-shader').value      = prefs.shader      || '';
+                        sel('jellyemu-pref-scale').value       = prefs.scale       || 'fit';
+                        sel('jellyemu-pref-mute').value        = prefs.mute        || 'false';
+                        sel('jellyemu-pref-controller').value  = prefs.controller  || 'auto';
+                        sel('jellyemu-pref-haptics').value     = prefs.haptics     || 'true';
+                        sel('jellyemu-pref-autosave').value    = prefs.autosave    || 'true';
+
+                        const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                        if (userId) {
+                            fetch('/jellyemu/slot/' + userId)
+                                .then(r => r.ok ? r.json() : null)
+                                .then(data => { if (data) sel('jellyemu-pref-slot').value = String(data.slot); })
+                                .catch(() => {});
+                        }
+
+                        activePage.querySelector('form').addEventListener('submit', function(e) {
+                            e.preventDefault();
+                        });
+
+                        sel('jellyemu-prefs-save').addEventListener('click', function() {
+                            savePrefs({
+                                shader:     sel('jellyemu-pref-shader').value,
+                                scale:      sel('jellyemu-pref-scale').value,
+                                mute:       sel('jellyemu-pref-mute').value,
+                                controller: sel('jellyemu-pref-controller').value,
+                                haptics:    sel('jellyemu-pref-haptics').value,
+                                autosave:   sel('jellyemu-pref-autosave').value,
+                            });
+
+                            const slotVal = parseInt(sel('jellyemu-pref-slot').value, 10) || 1;
+                            const slotUserId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                            const slotSave = slotUserId
+                                ? fetch('/jellyemu/slot/' + slotUserId + '?slot=' + slotVal, { method: 'POST' })
+                                : Promise.resolve();
+
+                            slotSave.then(() => {
+                                const status = sel('jellyemu-prefs-status');
+                                status.textContent = 'Settings saved.';
+                                status.style.color = '#52B54B';
+                                status.style.display = 'block';
+                                setTimeout(() => status.style.display = 'none', 3000);
+                            }).catch(() => {
+                                const status = sel('jellyemu-prefs-status');
+                                status.textContent = 'Failed to save slot setting.';
+                                status.style.color = '#FF4444';
+                                status.style.display = 'block';
+                                setTimeout(() => status.style.display = 'none', 3000);
+                            });
+                        });
+                    }
+
+                    function checkPrefsRoute() {
+                        const hash = window.location.hash;
+                        const prefsPage = document.getElementById('jellyemu-prefs-page');
+
+                        if (hash.startsWith(JELLYEMU_PREFS_HASH)) {
+                            renderJellyEmuPrefsPage();
+                        } else if (prefsPage) {
+                            prefsPage.style.display = 'none';
+                        }
+                    }
+
+                    window.addEventListener('hashchange', checkPrefsRoute);
+                    checkPrefsRoute();
 
                     tick();
                 })();
