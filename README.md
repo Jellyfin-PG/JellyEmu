@@ -139,3 +139,66 @@ https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifes
 ### Step 4 — Restart Jellyfin
 
 Restart your Jellyfin server. Both plugins must be active at the same time — File Transformation handles the page injection, JellyEmu manages your roms.
+
+---
+
+## ROM Naming & Folder Structure Guide
+
+JellyEmu uses a smart detection system to figure out which console a ROM belongs to and exactly which game it is. You have a lot of flexibility in how you organize your library.
+
+### How Platform Detection Works
+The plugin determines a ROM's platform using a strict 3-step priority list. If step 1 fails, it moves to step 2, and so on.
+
+1. **Inline Tokens:** The system looks for a platform name wrapped in brackets `[]` or parentheses `()` anywhere in the filename.
+2. **Folder Names:** The system checks the parent and grandparent folder names of the ROM file.
+3. **File Extensions:** The system checks the file extension. This only works for **unambiguous** extensions (like `.nes` or `.z64`).
+
+> **Note on Ambiguous Formats:** Formats shared across multiple consoles (like `.iso`, `.chd`, `.cue`, and `.pbp`) are considered ambiguous. For these files, you **must** use an inline token or place them in a properly named folder, otherwise the platform will be marked as "Unknown".
+
+---
+
+### Method 1: Organizing by Folder (Recommended)
+The easiest way to organize a large library is to place your ROMs inside folders named after the console. JellyEmu checks up to two directories up, so subfolders for game series are perfectly fine.
+
+The folder name can be the official name or a common abbreviation (e.g., `SNES`, `Super Nintendo`, and `Super Famicom` will all map to **SNES**).
+
+**Examples:**
+```text
+/ROMs/
+ ├── /SNES/
+ │    └── Super Mario World.sfc          (Platform: SNES)
+ ├── /PlayStation/
+ │    ├── /Final Fantasy VII/
+ │    │    └── Disc 1.chd                (Platform: PlayStation)
+ └── /Sega Genesis/
+      └── Sonic The Hedgehog.md          (Platform: Sega Genesis)
+```
+
+### Method 2: Inline Naming Tokens
+If you prefer to dump all your ROMs into a single flat directory, you can explicitly define the platform by adding the console name in brackets `[]` or parentheses `()` in the filename.
+
+JellyEmu will automatically hide these platform tags in the user interface so your game titles remain clean.
+
+**Examples:**
+* `Sonic CD [Sega CD].chd` ➔ UI Display: **Sonic CD**
+* `Crash Bandicoot (PS1).chd` ➔ UI Display: **Crash Bandicoot**
+* `Super Mario 64 [Nintendo 64].z64` ➔ UI Display: **Super Mario 64**
+
+*Region and revision flags (like `(USA)` or `[!]`) are intentionally ignored by the platform detector and will remain part of the display name.*
+
+---
+
+### Forcing Specific Metadata (IGDB & RAWG)
+Sometimes, game titles are ambiguous, or a metadata provider grabs the wrong version of a game (like an HD remake instead of the retro original). 
+
+You can force JellyEmu to link the ROM to a specific database entry by adding a provider ID directly into the filename. The plugin will use this exact ID to fetch artwork and descriptions, and will automatically hide the token from the UI.
+
+* **For IGDB:** Use `[igdb-ID]` 
+* **For RAWG:** Use `[rawg-SLUG]`
+
+**Examples:**
+* `Doom [igdb-1039].iso` ➔ Forces the IGDB entry for the 1993 original, rather than the 2016 reboot.
+* `Aladdin (Sega) [rawg-disneys-aladdin-1993].md` ➔ Forces the exact RAWG entry.
+
+You can combine provider IDs and platform tokens safely. For example:
+`Sonic Adventure [igdb-3273][Sega CD].chd` will properly match the IGDB database entry, assign it to the Sega CD platform, and display cleanly as simply **Sonic Adventure**.
