@@ -12,65 +12,17 @@ namespace JellyEmu
 
     internal static class RomExtensions
     {
-        private static readonly Dictionary<string, string> _extensionMappings = new(StringComparer.OrdinalIgnoreCase)
-        {
-            // NES - fceumm/nestopia
-            { ".nes", "NES" }, { ".fds", "NES" }, { ".unf", "NES" }, { ".unif", "NES" },
-            // SNES - snes9x/bsnes
-            { ".smc", "SNES" }, { ".sfc", "SNES" }, { ".swc", "SNES" }, { ".fig", "SNES" },
-            // N64 - mupen64plus_next/parallel-n64
-            { ".z64", "N64" }, { ".n64", "N64" }, { ".v64", "N64" },
-            // Game Boy / Game Boy Color - both use gambatte
-            { ".gb", "Game Boy" }, { ".gbc", "Game Boy" },
-            // Game Boy Advance - mgba
-            { ".gba", "Game Boy Advance" },
-            // Nintendo DS - melonds/desmume
-            { ".nds", "Nintendo DS" },
-            // Virtual Boy - beetle_vb
-            { ".vb", "Virtual Boy" },
-            // Sega - genesis_plus_gx
-            { ".sms", "Master System" },
-            { ".gg", "Game Gear" },
-            { ".md", "Sega Genesis" }, { ".smd", "Sega Genesis" }, { ".gen", "Sega Genesis" },
-            { ".68k", "Sega Genesis" }, { ".sgd", "Sega Genesis" },
-            // Sega 32X - picodrive
-            { ".32x", "Sega 32X" },
-            // PlayStation - pcsx_rearmed
-            { ".pbp", "PlayStation" }, { ".cue", "PlayStation" }, { ".chd", "PlayStation" }, { ".iso", "PlayStation" },
-            // Atari - stella2014/prosystem/handy/virtualjaguar
-            { ".a26", "Atari 2600" },
-            { ".a78", "Atari 7800" },
-            { ".lnx", "Atari Lynx" },
-            { ".jag", "Atari Jaguar" }, { ".j64", "Atari Jaguar" },
-            // WonderSwan - mednafen_wswan
-            { ".ws", "WonderSwan" }, { ".wsc", "WonderSwan" },
-            // TurboGrafx-16 - mednafen_pce
-            { ".pce", "TurboGrafx-16" },
-            // ColecoVision - gearcoleco
-            { ".col", "ColecoVision" }, { ".cv", "ColecoVision" },
-            // NeoGeo Pocket - mednafen_ngp
-            { ".ngp", "NeoGeo Pocket" }, { ".ngc", "NeoGeo Pocket" },
-        };
-
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
             var ext = Path.GetExtension(path);
-            return !string.IsNullOrEmpty(ext) && _extensionMappings.ContainsKey(ext);
-        }
-
-        public static string GetConsoleTag(string? path)
-        {
-            if (string.IsNullOrEmpty(path)) return "Unknown";
-            var ext = Path.GetExtension(path);
-            if (!string.IsNullOrEmpty(ext) && _extensionMappings.TryGetValue(ext, out var tag)) return tag;
-            return ext?.TrimStart('.') ?? "Unknown";
+            return !string.IsNullOrEmpty(ext) && PlatformResolver.AllRomExtensions.Contains(ext);
         }
 
         public static string CleanName(string name)
         {
-            var cleaned = Regex.Replace(name ?? string.Empty, @"(\(.*?\)|\[.*?\])", "").Trim();
-            cleaned = Regex.Replace(cleaned.Replace("_", " ").Replace("-", " "), @"\s+", " ").Trim();
+            var stripped = PlatformResolver.CleanDisplayName(name ?? string.Empty);
+            var cleaned = Regex.Replace(stripped.Replace("_", " ").Replace("-", " "), @"\s+", " ").Trim();
             return cleaned;
         }
     }
@@ -78,10 +30,12 @@ namespace JellyEmu
     public class RomLocalProvider : ILocalMetadataProvider<Book>, IRemoteImageProvider
     {
         private readonly ILogger<RomLocalProvider> _logger;
+        private readonly PlatformResolver _platformResolver;
 
-        public RomLocalProvider(ILogger<RomLocalProvider> logger)
+        public RomLocalProvider(ILogger<RomLocalProvider> logger, PlatformResolver platformResolver)
         {
             _logger = logger;
+            _platformResolver = platformResolver;
         }
 
         public string Name => "Retro Games Local Assets";
@@ -103,7 +57,7 @@ namespace JellyEmu
                     {
                         Overview = "Parsed successfully from local .nfo file!",
                         PremiereDate = new DateTime(1990, 1, 1),
-                        Tags = new[] { "Game", RomExtensions.GetConsoleTag(info.Path) }
+                        Tags = new[] { "Game", _platformResolver.Resolve(info.Path) }
                     };
                 }
             }
@@ -289,7 +243,16 @@ namespace JellyEmu
         public string Name => "IGDB Video Game Database";
         public int Order => 1;
 
-        public IgdbMetadataProvider(IHttpClientFactory httpClientFactory, ILogger<IgdbMetadataProvider> logger) : base(httpClientFactory, logger) { }
+        private readonly PlatformResolver _platformResolver;
+
+        public IgdbMetadataProvider(
+            IHttpClientFactory httpClientFactory,
+            ILogger<IgdbMetadataProvider> logger,
+            PlatformResolver platformResolver)
+            : base(httpClientFactory, logger)
+        {
+            _platformResolver = platformResolver;
+        }
 
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
@@ -345,11 +308,14 @@ namespace JellyEmu
                     if (document.RootElement.GetArrayLength() > 0)
                     {
                         var root = document.RootElement[0];
+
+                        var consoleTag = _platformResolver.Resolve(info.Path);
+
                         var item = new Book
                         {
                             Name = root.GetProperty("name").GetString() ?? string.Empty,
                             Overview = root.TryGetProperty("summary", out var desc) ? (desc.GetString() ?? string.Empty) : string.Empty,
-                            Tags = new[] { "Game", RomExtensions.GetConsoleTag(info.Path) }
+                            Tags = new[] { "Game", consoleTag }
                         };
 
                         if (root.TryGetProperty("first_release_date", out var releaseUnix))
@@ -438,7 +404,16 @@ namespace JellyEmu
         public string Name => "RAWG Video Game Database";
         public int Order => 2;
 
-        public RawgMetadataProvider(IHttpClientFactory httpClientFactory, ILogger<RawgMetadataProvider> logger) : base(httpClientFactory, logger) { }
+        private readonly PlatformResolver _platformResolver;
+
+        public RawgMetadataProvider(
+            IHttpClientFactory httpClientFactory,
+            ILogger<RawgMetadataProvider> logger,
+            PlatformResolver platformResolver)
+            : base(httpClientFactory, logger)
+        {
+            _platformResolver = platformResolver;
+        }
 
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
@@ -486,11 +461,14 @@ namespace JellyEmu
                 {
                     using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     var root = document.RootElement;
+
+                    var consoleTag = _platformResolver.Resolve(info.Path);
+
                     var item = new Book
                     {
                         Name = root.GetProperty("name").GetString() ?? string.Empty,
                         Overview = root.TryGetProperty("description_raw", out var desc) ? (desc.GetString() ?? string.Empty) : string.Empty,
-                        Tags = new[] { "Game", RomExtensions.GetConsoleTag(info.Path) }
+                        Tags = new[] { "Game", consoleTag }
                     };
 
                     if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
@@ -505,6 +483,7 @@ namespace JellyEmu
             catch { }
             return result;
         }
+
     }
 
     public class RawgImageProvider : BaseRawgProvider, IRemoteImageProvider, IHasOrder
