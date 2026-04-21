@@ -157,6 +157,32 @@ The plugin determines a ROM's platform using a strict 3-step priority list. If s
 
 ---
 
+| Target Platform | Accepted Folder Names & Inline Tokens |
+| :--- | :--- |
+| **Nintendo Entertainment System (NES)** | `nes`, `famicom`, `nintendo entertainment system` |
+| **Super Nintendo (SNES)** | `snes`, `super nintendo`, `super famicom`, `super nintendo entertainment system` |
+| **Nintendo 64** | `n64`, `nintendo 64` |
+| **Game Boy / Color** | `gb`, `game boy`, `gameboy`, `gbc`, `game boy color`, `gameboy color` |
+| **Game Boy Advance** | `gba`, `game boy advance`, `gameboy advance` |
+| **Nintendo DS** | `nds`, `nintendo ds`, `ds` |
+| **Virtual Boy** | `vb`, `virtual boy` |
+| **Sega Master System** | `sms`, `master system`, `sega master system` |
+| **Sega Genesis / Mega Drive** | `genesis`, `sega genesis`, `mega drive`, `sega mega drive`, `md` |
+| **Sega Game Gear** | `gg`, `game gear`, `sega game gear` |
+| **Sega CD** | `sega cd`, `segacd`, `mega cd`, `sega-cd` |
+| **Sega 32X** | `32x`, `sega 32x` |
+| **PlayStation 1** | `psx`, `ps1`, `playstation`, `playstation 1`, `ps one` |
+| **Atari 2600** | `atari 2600`, `2600` |
+| **Atari 7800** | `atari 7800`, `7800` |
+| **Atari Lynx** | `lynx`, `atari lynx` |
+| **Atari Jaguar** | `jaguar`, `atari jaguar` |
+| **WonderSwan** | `ws`, `wonderswan`, `wonder swan` |
+| **TurboGrafx-16 / PC Engine** | `pce`, `turbografx`, `turbografx-16`, `turbografx 16`, `pc engine` |
+| **ColecoVision** | `coleco`, `colecovision` |
+| **NeoGeo Pocket / Color** | `ngp`, `neogeo pocket`, `neo geo pocket`, `ngpc` |
+
+---
+
 ### Method 1: Organizing by Folder (Recommended)
 The easiest way to organize a large library is to place your ROMs inside folders named after the console. JellyEmu checks up to two directories up, so subfolders for game series are perfectly fine.
 
