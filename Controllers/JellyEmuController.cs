@@ -79,13 +79,15 @@ namespace JellyEmu.Controllers
             }
 
             var core = ResolveCore(item);
-            var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var romUrl = $"{baseUrl}/jellyemu/rom/{itemId}";
+            // Use relative URLs so the browser resolves them against the page's origin/scheme.
+            // Request.Scheme is unreliable behind reverse proxies that terminate TLS (would yield http://
+            // while the client loaded the page over https://, triggering Mixed Content blocks).
+            var romUrl = $"/jellyemu/rom/{itemId}";
 
             // Save state URLs — only wired up if a userId was provided
             var hasSaves = !string.IsNullOrEmpty(userId);
-            var saveGetUrl = hasSaves ? $"{baseUrl}/jellyemu/save/{itemId}/{userId}" : "";
-            var savePostUrl = hasSaves ? $"{baseUrl}/jellyemu/save/{itemId}/{userId}" : "";
+            var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
+            var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
             // Check if a save already exists for this user+item to auto-load it
             var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId));
