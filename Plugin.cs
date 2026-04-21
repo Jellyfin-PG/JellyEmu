@@ -59,5 +59,7 @@ namespace JellyEmu
         /// RAWG API Key. Get yours at https://rawg.io/apidocs
         /// </summary>
         public string RawgApiKey { get; set; } = string.Empty;
+
+
     }
 }

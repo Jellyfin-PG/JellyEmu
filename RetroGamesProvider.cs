@@ -310,12 +310,16 @@ namespace JellyEmu
                         var root = document.RootElement[0];
 
                         var consoleTag = _platformResolver.Resolve(info.Path);
+                        var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+
+                        var tags = new List<string> { "Game", consoleTag };
+                        if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                         var item = new Book
                         {
                             Name = root.GetProperty("name").GetString() ?? string.Empty,
                             Overview = root.TryGetProperty("summary", out var desc) ? (desc.GetString() ?? string.Empty) : string.Empty,
-                            Tags = new[] { "Game", consoleTag }
+                            Tags = tags.ToArray()
                         };
 
                         if (root.TryGetProperty("first_release_date", out var releaseUnix))
@@ -463,12 +467,16 @@ namespace JellyEmu
                     var root = document.RootElement;
 
                     var consoleTag = _platformResolver.Resolve(info.Path);
+                    var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+
+                    var tags = new List<string> { "Game", consoleTag };
+                    if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                     var item = new Book
                     {
                         Name = root.GetProperty("name").GetString() ?? string.Empty,
                         Overview = root.TryGetProperty("description_raw", out var desc) ? (desc.GetString() ?? string.Empty) : string.Empty,
-                        Tags = new[] { "Game", consoleTag }
+                        Tags = tags.ToArray()
                     };
 
                     if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
@@ -657,12 +665,16 @@ namespace JellyEmu
                         pages.TryGetProperty(pageId, out var page))
                     {
                         var consoleTag = _platformResolver.Resolve(info.Path);
+                        var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+
+                        var tags = new List<string> { "Game", consoleTag };
+                        if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                         var item = new Book
                         {
                             Name = page.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty,
                             Overview = page.TryGetProperty("extract", out var ext) ? ext.GetString() ?? string.Empty : string.Empty,
-                            Tags = new[] { "Game", consoleTag }
+                            Tags = tags.ToArray()
                         };
 
                         item.SetProviderId("Wikipedia", pageId);
@@ -721,4 +733,5 @@ namespace JellyEmu
             return list;
         }
     }
+
 }
