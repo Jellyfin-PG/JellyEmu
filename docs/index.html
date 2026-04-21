@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JellyEmu - Play Your ROMs in Jellyfin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --game-bg: #1a1a2e;
+            --platform-color: #4e4e6e;
+            --accent-color: #00a4dc;
+            --text-main: #ffffff;
+        }
+
+        body {
+            background-color: var(--game-bg);
+            color: var(--text-main);
+            font-family: 'VT323', monospace;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 40px 40px;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            body {
+                padding: 2rem;
+            }
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        .game-card {
+            background: #16213e;
+            border: 4px solid var(--platform-color);
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+        }
+
+        .btn-retro {
+            background: var(--accent-color);
+            border-bottom: 6px solid #00779d;
+            transition: all 0.1s;
+            text-transform: uppercase;
+        }
+
+        .btn-retro:active {
+            border-bottom-width: 0px;
+            transform: translateY(6px);
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .platform {
+            height: 20px;
+            background: repeating-linear-gradient(
+                90deg,
+                #4e4e6e,
+                #4e4e6e 20px,
+                #3a3a52 20px,
+                #3a3a52 40px
+            );
+            position: relative;
+        }
+
+        .platform::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .sprite-container {
+            position: relative;
+            height: 200px;
+        }
+
+        .scanline {
+            width: 100vw;
+            height: 100vh;
+            z-index: 999;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="scanline"></div>
+
+    <header class="max-w-4xl mx-auto text-center mt-10">
+        <div class="sprite-container flex flex-col items-center justify-center">
+            <img src="https://cdn.jsdelivr.net/gh/Jellyfin-PG/JellyEmu@main/assets/jellyemu.png" 
+                 alt="JellyEmu Logo" 
+                 class="w-48 h-48 floating object-contain"
+                 onerror="this.src='https://via.placeholder.com/200?text=JellyEmu'">
+            <h1 class="pixel-font text-3xl md:text-5xl mt-6 tracking-tighter text-blue-400">JellyEmu</h1>
+        </div>
+        <p class="text-2xl mt-8 text-gray-300">The Ultimate Emulator Library for Jellyfin</p>
+        
+        <div class="mt-8 flex flex-wrap justify-center gap-4">
+            <a href="https://github.com/Jellyfin-PG/JellyEmu" target="_blank" class="btn-retro px-8 py-4 text-xl pixel-font inline-block">
+                View GitHub
+            </a>
+        </div>
+    </header>
+
+    <div class="platform max-w-4xl mx-auto mt-12 mb-16"></div>
+
+    <main class="max-w-4xl mx-auto grid grid-cols-1 gap-12">
+        
+        <section class="game-card p-6 md:p-10">
+            <h2 class="pixel-font text-2xl mb-8 border-b-4 border-gray-700 pb-4">Installation README</h2>
+            
+            <div class="space-y-8 text-xl leading-relaxed">
+                <div>
+                    <h3 class="text-blue-400 text-2xl mb-2">Step 1: Plugin Configuration</h3>
+                    <p class="mb-4">Configure the plugin before adding your media to ensure providers are ready.</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Navigate to Dashboard > Plugins</li>
+                        <li>Open the Emulator Library configuration</li>
+                        <li>Enter your IGDB Client ID and Secret</li>
+                        <li>Enter your RAWG API Key</li>
+                        <li>Save settings</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 text-2xl mb-2">Step 2: Library Creation</h3>
+                    <p class="mb-4">Create a specific library for your ROM collection.</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Navigate to Dashboard > Libraries</li>
+                        <li>Select "Books" as the Content Type (Required)</li>
+                        <li>Add your ROM folder path</li>
+                        <li>Enable IGDB and RAWG under Metadata Downloaders</li>
+                    </ul>
+                </div>
+
+                <div class="bg-blue-900/30 border-l-4 border-blue-400 p-4 italic">
+                    Note: Using the "Books" content type allows JellyEmu to properly inject game metadata into the Jellyfin database structure.
+                </div>
+            </div>
+        </section>
+
+        <section class="game-card p-6 md:p-10">
+            <h2 class="pixel-font text-2xl mb-8 border-b-4 border-gray-700 pb-4">Compatible Platforms</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-lg">
+                <div class="p-2 border border-gray-700 bg-black/20">Nintendo (NES)</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Super Nintendo</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Game Boy / GBC</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Game Boy Advance</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Nintendo DS</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Nintendo 64</div>
+                <div class="p-2 border border-gray-700 bg-black/20">PlayStation (PSX)</div>
+                <div class="p-2 border border-gray-700 bg-black/20">PSP</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Sega Genesis</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Sega Saturn</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Atari 2600-7800</div>
+                <div class="p-2 border border-gray-700 bg-black/20">MAME / Arcade</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Commodore 64</div>
+                <div class="p-2 border border-gray-700 bg-black/20">Amiga</div>
+                <div class="p-2 border border-gray-700 bg-black/20">DOS</div>
+            </div>
+            <p class="mt-6 text-gray-400">...and many more legacy systems.</p>
+        </section>
+
+    </main>
+
+    <footer class="max-w-4xl mx-auto mt-20 mb-10 text-center text-gray-500">
+        <div class="platform w-full mb-8"></div>
+        <p class="pixel-font text-xs">JellyEmu - Press Start to Play</p>
+        <p class="mt-2">Distributed under the GPL-3.0 License</p>
+    </footer>
+
+    <script>
+        const logo = document.querySelector('.sprite-container img');
+        logo.addEventListener('click', () => {
+            logo.style.animation = 'none';
+            logo.offsetHeight;
+            logo.style.animation = 'jump 0.5s ease-out';
+            
+            setTimeout(() => {
+                logo.style.animation = 'float 3s ease-in-out infinite';
+            }, 500);
+        });
+
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes jump {
+                0% { transform: translateY(0); }
+                50% { transform: translateY(-100px) scale(1.1); }
+                100% { transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
