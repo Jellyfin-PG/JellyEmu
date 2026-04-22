@@ -30,8 +30,6 @@ namespace JellyEmu.Services
                 <style data-jellyemu-mods="1">
                   [data-collectiontype="games"] .cardImageContainer,
                   [data-jellyemu-game="1"] .cardImageContainer {
-                      padding-bottom: 150% !important;
-                      background-size: cover;
                   }
                   #jellyemu-play-btn {
                       display: flex !important;
@@ -142,7 +140,7 @@ namespace JellyEmu.Services
                             .catch(function() { return { needsThreads: false }; })
                             .then(function(info) {
                                 if (info.needsThreads) {
-                                    // Threaded cores (DOS, PSP, Saturn) require SharedArrayBuffer
+                                    // Threaded cores (DOS, PSP) require SharedArrayBuffer
                                     // which needs cross-origin isolation — open in a new tab
                                     const gameTab = window.open(playUrl, '_blank');
                                     const jellyEmuChannel = new BroadcastChannel('jellyemu-exit');
@@ -600,9 +598,8 @@ namespace JellyEmu.Services
                         if (headerTitle) headerTitle.textContent = 'JellyEmu Settings';
 
                         const PREFS_KEY = 'jellyemu-userprefs';
-                        function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { return {}; } }
-                        function savePrefs(prefs) { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
-                        const prefs = loadPrefs();
+                        function loadLocalPrefs() { try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { return {}; } }
+                        function saveLocalPrefs(prefs) { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
 
                         activePage.innerHTML = `
                             <div class="settingsContainer padded-left padded-right padded-bottom-page">
@@ -613,11 +610,20 @@ namespace JellyEmu.Services
                                             <label class="selectLabel" for="jellyemu-pref-shader">Display Shader</label>
                                             <select id="jellyemu-pref-shader" is="emby-select" class="emby-select-withcolor emby-select">
                                                 <option value="">None</option>
+                                                <option value="2xScaleHQ.glslp">2xScaleHQ</option>
+                                                <option value="4xScaleHQ.glslp">4xScaleHQ</option>
+                                                <option value="sabr">Sabre</option>
+                                                <option value="crt-aperture.glslp">CRT Aperture</option>
+                                                <option value="crt-easymode.glslp">CRT Easy Mode</option>
+                                                <option value="crt-geom.glslp">CRT Geometry</option>
                                                 <option value="crt-mattias.glslp">CRT Mattias</option>
-                                                <option value="crt-easymode">CRT Easy Mode</option>
-                                                <option value="crt-royale">CRT Royale</option>
-                                                <option value="lcd-grid">LCD Grid</option>
-                                                <option value="scanlines">Scanlines</option>
+                                                <option value="crt-beam">CRT Beam</option>
+                                                <option value="crt-caligari">CRT Caligari</option>
+                                                <option value="crt-lottes">CRT Lottes</option>
+                                                <option value="crt-zfast">CRT ZFast</option>
+                                                <option value="crt-yeetron">CRT Yeetron</option>
+                                                <option value="bicubic">Bicubic</option>
+                                                <option value="mix-frames">Mix Frames</option>
                                             </select>
                                             <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                         </div>
@@ -706,22 +712,44 @@ namespace JellyEmu.Services
 
                         const sel = (id) => activePage.querySelector('#' + id);
 
-                        sel('jellyemu-pref-shader').value      = prefs.shader      || '';
-                        sel('jellyemu-pref-scale').value       = prefs.scale       || 'fit';
-                        sel('jellyemu-pref-mute').value        = prefs.mute        || 'false';
-                        sel('jellyemu-pref-controller').value  = prefs.controller  || 'auto';
-                        sel('jellyemu-pref-haptics').value     = prefs.haptics     || 'true';
-                        sel('jellyemu-pref-autosave').value    = prefs.autosave    || 'true';
+                        // Load instantly from localStorage cache to prevent form flicker
+                        const localPrefs = loadLocalPrefs();
+                        sel('jellyemu-pref-shader').value      = localPrefs.shader      || '';
+                        sel('jellyemu-pref-scale').value       = localPrefs.scale       || 'fit';
+                        sel('jellyemu-pref-mute').value        = localPrefs.mute        || 'false';
+                        sel('jellyemu-pref-controller').value  = localPrefs.controller  || 'auto';
+                        sel('jellyemu-pref-haptics').value     = localPrefs.haptics     || 'true';
+                        sel('jellyemu-pref-autosave').value    = localPrefs.autosave    || 'true';
+                        sel('jellyemu-pref-rotation').value    = String(localPrefs.videoRotation ?? 0);
 
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                        
                         if (userId) {
+                            // Fetch slot exclusively
                             fetch('/jellyemu/slot/' + userId)
                                 .then(r => r.ok ? r.json() : null)
                                 .then(data => {
+                                    if (data && data.slot) {
+                                        sel('jellyemu-pref-slot').value = String(data.slot);
+                                    }
+                                })
+                                .catch(() => {});
+
+                            // Fetch full preferences (which now includes shader & rotation)
+                            fetch('/jellyemu/prefs/' + userId)
+                                .then(r => r.ok ? r.json() : null)
+                                .then(data => {
                                     if (data) {
-                                        sel('jellyemu-pref-slot').value     = String(data.slot);
-                                        sel('jellyemu-pref-shader').value   = data.shader        || '';
-                                        sel('jellyemu-pref-rotation').value = String(data.videoRotation ?? 0);
+                                        if (data.shader !== undefined) sel('jellyemu-pref-shader').value = data.shader;
+                                        if (data.scale !== undefined) sel('jellyemu-pref-scale').value = data.scale;
+                                        if (data.mute !== undefined) sel('jellyemu-pref-mute').value = data.mute;
+                                        if (data.controller !== undefined) sel('jellyemu-pref-controller').value = data.controller;
+                                        if (data.haptics !== undefined) sel('jellyemu-pref-haptics').value = data.haptics;
+                                        if (data.autosave !== undefined) sel('jellyemu-pref-autosave').value = data.autosave;
+                                        if (data.videoRotation !== undefined) sel('jellyemu-pref-rotation').value = String(data.videoRotation);
+                                        
+                                        // Keep localStorage cache in sync with the server response
+                                        saveLocalPrefs(data);
                                     }
                                 })
                                 .catch(() => {});
@@ -732,36 +760,53 @@ namespace JellyEmu.Services
                         });
 
                         sel('jellyemu-prefs-save').addEventListener('click', function() {
-                            savePrefs({
-                                shader:     sel('jellyemu-pref-shader').value,
-                                scale:      sel('jellyemu-pref-scale').value,
-                                mute:       sel('jellyemu-pref-mute').value,
-                                controller: sel('jellyemu-pref-controller').value,
-                                haptics:    sel('jellyemu-pref-haptics').value,
-                                autosave:   sel('jellyemu-pref-autosave').value,
-                            });
+                            const prefsPayload = {
+                                shader:        sel('jellyemu-pref-shader').value,
+                                scale:         sel('jellyemu-pref-scale').value,
+                                mute:          sel('jellyemu-pref-mute').value,
+                                controller:    sel('jellyemu-pref-controller').value,
+                                haptics:       sel('jellyemu-pref-haptics').value,
+                                autosave:      sel('jellyemu-pref-autosave').value,
+                                videoRotation: parseInt(sel('jellyemu-pref-rotation').value, 10) || 0
+                            };
+
+                            // Always save locally so the emulator iframe has instant fallback access
+                            saveLocalPrefs(prefsPayload);
 
                             const slotVal     = parseInt(sel('jellyemu-pref-slot').value, 10) || 1;
-                            const shaderVal   = encodeURIComponent(sel('jellyemu-pref-shader').value);
-                            const rotationVal = parseInt(sel('jellyemu-pref-rotation').value, 10) || 0;
                             const slotUserId  = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
-                            const slotSave    = slotUserId
-                                ? fetch('/jellyemu/slot/' + slotUserId + '?slot=' + slotVal + '&shader=' + shaderVal + '&videoRotation=' + rotationVal, { method: 'POST' })
-                                : Promise.resolve();
 
-                            slotSave.then(() => {
+                            if (slotUserId) {
+                                // Exclusively POST slot
+                                const saveSlotReq = fetch('/jellyemu/slot/' + slotUserId + '?slot=' + slotVal, { method: 'POST' });
+                                
+                                // POST full preferences JSON
+                                const savePrefsReq = fetch('/jellyemu/prefs/' + slotUserId, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(prefsPayload)
+                                });
+
+                                Promise.all([saveSlotReq, savePrefsReq]).then(() => {
+                                    const status = sel('jellyemu-prefs-status');
+                                    status.textContent = 'Settings saved.';
+                                    status.style.color = '#52B54B';
+                                    status.style.display = 'block';
+                                    setTimeout(() => status.style.display = 'none', 3000);
+                                }).catch(() => {
+                                    const status = sel('jellyemu-prefs-status');
+                                    status.textContent = 'Failed to save settings to server.';
+                                    status.style.color = '#FF4444';
+                                    status.style.display = 'block';
+                                    setTimeout(() => status.style.display = 'none', 3000);
+                                });
+                            } else {
                                 const status = sel('jellyemu-prefs-status');
-                                status.textContent = 'Settings saved.';
+                                status.textContent = 'Settings saved locally.';
                                 status.style.color = '#52B54B';
                                 status.style.display = 'block';
                                 setTimeout(() => status.style.display = 'none', 3000);
-                            }).catch(() => {
-                                const status = sel('jellyemu-prefs-status');
-                                status.textContent = 'Failed to save slot setting.';
-                                status.style.color = '#FF4444';
-                                status.style.display = 'block';
-                                setTimeout(() => status.style.display = 'none', 3000);
-                            });
+                            }
                         });
                     }
 

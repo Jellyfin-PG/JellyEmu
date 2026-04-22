@@ -110,7 +110,12 @@ namespace JellyEmu.Controllers
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
                 return doc.RootElement.TryGetProperty(itemId, out var v) ? v.GetInt64() : 0;
             }
-            catch { return 0; }
+            catch (Exception ex)
+            {
+                // NOTE: Added logging for unexpected parse failures
+                _logger.LogWarning(ex, "[JellyEmu] Failed to parse playtime for user {UserId}, defaulting to 0", userId);
+                return 0;
+            }
         }
 
         private void AddPlaytimeSeconds(string userId, string itemId, long seconds)
@@ -127,7 +132,11 @@ namespace JellyEmu.Controllers
                     foreach (var prop in doc.RootElement.EnumerateObject())
                         dict[prop.Name] = prop.Value.GetInt64();
                 }
-                catch { /* corrupt file — start fresh */ }
+                catch (Exception ex)
+                {
+                    // NOTE: Addressed "corrupt file — start fresh" comment by logging the occurrence.
+                    _logger.LogWarning(ex, "[JellyEmu] Playtime file corrupt for user {UserId}. Starting fresh.", userId);
+                }
             }
             dict[itemId] = (dict.TryGetValue(itemId, out var current) ? current : 0) + seconds;
             System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(dict));
@@ -149,16 +158,93 @@ namespace JellyEmu.Controllers
                 var rot = root.TryGetProperty("videoRotation", out var r) ? r.GetInt32() : 0;
                 return new UserPrefs(slot, shader, rot);
             }
-            catch { return new UserPrefs(1, string.Empty, 0); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Slot prefs file corrupt for user {UserId}. Returning defaults.", userId);
+                return new UserPrefs(1, string.Empty, 0);
+            }
         }
 
         // Kept for backward-compat internal usage
+        [Obsolete("Use ReadUserPrefs(userId) instead to fetch all slot-level preference settings.")]
         private int ReadActiveSlot(string userId) => ReadUserPrefs(userId).Slot;
+
+        // ── Full user preferences (emulator + controls + save behaviour) ──────────
+        // Stored separately from the slot file so slot reads stay cheap.
+        // File: {DataPath}/jellyemu-saves/{userId}/prefs.json
+
+        private record UserFullPrefs(
+            string Scale,
+            string Mute,
+            string Controller,
+            string Haptics,
+            string Autosave,
+            string Shader,
+            int VideoRotation);
+
+        private static readonly UserFullPrefs DefaultFullPrefs =
+            new("fit", "false", "auto", "true", "true", string.Empty, 0);
+
+        private string GetPrefsFilePath(string userId)
+        {
+            var dir = Path.Combine(_appPaths.DataPath, "jellyemu-saves", userId);
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, "prefs.json");
+        }
+
+        private UserFullPrefs ReadFullPrefs(string userId)
+        {
+            var path = GetPrefsFilePath(userId);
+            if (!System.IO.File.Exists(path)) return DefaultFullPrefs;
+            try
+            {
+                var json = System.IO.File.ReadAllText(path);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var r = doc.RootElement;
+                string Str(string key, string def) =>
+                    r.TryGetProperty(key, out var v) ? (v.GetString() ?? def) : def;
+                int Int(string key, int def) =>
+                    r.TryGetProperty(key, out var v) ? v.GetInt32() : def;
+                return new UserFullPrefs(
+                    Scale: Str("scale", DefaultFullPrefs.Scale),
+                    Mute: Str("mute", DefaultFullPrefs.Mute),
+                    Controller: Str("controller", DefaultFullPrefs.Controller),
+                    Haptics: Str("haptics", DefaultFullPrefs.Haptics),
+                    Autosave: Str("autosave", DefaultFullPrefs.Autosave),
+                    Shader: Str("shader", DefaultFullPrefs.Shader),
+                    VideoRotation: Int("videoRotation", DefaultFullPrefs.VideoRotation));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Prefs file corrupt for user {UserId}. Returning defaults.", userId);
+                return DefaultFullPrefs;
+            }
+        }
+
+        private void WriteFullPrefs(string userId, UserFullPrefs prefs)
+        {
+            var path = GetPrefsFilePath(userId);
+            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new
+            {
+                scale = prefs.Scale,
+                mute = prefs.Mute,
+                controller = prefs.Controller,
+                haptics = prefs.Haptics,
+                autosave = prefs.Autosave,
+                shader = prefs.Shader,
+                videoRotation = prefs.VideoRotation,
+            }));
+        }
 
         /// <summary>
         /// Returns a standalone EmulatorJS HTML page for the given item.
-        /// Pass ?userId= so the player can wire up per-user save states.
         /// No authentication required — the ROM is fetched via /jellyemu/rom/{itemId}.
+        /// 
+        /// Path: GET /jellyemu/play/{itemId}
+        /// Parameters: 
+        ///   - itemId (string, path): The unique ID of the library item.
+        ///   - userId (string, query, optional): Allows wire up of per-user save states.
+        /// Returns Example: `200 OK` (Content-Type: text/html)
         /// </summary>
         [HttpGet("/jellyemu/play/{itemId}")]
         [Produces(MediaTypeNames.Text.Html)]
@@ -239,7 +325,7 @@ namespace JellyEmu.Controllers
             'save-state-location': 'browser'{(string.IsNullOrEmpty(activeShader) ? "" : $",\n            'shader': '{activeShader}'")}
         }};
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
-        {(core is "dos" or "psp" or "segaSaturn" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
+        {(core is "dos" or "psp" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
 
         {(!string.IsNullOrEmpty(igdbId) ? $"window.EJS_gameID = {igdbId};" : "")}
         {(hasNetplay ? $@"window.EJS_netplayServer = '{netplayServer}';
@@ -385,8 +471,12 @@ namespace JellyEmu.Controllers
 
         /// <summary>
         /// Streams the raw ROM file for the given item directly from disk.
-        /// No authentication required.
-        /// HEAD is supported so EmulatorJS can read Content-Length before downloading.
+        /// No authentication required. HEAD is supported so EmulatorJS can read Content-Length before downloading.
+        /// 
+        /// Path: GET /jellyemu/rom/{itemId} (or HEAD)
+        /// Parameters:
+        ///   - itemId (string, path): The unique ID of the ROM file item.
+        /// Returns Example: Binary File Stream (e.g., application/zip)
         /// </summary>
         [HttpGet("/jellyemu/rom/{itemId}")]
         [HttpHead("/jellyemu/rom/{itemId}")]
@@ -428,6 +518,11 @@ namespace JellyEmu.Controllers
         /// <summary>
         /// Returns the resolved core name and whether it requires threads (SharedArrayBuffer)
         /// for the given item. Used by the UI to decide iframe vs new tab launch.
+        /// 
+        /// Path: GET /jellyemu/core/{itemId}
+        /// Parameters:
+        ///   - itemId (string, path): The unique ID of the item.
+        /// Returns Example: { "core": "gba", "needsThreads": false }
         /// </summary>
         [HttpGet("/jellyemu/core/{itemId}")]
         [Produces(MediaTypeNames.Application.Json)]
@@ -440,33 +535,47 @@ namespace JellyEmu.Controllers
                 return NotFound();
 
             var core = ResolveCore(item);
-            var needsThreads = core is "dos" or "psp" or "segaSaturn";
+            var needsThreads = core is "dos" or "psp";
             return Ok(new { core, needsThreads });
         }
 
         /// <summary>
         /// Returns 200 if a save state exists for the given user/item/slot, 404 otherwise.
         /// Used by the UI save-slot pill to check save presence without downloading the state.
+        /// 
+        /// Path: HEAD /jellyemu/save/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): The game ID.
+        ///   - userId (string, path): The user ID.
+        /// Returns Example: `200 OK` (if exists) or `404 Not Found`
         /// </summary>
         [HttpHead("/jellyemu/save/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult HeadSave(string itemId, string userId)
         {
-            var slot = ReadActiveSlot(userId);
+            var userPrefs = ReadUserPrefs(userId);
+            var slot = userPrefs.Slot;
             var path = GetSavePath(userId, itemId, slot);
             return System.IO.File.Exists(path) ? Ok() : NotFound();
         }
 
         /// <summary>
         /// Downloads the save state for a given user and item.
+        /// 
+        /// Path: GET /jellyemu/save/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): The game ID.
+        ///   - userId (string, path): The user ID.
+        ///   - slot (int, query, optional): Specific slot to fetch.
+        /// Returns Example: Binary stream (application/octet-stream)
         /// </summary>
         [HttpGet("/jellyemu/save/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            var slotNum = slot.HasValue ? slot.Value : ReadActiveSlot(userId);
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
@@ -480,8 +589,15 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Uploads and stores a save state for a given user and item.
+        /// Uploads and stores a save state for a given user and item into the active slot.
         /// Accepts raw bytes in the request body.
+        /// 
+        /// Path: POST /jellyemu/save/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): The game ID.
+        ///   - userId (string, path): The user ID.
+        ///   - Request Body: Raw binary state data.
+        /// Returns Example: `200 OK`
         /// </summary>
         [HttpPost("/jellyemu/save/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -491,7 +607,7 @@ namespace JellyEmu.Controllers
             if (Request.ContentLength == 0 || Request.ContentLength == null)
                 return BadRequest("Empty save body.");
 
-            var slot = ReadActiveSlot(userId);
+            var slot = ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slot);
 
             using var fs = System.IO.File.Create(path);
@@ -503,37 +619,137 @@ namespace JellyEmu.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Retrieves the active slot for a user.
+        /// 
+        /// Path: GET /jellyemu/slot/{userId}
+        /// Parameters:
+        ///   - userId (string, path): The user ID.
+        /// Returns Example: { "userId": "user123", "slot": 1 }
+        /// </summary>
         [HttpGet("/jellyemu/slot/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetSlot(string userId)
         {
             var prefs = ReadUserPrefs(userId);
-            return Ok(new { userId, slot = prefs.Slot, shader = prefs.Shader, videoRotation = prefs.VideoRotation });
+            return Ok(new { userId, slot = prefs.Slot });
         }
 
+        /// <summary>
+        /// Updates the active slot for a user.
+        /// 
+        /// Path: POST /jellyemu/slot/{userId}
+        /// Parameters:
+        ///   - userId (string, path): The user ID.
+        ///   - slot (int, query): Must be between 1 and 99.
+        /// Returns Example: { "userId": "user123", "slot": 2 }
+        /// </summary>
         [HttpPost("/jellyemu/slot/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult SetSlot(string userId, [FromQuery] int slot, [FromQuery] string? shader, [FromQuery] int? videoRotation)
+        public IActionResult SetSlot(string userId, [FromQuery] int slot)
         {
             if (slot < 1 || slot > 99)
                 return BadRequest("Slot must be between 1 and 99.");
 
-            var rotation = videoRotation.HasValue ? Math.Clamp(videoRotation.Value, 0, 3) : ReadUserPrefs(userId).VideoRotation;
-            var shaderVal = shader ?? ReadUserPrefs(userId).Shader;
-
+            var existingPrefs = ReadUserPrefs(userId);
             var path = GetSlotFilePath(userId);
-            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new { slot, shader = shaderVal, videoRotation = rotation }));
 
-            _logger.LogInformation("[JellyEmu] User {UserId} prefs set — slot:{Slot} shader:{Shader} rotation:{Rotation}", userId, slot, shaderVal, rotation);
-            return Ok(new { userId, slot, shader = shaderVal, videoRotation = rotation });
+            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new { slot, shader = existingPrefs.Shader, videoRotation = existingPrefs.VideoRotation }));
+
+            _logger.LogInformation("[JellyEmu] User {UserId} slot set — slot:{Slot}", userId, slot);
+            return Ok(new { userId, slot });
         }
 
+        /// <summary>
+        /// Returns all stored emulator preferences for a user.
+        /// 
+        /// Path: GET /jellyemu/prefs/{userId}
+        /// Parameters:
+        ///   - userId (string, path): The user ID.
+        /// Returns Example: { "userId": "user123", "scale": "fit", "mute": "false", "controller": "auto", "haptics": "true", "autosave": "true", "shader": "", "videoRotation": 0 }
+        /// </summary>
+        [HttpGet("/jellyemu/prefs/{userId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult GetPrefs(string userId)
+        {
+            var prefs = ReadFullPrefs(userId);
+            return Ok(new
+            {
+                userId,
+                scale = prefs.Scale,
+                mute = prefs.Mute,
+                controller = prefs.Controller,
+                haptics = prefs.Haptics,
+                autosave = prefs.Autosave,
+                shader = prefs.Shader,
+                videoRotation = prefs.VideoRotation,
+            });
+        }
+
+        /// <summary>
+        /// Saves emulator preferences for a user. Omitted fields keep their current value.
+        /// 
+        /// Path: POST /jellyemu/prefs/{userId}
+        /// Parameters:
+        ///   - userId (string, path): The user ID.
+        ///   - Request Body: JSON object representing prefs fields to update.
+        /// Returns Example: (Returns the updated state format equivalent to GET /jellyemu/prefs/{userId})
+        /// </summary>
+        [HttpPost("/jellyemu/prefs/{userId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> PostPrefs(string userId)
+        {
+            UserFullPrefs current = ReadFullPrefs(userId);
+            try
+            {
+                var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                var r = doc.RootElement;
+                string Str(string key, string current) =>
+                    r.TryGetProperty(key, out var v) ? (v.GetString() ?? current) : current;
+                int Int(string key, int current) =>
+                    r.TryGetProperty(key, out var v) ? v.GetInt32() : current;
+
+                current = new UserFullPrefs(
+                    Scale: Str("scale", current.Scale),
+                    Mute: Str("mute", current.Mute),
+                    Controller: Str("controller", current.Controller),
+                    Haptics: Str("haptics", current.Haptics),
+                    Autosave: Str("autosave", current.Autosave),
+                    Shader: Str("shader", current.Shader),
+                    VideoRotation: Int("videoRotation", current.VideoRotation));
+            }
+            catch { return BadRequest("Body must be a JSON object."); }
+
+            WriteFullPrefs(userId, current);
+            _logger.LogInformation("[JellyEmu] Prefs saved for user {UserId}", userId);
+            return Ok(new
+            {
+                userId,
+                scale = current.Scale,
+                mute = current.Mute,
+                controller = current.Controller,
+                haptics = current.Haptics,
+                autosave = current.Autosave,
+                shader = current.Shader,
+                videoRotation = current.VideoRotation,
+            });
+        }
 
         /// <summary>
         /// Returns the total playtime in seconds for a given user and item.
+        /// 
+        /// Path: GET /jellyemu/playtime/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): Game ID.
+        ///   - userId (string, path): User ID.
+        /// Returns Example: { "userId": "user123", "itemId": "game456", "seconds": 3600 }
         /// </summary>
         [HttpGet("/jellyemu/playtime/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
@@ -546,7 +762,13 @@ namespace JellyEmu.Controllers
 
         /// <summary>
         /// Adds played seconds to the running total for a given user and item.
-        /// Body: plain integer (seconds elapsed this session), or JSON { "seconds": N }.
+        /// 
+        /// Path: POST /jellyemu/playtime/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): Game ID.
+        ///   - userId (string, path): User ID.
+        ///   - Request Body: Plain integer OR JSON { "seconds": N }
+        /// Returns Example: { "userId": "user123", "itemId": "game456", "added": 120, "total": 3720 }
         /// </summary>
         [HttpPost("/jellyemu/playtime/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -581,8 +803,12 @@ namespace JellyEmu.Controllers
 
         /// <summary>
         /// Returns all save states for a given user, enriched with game metadata.
-        /// Each entry includes: itemId, gameName, platform, region, slot, sizeBytes, lastModified (ISO-8601).
         /// Used by the in-Jellyfin save-state browser.
+        /// 
+        /// Path: GET /jellyemu/saves/{userId}
+        /// Parameters:
+        ///   - userId (string, path): User ID.
+        /// Returns Example: JSON Array of objects `[{ "itemId": "id1", "gameName": "Mario", ... }]`
         /// </summary>
         [HttpGet("/jellyemu/saves/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
@@ -663,9 +889,14 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Opens a Jellyfin playback session for the game, making it visible in the
-        /// Dashboard → Active Sessions panel exactly like a movie or TV playback.
-        /// Called by the player page immediately after the emulator loads.
+        /// Opens a Jellyfin playback session for the game, making it visible in Active Sessions.
+        /// 
+        /// Path: POST /jellyemu/session/start/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): Game ID.
+        ///   - userId (string, path): User ID.
+        ///   - Headers (Optional): X-JellyEmu-DeviceId, X-JellyEmu-DeviceName
+        /// Returns Example: { "started": true, "itemId": "game1", "userId": "user1" }
         /// </summary>
         [HttpPost("/jellyemu/session/start/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
@@ -686,8 +917,13 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Keeps the session alive and advances the elapsed-time ticker.
-        /// The player page calls this every 30 seconds while the game is running.
+        /// Keeps the session alive and advances the elapsed-time ticker. Called via polling.
+        /// 
+        /// Path: POST /jellyemu/session/ping/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): Game ID.
+        ///   - userId (string, path): User ID.
+        /// Returns Example: { "alive": true }
         /// </summary>
         [HttpPost("/jellyemu/session/ping/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -700,7 +936,12 @@ namespace JellyEmu.Controllers
 
         /// <summary>
         /// Closes the Jellyfin playback session for the game.
-        /// Called from EJS_onExit alongside the playtime flush and auto-save.
+        /// 
+        /// Path: POST /jellyemu/session/stop/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): Game ID.
+        ///   - userId (string, path): User ID.
+        /// Returns Example: { "stopped": true }
         /// </summary>
         [HttpPost("/jellyemu/session/stop/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -711,12 +952,11 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// <summary>
-        /// Serves a Cross-Origin Isolation service worker that adds COOP/COEP headers
-        /// to every response, making SharedArrayBuffer available for threaded cores
-        /// (DOS, PSP, Saturn) without requiring Jellyfin itself to send those headers.
-        /// Must be served from the root scope (/jellyemu/coi-sw.js) with
-        /// Service-Worker-Allowed: / so the SW can control the whole origin.
+        /// Serves a Cross-Origin Isolation service worker that adds COOP/COEP headers.
+        /// Required for threaded cores (DOS, PSP).
+        /// 
+        /// Path: GET /jellyemu/coi-sw.js
+        /// Returns Example: Raw JavaScript document.
         /// </summary>
         [HttpGet("/jellyemu/coi-sw.js")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -761,9 +1001,12 @@ self.addEventListener('fetch', function(e) {
         }
 
         /// <summary>
-        /// If the local cache is not ready yet (still downloading or failed),
-        /// proxies the request transparently to the CDN so the player always works.
-        /// Route: GET /jellyemu/ejs/{*path}  e.g. /jellyemu/ejs/loader.js
+        /// Proxies the EJS assets. Uses local cache if available, otherwise proxies to CDN.
+        /// 
+        /// Path: GET /jellyemu/ejs/{*path}
+        /// Parameters:
+        ///   - path (string, wildcard): Path to resource (e.g. loader.js).
+        /// Returns Example: File stream mapping to mimetype of asset.
         /// </summary>
         [HttpGet("/jellyemu/ejs/{*path}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
