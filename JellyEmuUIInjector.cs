@@ -30,8 +30,6 @@ namespace JellyEmu.Services
                 <style data-jellyemu-mods="1">
                   [data-collectiontype="games"] .cardImageContainer,
                   [data-jellyemu-game="1"] .cardImageContainer {
-                      padding-bottom: 150% !important;
-                      background-size: cover;
                   }
                   #jellyemu-play-btn {
                       display: flex !important;
