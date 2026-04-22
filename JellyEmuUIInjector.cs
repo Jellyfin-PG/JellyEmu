@@ -28,7 +28,8 @@ namespace JellyEmu.Services
 
                 var injection = """
                 <style data-jellyemu-mods="1">
-                  [data-collectiontype="games"] .cardImageContainer {
+                  [data-collectiontype="games"] .cardImageContainer,
+                  [data-jellyemu-game="1"] .cardImageContainer {
                       padding-bottom: 150% !important;
                       background-size: cover;
                   }
@@ -113,10 +114,16 @@ namespace JellyEmu.Services
                         "gb","gbc","gba","nds","vb",
                         "sms","gg",
                         "md","smd","gen","68k","32x",
-                        "pbp","cue","iso","chd",
+                        "pbp","cue","iso","chd","gdi","cdi","mdf",
+                        "cso",
                         "a26","a78","lnx","jag","j64",
                         "ws","wsc","pce",
-                        "col","cv","ngp","ngc"
+                        "col","cv","ngp","ngc",
+                        "zip",
+                        "d64","t64","crt","tap","prg",
+                        "adf","dms","ipf","adz",
+                        "dsk",
+                        "bin"
                     ]);
 
                     const knownRegions = new Set([
@@ -127,13 +134,34 @@ namespace JellyEmu.Services
 
                     function launchEmulator(itemId) {
                         console.log('[JellyEmu] Launching emulator for item:', itemId);
-                        const iframe = document.createElement('iframe');
-                        iframe.id = 'jellyemu-iframe';
-                        iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
-                        iframe.src = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
-                        document.body.appendChild(iframe);
-                        document.body.style.overflow = 'hidden';
+                        const playUrl = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
+
+                        fetch('/jellyemu/core/' + itemId)
+                            .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
+                            .catch(function() { return { needsThreads: false }; })
+                            .then(function(info) {
+                                if (info.needsThreads) {
+                                    // Threaded cores (DOS, PSP, Saturn) require SharedArrayBuffer
+                                    // which needs cross-origin isolation — open in a new tab
+                                    const gameTab = window.open(playUrl, '_blank');
+                                    const jellyEmuChannel = new BroadcastChannel('jellyemu-exit');
+                                    jellyEmuChannel.addEventListener('message', function(msg) {
+                                        if (msg.data === 'close-jellyemu') {
+                                            jellyEmuChannel.close();
+                                            if (gameTab && !gameTab.closed) gameTab.close();
+                                        }
+                                    });
+                                } else {
+                                    // Non-threaded cores work fine in an iframe
+                                    const iframe = document.createElement('iframe');
+                                    iframe.id = 'jellyemu-iframe';
+                                    iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
+                                    iframe.src = playUrl;
+                                    document.body.appendChild(iframe);
+                                    document.body.style.overflow = 'hidden';
+                                }
+                            });
                     }
 
                     function dismissActionSheet(sheetRoot) {
@@ -143,16 +171,21 @@ namespace JellyEmu.Services
 
                     window.addEventListener('message', function(e) {
                         if (e.data === 'close-jellyemu') {
+                            // Iframe case — remove it
                             const iframe = document.getElementById('jellyemu-iframe');
-                            if (iframe) document.body.removeChild(iframe);
-                            document.body.style.overflow = '';
+                            if (iframe) {
+                                document.body.removeChild(iframe);
+                                document.body.style.overflow = '';
+                            }
+                            // New tab case — the tab closes itself, nothing to do here
                         }
                     });
 
                     document.body.addEventListener('click', function(e) {
                         const menuBtn = e.target.closest('button[data-action="menu"]');
                         if (!menuBtn) return;
-                        const card = menuBtn.closest('.card[data-collectiontype="games"]');
+                        const card = menuBtn.closest('.card[data-collectiontype="games"]') ||
+                                     menuBtn.closest('.card[data-jellyemu-game="1"]');
                         if (card) lastGameCardId = card.getAttribute('data-id');
                     }, true);
 
@@ -200,6 +233,51 @@ namespace JellyEmu.Services
                             div.textContent = tag;
                             miscBar.appendChild(div);
                         });
+
+                        const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                        const m = window.location.hash.match(/id=([a-zA-Z0-9]+)/);
+                        const itemId = m ? m[1] : null;
+                        if (userId && itemId && !miscBar.querySelector('.jellyemu-slot-pill')) {
+                            fetch('/jellyemu/slot/' + userId)
+                                .then(r => r.ok ? r.json() : null)
+                                .then(data => {
+                                    if (!data) return;
+                                    const slot = data.slot || 1;
+                                    fetch('/jellyemu/save/' + itemId + '/' + userId, { method: 'HEAD' })
+                                        .then(r => {
+                                            const hasSave = r.ok;
+                                            const pill = document.createElement('div');
+                                            pill.className = 'mediaInfoItem jellyemu-slot-pill';
+                                            pill.title = hasSave ? 'Save exists in slot ' + slot : 'No save in slot ' + slot;
+                                            pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
+                                            pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">' +
+                                                (hasSave ? 'save' : 'save_outlined') + '</span>' +
+                                                'Slot ' + slot +
+                                                (hasSave ? ' <span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">check_circle</span>' : '');
+                                            miscBar.appendChild(pill);
+                                        })
+                                        .catch(() => {});
+                                })
+                                .catch(() => {});
+                        }
+
+                        if (userId && itemId && !miscBar.querySelector('.jellyemu-playtime-pill')) {
+                            fetch('/jellyemu/playtime/' + itemId + '/' + userId)
+                                .then(r => r.ok ? r.json() : null)
+                                .then(data => {
+                                    if (!data || !data.seconds) return; // hide pill if zero playtime
+                                    const pill = document.createElement('div');
+                                    pill.className = 'mediaInfoItem jellyemu-playtime-pill';
+                                    pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
+                                    pill.title = data.seconds + ' seconds played';
+                                    const h = Math.floor(data.seconds / 3600);
+                                    const min = Math.floor((data.seconds % 3600) / 60);
+                                    const label = h > 0 ? h + 'h ' + min + 'm' : min > 0 ? min + 'm' : '<1m';
+                                    pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">schedule</span>' + label + ' played';
+                                    miscBar.appendChild(pill);
+                                })
+                                .catch(() => {});
+                        }
                     }
 
                     function injectPlayButton() {
@@ -264,6 +342,10 @@ namespace JellyEmu.Services
                             hijackJellyEmuPrefsPage();
                             return;
                         }
+                        if (window.location.hash.startsWith(JELLYEMU_SAVES_HASH)) {
+                            hijackJellyEmuSavesBrowser();
+                            return;
+                        }
 
                         const detailPage = getVisibleDetailPage();
 
@@ -291,6 +373,91 @@ namespace JellyEmu.Services
 
                     setInterval(tick, 200);
 
+                    // ── Stamp a card as a JellyEmu game card and wire up the play button ──
+                    function applyGameCardTreatment(card) {
+                        card.setAttribute('data-collectiontype', 'games');
+                        card.setAttribute('data-jellyemu-game', '1');
+                        const iconSpan = card.querySelector('.cardImageIcon');
+                        if (iconSpan) iconSpan.innerHTML = 'sports_esports';
+
+                        if (!card.querySelector('.jellyemu-card-badge-wrap')) {
+                            const cardId = card.getAttribute('data-id');
+                            if (cardId && window.ApiClient) {
+                                window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), cardId).then(function(item) {
+                                    if (!item || !item.Tags) return;
+                                    const badgeWrap = document.createElement('div');
+                                    badgeWrap.className = 'jellyemu-card-badge-wrap';
+                                    badgeWrap.style.cssText = 'position:absolute;bottom:4px;left:4px;display:flex;gap:3px;flex-wrap:wrap;z-index:2;pointer-events:none;';
+                                    item.Tags.filter(t => t !== 'Game').forEach(function(tag) {
+                                        const badge = document.createElement('span');
+                                        const isRegion = knownRegions.has(tag);
+                                        badge.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.03em;padding:1px 5px;border-radius:3px;opacity:.88;' +
+                                            (isRegion
+                                                ? 'background:rgba(0,164,220,.85);color:#fff;'
+                                                : 'background:rgba(0,0,0,.72);color:#e0e0e0;border:1px solid rgba(255,255,255,.18);');
+                                        badge.textContent = tag;
+                                        badgeWrap.appendChild(badge);
+                                    });
+                                    if (badgeWrap.children.length > 0) {
+                                        const imgCtr = card.querySelector('.cardImageContainer');
+                                        if (imgCtr) imgCtr.appendChild(badgeWrap);
+                                    }
+                                }).catch(function() {});
+                            }
+                        }
+
+                        const playBtns = card.querySelectorAll('button[data-action="resume"], button[data-action="play"]');
+                        playBtns.forEach(playBtn => {
+                            playBtn.style.display = 'none';
+                            if (playBtn.parentNode && !playBtn.parentNode.querySelector('.jellyemu-card-play')) {
+                                const sterileBtn = document.createElement('button');
+                                sterileBtn.type = 'button';
+                                sterileBtn.className = 'cardOverlayButton cardOverlayButton-hover jellyemu-card-play';
+                                sterileBtn.title = 'Play Game';
+                                sterileBtn.innerHTML = '<span class="material-icons" aria-hidden="true">sports_esports</span>';
+                                sterileBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    e.stopImmediatePropagation();
+                                    launchEmulator(card.getAttribute('data-id'));
+                                });
+                                playBtn.parentNode.insertBefore(sterileBtn, playBtn);
+                            }
+                        });
+                    }
+
+                    // ── Classify and process a single card element ──
+                    function processCard(card) {
+                        const path = card.getAttribute('data-path');
+                        let isGameCard = card.getAttribute('data-collectiontype') === 'games' ||
+                                         card.getAttribute('data-jellyemu-game') === '1' ||
+                                         (card.querySelector('.cardText') && (card.querySelector('.cardText').innerText.includes('Games') || card.querySelector('.cardText').innerText.includes('Emulators')));
+
+                        if (path) {
+                            const extMatch = path.match(/\.([a-zA-Z0-9]+)$/);
+                            if (extMatch && romExtensions.has(extMatch[1].toLowerCase())) {
+                                isGameCard = true;
+                            }
+                        }
+
+                        if (isGameCard) {
+                            applyGameCardTreatment(card);
+                        } else if (
+                            card.getAttribute('data-type') === 'Book' &&
+                            !card.getAttribute('data-jellyemu-checked')
+                        ) {
+                            card.setAttribute('data-jellyemu-checked', '1');
+                            const cardId = card.getAttribute('data-id');
+                            if (cardId && window.ApiClient) {
+                                window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), cardId).then(function(item) {
+                                    if (item && item.Tags && item.Tags.includes('Game')) {
+                                        applyGameCardTreatment(card);
+                                    }
+                                }).catch(function() {});
+                            }
+                        }
+                    }
+
                     const observer = new MutationObserver((mutations) => {
                         let checkDetails = false;
 
@@ -314,15 +481,6 @@ namespace JellyEmu.Services
                                         injectPrefsMenuEntry(prefsMenuPage);
                                     }
 
-                                    const selectEl = node.id === 'selectCollectionType' ? node : (node.querySelector ? node.querySelector('#selectCollectionType') : null);
-                                    if (selectEl && !selectEl.querySelector('option[data-jellyemu="true"]')) {
-                                        const opt = document.createElement('option');
-                                        opt.value = 'books';
-                                        opt.innerText = 'Games';
-                                        opt.setAttribute('data-jellyemu', 'true');
-                                        selectEl.appendChild(opt);
-                                    }
-
                                     if ((node.classList && node.classList.contains('mainDetailButtons')) || (node.querySelector && node.querySelector('.mainDetailButtons'))) {
                                         checkDetails = true;
                                     }
@@ -342,47 +500,7 @@ namespace JellyEmu.Services
                                         if (parentCard) cardsToProcess.push(parentCard);
                                     }
 
-                                    cardsToProcess.forEach(card => {
-                                        const path = card.getAttribute('data-path');
-                                        let isGameCard = card.getAttribute('data-collectiontype') === 'games' ||
-                                                           (card.querySelector('.cardText') && (card.querySelector('.cardText').innerText.includes('Games') || card.querySelector('.cardText').innerText.includes('Emulators')));
-
-                                        if (path) {
-                                            const extMatch = path.match(/\.([a-zA-Z0-9]+)$/);
-                                            if (extMatch && romExtensions.has(extMatch[1].toLowerCase())) {
-                                                isGameCard = true;
-                                            }
-                                        }
-
-                                        if (isGameCard) {
-                                            card.setAttribute('data-collectiontype', 'games');
-                                            const iconSpan = card.querySelector('.cardImageIcon');
-                                            if (iconSpan) iconSpan.innerHTML = 'sports_esports';
-
-                                            const playBtns = card.querySelectorAll('button[data-action="resume"], button[data-action="play"]');
-
-                                            playBtns.forEach(playBtn => {
-                                                playBtn.style.display = 'none';
-
-                                                if (playBtn.parentNode && !playBtn.parentNode.querySelector('.jellyemu-card-play')) {
-                                                    const sterileBtn = document.createElement('button');
-                                                    sterileBtn.type = 'button';
-                                                    sterileBtn.className = 'cardOverlayButton cardOverlayButton-hover jellyemu-card-play';
-                                                    sterileBtn.title = 'Play Game';
-                                                    sterileBtn.innerHTML = '<span class="material-icons" aria-hidden="true">sports_esports</span>';
-
-                                                    sterileBtn.addEventListener('click', function(e) {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        e.stopImmediatePropagation();
-                                                        launchEmulator(card.getAttribute('data-id'));
-                                                    });
-
-                                                    playBtn.parentNode.insertBefore(sterileBtn, playBtn);
-                                                }
-                                            });
-                                        }
-                                    });
+                                    cardsToProcess.forEach(processCard);
 
                                     if (node.tagName === 'BUTTON' && node.classList.contains('headerButton')) {
                                         const titleStr = node.getAttribute('title') || '';
@@ -402,7 +520,11 @@ namespace JellyEmu.Services
 
                     observer.observe(document.body, { childList: true, subtree: true });
 
-                    const JELLYEMU_PREFS_HASH = '#/jellyemu-userprefs';
+                    // ── Initial scan: process any cards already rendered before the observer started ──
+                    document.querySelectorAll('.card').forEach(processCard);
+
+                    const JELLYEMU_PREFS_HASH  = '#/jellyemu-userprefs';
+                    const JELLYEMU_SAVES_HASH  = '#/jellyemu-saves';
 
                     function injectPrefsMenuEntry(page) {
                         if (page.querySelector('.jellyemu-prefs-entry')) return;
@@ -421,18 +543,37 @@ namespace JellyEmu.Services
                                     <div class="listItemBodyText">JellyEmu</div>
                                 </div>
                             </div>`;
-
                         anchor.addEventListener('click', function(e) {
                             e.preventDefault();
                             window.location.hash = JELLYEMU_PREFS_HASH + (userId ? '?userId=' + userId : '');
                         });
 
+                        const savesAnchor = document.createElement('a');
+                        savesAnchor.className = 'emby-button jellyemu-prefs-entry listItem-border';
+                        savesAnchor.href = JELLYEMU_SAVES_HASH + (userId ? '?userId=' + userId : '');
+                        savesAnchor.style.cssText = 'display:block; margin:0; padding:0;';
+                        savesAnchor.innerHTML = `
+                            <div class="listItem">
+                                <span class="material-icons listItemIcon listItemIcon-transparent save" aria-hidden="true"></span>
+                                <div class="listItemBody">
+                                    <div class="listItemBodyText">Save State Browser</div>
+                                </div>
+                            </div>`;
+                        savesAnchor.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            window.location.hash = JELLYEMU_SAVES_HASH + (userId ? '?userId=' + userId : '');
+                        });
+
                         const targetSection = page.querySelector('.verticalSection.verticalSection-extrabottompadding');
                         if (targetSection) {
                             targetSection.appendChild(anchor);
+                            targetSection.appendChild(savesAnchor);
                         } else {
                             const readOnly = page.querySelector('.readOnlyContent');
-                            if (readOnly) readOnly.appendChild(anchor);
+                            if (readOnly) {
+                                readOnly.appendChild(anchor);
+                                readOnly.appendChild(savesAnchor);
+                            }
                         }
                     }
 
@@ -472,6 +613,7 @@ namespace JellyEmu.Services
                                             <label class="selectLabel" for="jellyemu-pref-shader">Display Shader</label>
                                             <select id="jellyemu-pref-shader" is="emby-select" class="emby-select-withcolor emby-select">
                                                 <option value="">None</option>
+                                                <option value="crt-mattias.glslp">CRT Mattias</option>
                                                 <option value="crt-easymode">CRT Easy Mode</option>
                                                 <option value="crt-royale">CRT Royale</option>
                                                 <option value="lcd-grid">LCD Grid</option>
@@ -487,6 +629,16 @@ namespace JellyEmu.Services
                                                 <option value="2x">2×</option>
                                                 <option value="3x">3×</option>
                                                 <option value="4x">4×</option>
+                                            </select>
+                                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                                        </div>
+                                        <div class="selectContainer">
+                                            <label class="selectLabel" for="jellyemu-pref-rotation">Video Rotation</label>
+                                            <select id="jellyemu-pref-rotation" is="emby-select" class="emby-select-withcolor emby-select">
+                                                <option value="0">No rotation</option>
+                                                <option value="1">90°</option>
+                                                <option value="2">180°</option>
+                                                <option value="3">270°</option>
                                             </select>
                                             <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                         </div>
@@ -565,7 +717,13 @@ namespace JellyEmu.Services
                         if (userId) {
                             fetch('/jellyemu/slot/' + userId)
                                 .then(r => r.ok ? r.json() : null)
-                                .then(data => { if (data) sel('jellyemu-pref-slot').value = String(data.slot); })
+                                .then(data => {
+                                    if (data) {
+                                        sel('jellyemu-pref-slot').value     = String(data.slot);
+                                        sel('jellyemu-pref-shader').value   = data.shader        || '';
+                                        sel('jellyemu-pref-rotation').value = String(data.videoRotation ?? 0);
+                                    }
+                                })
                                 .catch(() => {});
                         }
 
@@ -583,10 +741,12 @@ namespace JellyEmu.Services
                                 autosave:   sel('jellyemu-pref-autosave').value,
                             });
 
-                            const slotVal = parseInt(sel('jellyemu-pref-slot').value, 10) || 1;
-                            const slotUserId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
-                            const slotSave = slotUserId
-                                ? fetch('/jellyemu/slot/' + slotUserId + '?slot=' + slotVal, { method: 'POST' })
+                            const slotVal     = parseInt(sel('jellyemu-pref-slot').value, 10) || 1;
+                            const shaderVal   = encodeURIComponent(sel('jellyemu-pref-shader').value);
+                            const rotationVal = parseInt(sel('jellyemu-pref-rotation').value, 10) || 0;
+                            const slotUserId  = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                            const slotSave    = slotUserId
+                                ? fetch('/jellyemu/slot/' + slotUserId + '?slot=' + slotVal + '&shader=' + shaderVal + '&videoRotation=' + rotationVal, { method: 'POST' })
                                 : Promise.resolve();
 
                             slotSave.then(() => {
@@ -605,14 +765,323 @@ namespace JellyEmu.Services
                         });
                     }
 
+                    function hijackJellyEmuSavesBrowser() {
+                        const activePage = document.querySelector('.page:not(.hide)');
+                        if (!activePage) return;
+
+                        if (activePage.hasAttribute('data-jellyemu-saves-hijacked')) {
+                            const headerTitle = document.querySelector('.skinHeader .pageTitle');
+                            if (headerTitle && headerTitle.textContent !== 'Save State Browser') {
+                                headerTitle.textContent = 'Save State Browser';
+                            }
+                            return;
+                        }
+
+                        activePage.setAttribute('data-jellyemu-saves-hijacked', '1');
+                        activePage.className = 'page libraryPage noSecondaryNavPage mainAnimatedPage';
+                        activePage.setAttribute('data-title', 'Save State Browser');
+                        activePage.setAttribute('data-backbutton', 'true');
+
+                        document.title = 'Save State Browser';
+                        const headerTitle = document.querySelector('.skinHeader .pageTitle');
+                        if (headerTitle) headerTitle.textContent = 'Save State Browser';
+
+                        const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+
+                        activePage.innerHTML = `
+                            <style>
+                                .je-saves-grid {
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                                    gap: 18px;
+                                    padding: 24px;
+                                }
+                                .je-save-card {
+                                    background: rgba(255,255,255,0.05);
+                                    border: 1px solid rgba(255,255,255,0.08);
+                                    border-radius: 10px;
+                                    overflow: hidden;
+                                    display: flex;
+                                    flex-direction: column;
+                                    transition: transform 0.15s ease, border-color 0.15s ease;
+                                    cursor: default;
+                                }
+                                .je-save-card:hover {
+                                    transform: translateY(-3px);
+                                    border-color: rgba(0,164,220,0.5);
+                                }
+                                .je-save-art {
+                                    width: 100%;
+                                    aspect-ratio: 2/3;
+                                    object-fit: cover;
+                                    background: rgba(0,0,0,0.4);
+                                    display: block;
+                                    flex-shrink: 0;
+                                }
+                                .je-save-art-placeholder {
+                                    width: 100%;
+                                    aspect-ratio: 2/3;
+                                    background: rgba(0,0,0,0.35);
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    flex-shrink: 0;
+                                }
+                                .je-save-art-placeholder .material-icons {
+                                    font-size: 56px;
+                                    color: rgba(255,255,255,0.15);
+                                }
+                                .je-save-body {
+                                    padding: 12px 14px 14px;
+                                    display: flex;
+                                    flex-direction: column;
+                                    gap: 6px;
+                                    flex: 1;
+                                }
+                                .je-save-title {
+                                    font-size: 0.88rem;
+                                    font-weight: 600;
+                                    color: #fff;
+                                    white-space: nowrap;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    line-height: 1.3;
+                                }
+                                .je-save-badges {
+                                    display: flex;
+                                    flex-wrap: wrap;
+                                    gap: 4px;
+                                }
+                                .je-save-badge {
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    letter-spacing: .03em;
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    line-height: 1.4;
+                                }
+                                .je-save-badge-platform {
+                                    background: rgba(255,255,255,0.1);
+                                    color: #ccc;
+                                    border: 1px solid rgba(255,255,255,0.15);
+                                }
+                                .je-save-badge-region {
+                                    background: rgba(0,164,220,0.8);
+                                    color: #fff;
+                                }
+                                .je-save-badge-slot {
+                                    background: rgba(82,181,75,0.25);
+                                    color: #7ed67a;
+                                    border: 1px solid rgba(82,181,75,0.35);
+                                }
+                                .je-save-meta {
+                                    font-size: 0.75rem;
+                                    color: rgba(255,255,255,0.45);
+                                    line-height: 1.4;
+                                }
+                                .je-save-actions {
+                                    display: flex;
+                                    gap: 8px;
+                                    margin-top: auto;
+                                    padding-top: 10px;
+                                }
+                                .je-save-btn {
+                                    flex: 1;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    gap: 5px;
+                                    padding: 7px 10px;
+                                    border-radius: 6px;
+                                    font-size: 0.78rem;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                    border: none;
+                                    transition: background 0.15s ease, opacity 0.15s ease;
+                                    text-decoration: none;
+                                }
+                                .je-save-btn .material-icons { font-size: 15px; }
+                                .je-save-btn-play {
+                                    background: rgba(0,164,220,0.85);
+                                    color: #fff;
+                                }
+                                .je-save-btn-play:hover { background: rgba(0,164,220,1); }
+                                .je-save-btn-dl {
+                                    background: rgba(255,255,255,0.08);
+                                    color: rgba(255,255,255,0.75);
+                                    border: 1px solid rgba(255,255,255,0.12);
+                                }
+                                .je-save-btn-dl:hover { background: rgba(255,255,255,0.15); }
+                                .je-saves-empty {
+                                    text-align: center;
+                                    color: rgba(255,255,255,0.35);
+                                    padding: 80px 24px;
+                                    font-size: 1rem;
+                                }
+                                .je-saves-empty .material-icons { font-size: 64px; display: block; margin-bottom: 16px; opacity: 0.3; }
+                                .je-saves-header {
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 16px;
+                                    padding: 20px 24px 4px;
+                                }
+                                .je-saves-filter {
+                                    background: rgba(255,255,255,0.07);
+                                    border: 1px solid rgba(255,255,255,0.12);
+                                    border-radius: 6px;
+                                    color: #fff;
+                                    padding: 6px 12px;
+                                    font-size: 0.82rem;
+                                    cursor: pointer;
+                                    outline: none;
+                                    transition: border-color 0.15s;
+                                }
+                                .je-saves-filter option {
+                                    background: #1a1a2e;
+                                    color: #fff;
+                                }
+                                .je-saves-filter:focus { border-color: #00a4dc; }
+                                .je-saves-count {
+                                    font-size: 0.82rem;
+                                    color: rgba(255,255,255,0.4);
+                                    margin-left: auto;
+                                }
+                            </style>
+                            <div class="je-saves-header">
+                                <select id="je-filter-slot" class="je-saves-filter">
+                                    <option value="">All slots</option>
+                                    <option value="1">Slot 1</option>
+                                    <option value="2">Slot 2</option>
+                                    <option value="3">Slot 3</option>
+                                    <option value="4">Slot 4</option>
+                                    <option value="5">Slot 5</option>
+                                </select>
+                                <select id="je-filter-platform" class="je-saves-filter">
+                                    <option value="">All platforms</option>
+                                </select>
+                                <span id="je-saves-count" class="je-saves-count"></span>
+                            </div>
+                            <div id="je-saves-grid" class="je-saves-grid">
+                                <div class="je-saves-empty"><span class="material-icons">hourglass_empty</span>Loading save states…</div>
+                            </div>`;
+
+                        if (!userId) {
+                            activePage.querySelector('#je-saves-grid').innerHTML =
+                                '<div class="je-saves-empty"><span class="material-icons">person_off</span>Sign in to view your save states.</div>';
+                            return;
+                        }
+
+                        function fmtDate(iso) {
+                            try {
+                                const d = new Date(iso);
+                                return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+                                       ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                            } catch { return iso; }
+                        }
+
+                        function fmtSize(bytes) {
+                            if (bytes < 1024) return bytes + ' B';
+                            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                            return (bytes / 1048576).toFixed(1) + ' MB';
+                        }
+
+                        let allSaves = [];
+
+                        function renderGrid(saves) {
+                            const grid = activePage.querySelector('#je-saves-grid');
+                            const count = activePage.querySelector('#je-saves-count');
+                            if (count) count.textContent = saves.length + ' save' + (saves.length !== 1 ? 's' : '');
+                            if (saves.length === 0) {
+                                grid.innerHTML = '<div class="je-saves-empty"><span class="material-icons">save</span>No save states found.</div>';
+                                return;
+                            }
+                            grid.innerHTML = '';
+                            saves.forEach(s => {
+                                const card = document.createElement('div');
+                                card.className = 'je-save-card';
+
+                                const artUrl = s.hasArt
+                                    ? `/Items/${s.itemId}/Images/Primary?maxHeight=420&quality=90`
+                                    : null;
+
+                                card.innerHTML = artUrl
+                                    ? `<img class="je-save-art" src="${artUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                       <div class="je-save-art-placeholder" style="display:none"><span class="material-icons">sports_esports</span></div>`
+                                    : `<div class="je-save-art-placeholder"><span class="material-icons">sports_esports</span></div>`;
+
+                                const badges = [
+                                    s.platform ? `<span class="je-save-badge je-save-badge-platform">${s.platform}</span>` : '',
+                                    s.region   ? `<span class="je-save-badge je-save-badge-region">${s.region}</span>`   : '',
+                                    `<span class="je-save-badge je-save-badge-slot">Slot ${s.slot}</span>`,
+                                ].join('');
+
+                                const body = document.createElement('div');
+                                body.className = 'je-save-body';
+                                body.innerHTML = `
+                                    <div class="je-save-title" title="${s.gameName}">${s.gameName}</div>
+                                    <div class="je-save-badges">${badges}</div>
+                                    <div class="je-save-meta">${fmtDate(s.lastModified)} · ${fmtSize(s.sizeBytes)}</div>
+                                    <div class="je-save-actions">
+                                        <button class="je-save-btn je-save-btn-play">
+                                            <span class="material-icons">sports_esports</span>Play
+                                        </button>
+                                        <a class="je-save-btn je-save-btn-dl" href="${s.downloadUrl}" download="${s.gameName.replace(/[^a-zA-Z0-9 _-]/g,'_')}_slot${s.slot}.state">
+                                            <span class="material-icons">download</span>
+                                        </a>
+                                    </div>`;
+
+                                body.querySelector('.je-save-btn-play').addEventListener('click', () => {
+                                    launchEmulator(s.itemId);
+                                });
+
+                                card.appendChild(body);
+                                grid.appendChild(card);
+                            });
+                        }
+
+                        function applyFilters() {
+                            const slotVal     = activePage.querySelector('#je-filter-slot').value;
+                            const platformVal = activePage.querySelector('#je-filter-platform').value;
+                            const filtered    = allSaves.filter(s => {
+                                if (slotVal     && String(s.slot)    !== slotVal)     return false;
+                                if (platformVal && s.platform        !== platformVal) return false;
+                                return true;
+                            });
+                            renderGrid(filtered);
+                        }
+
+                        fetch('/jellyemu/saves/' + userId)
+                            .then(r => r.ok ? r.json() : [])
+                            .then(saves => {
+                                allSaves = saves;
+
+                                const platforms = [...new Set(saves.map(s => s.platform).filter(Boolean))].sort();
+                                const platformSelect = activePage.querySelector('#je-filter-platform');
+                                platforms.forEach(p => {
+                                    const opt = document.createElement('option');
+                                    opt.value = p;
+                                    opt.textContent = p;
+                                    platformSelect.appendChild(opt);
+                                });
+
+                                activePage.querySelector('#je-filter-slot').addEventListener('change', applyFilters);
+                                activePage.querySelector('#je-filter-platform').addEventListener('change', applyFilters);
+
+                                renderGrid(allSaves);
+                            })
+                            .catch(() => {
+                                activePage.querySelector('#je-saves-grid').innerHTML =
+                                    '<div class="je-saves-empty"><span class="material-icons">error_outline</span>Failed to load save states.</div>';
+                            });
+                    }
+
                     function checkPrefsRoute() {
                         const hash = window.location.hash;
-                        const prefsPage = document.getElementById('jellyemu-prefs-page');
 
-                        if (hash.startsWith(JELLYEMU_PREFS_HASH)) {
-                            renderJellyEmuPrefsPage();
-                        } else if (prefsPage) {
-                            prefsPage.style.display = 'none';
+                        if (hash.startsWith(JELLYEMU_SAVES_HASH)) {
+                            hijackJellyEmuSavesBrowser();
+                        } else if (hash.startsWith(JELLYEMU_PREFS_HASH)) {
+                            hijackJellyEmuPrefsPage();
                         }
                     }
 

@@ -60,6 +60,6 @@ namespace JellyEmu
         /// </summary>
         public string RawgApiKey { get; set; } = string.Empty;
 
-
+        public string NetplayServer { get; set; } = string.Empty;
     }
 }
