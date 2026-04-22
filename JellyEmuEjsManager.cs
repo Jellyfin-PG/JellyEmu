@@ -32,7 +32,9 @@ namespace JellyEmu.Services
     public class JellyEmuEjsManager
     {
         /// <summary>CDN base used as fallback when local assets are not ready.</summary>
-        public const string CdnBase = "https://cdn.emulatorjs.org/latest/data/";
+        /// Using "stable" instead of "latest" — the latest/beta channel omits
+        /// cores/reports/*.json which causes EJS to fall back to the legacy wasm variant.
+        public const string CdnBase = "https://cdn.emulatorjs.org/stable/data/";
 
         private readonly IApplicationPaths _appPaths;
         private readonly ILogger<JellyEmuEjsManager> _logger;
@@ -79,6 +81,9 @@ namespace JellyEmu.Services
         {
             if (!Directory.Exists(EjsRoot)) return false;
             if (!File.Exists(StampFile)) return false;
+            // Invalidate caches built against the old beta ("latest") channel
+            var stamp = File.ReadAllText(StampFile).Trim();
+            if (stamp != "cdn-stable") return false;
             if (!File.Exists(Path.Combine(EjsRoot, "loader.js"))) return false;
             return true;
         }
@@ -128,7 +133,7 @@ namespace JellyEmu.Services
 
                 await Task.WhenAll(tasks);
 
-                await File.WriteAllTextAsync(StampFile, "cdn-latest");
+                await File.WriteAllTextAsync(StampFile, "cdn-stable");
 
                 _isReady = true;
                 _logger.LogInformation("[JellyEmu] CDN download complete! Assets are ready at {Root}", EjsRoot);
@@ -175,4 +180,3 @@ namespace JellyEmu.Services
         }
     }
 }
-

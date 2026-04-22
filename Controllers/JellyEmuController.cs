@@ -216,7 +216,7 @@ namespace JellyEmu.Controllers
     </style>
 </head>
 <body>
-    <button id=""exit-btn"" onclick=""(function(){{if(window.EJS_onExit){{EJS_onExit();}}else{{window.parent.postMessage('close-jellyemu','*');}}}})()"">
+    <button id=""exit-btn"" onclick=""(function(){{if(window.EJS_onExit){{EJS_onExit();}}else{{if(window.opener){{window.close();}}else{{window.parent.postMessage('close-jellyemu','*');}}}}}})()"">
         <svg width=""24"" height=""24"" viewBox=""0 0 24 24"" fill=""white"">
             <path d=""M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z""/>
         </svg>
@@ -239,6 +239,7 @@ namespace JellyEmu.Controllers
             'save-state-location': 'browser'{(string.IsNullOrEmpty(activeShader) ? "" : $",\n            'shader': '{activeShader}'")}
         }};
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
+        {(core is "dos" or "psp" or "segaSaturn" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
 
         {(!string.IsNullOrEmpty(igdbId) ? $"window.EJS_gameID = {igdbId};" : "")}
         {(hasNetplay ? $@"window.EJS_netplayServer = '{netplayServer}';
@@ -253,10 +254,18 @@ namespace JellyEmu.Controllers
 
         {(saveExists ? $"window.EJS_loadStateURL = '{saveGetUrl}';" : "")}
         {(hasSaves ? $@"
+        // Read the auth token Jellyfin's web UI already stored in localStorage
+        var _jellyToken = '';
+        try {{
+            var _jellyCreds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{{}}');
+            var _jellyServer = (_jellyCreds.Servers || []).find(function(s) {{ return s.UserId === '{userId}'; }});
+            _jellyToken = (_jellyServer && _jellyServer.AccessToken) || '';
+        }} catch(e) {{}}
+
         // Mark game as played in Jellyfin when the emulator launches
         fetch('/Users/{userId}/PlayedItems/{itemId}', {{
             method: 'POST',
-            headers: {{ 'X-Emby-Authorization': 'MediaBrowser Client=""JellyEmu"", Device=""Browser"", DeviceId=""jellyemu"", Version=""1.0""' }}
+            headers: {{ 'X-Emby-Authorization': 'MediaBrowser Client=""JellyEmu"", Device=""Browser"", DeviceId=""jellyemu"", Version=""1.0"", Token=""' + _jellyToken + '""' }}
         }}).catch(function(err) {{
             console.warn('[JellyEmu] Could not mark item as played:', err);
         }});
@@ -333,7 +342,16 @@ namespace JellyEmu.Controllers
                   }}).catch(function() {{}})
                 : Promise.resolve();
 
-            function closeIframe() {{ window.parent.postMessage('close-jellyemu', '*'); }}
+            function closeIframe() {{
+                if (window.parent === window) {{
+                    // New tab: broadcast exit signal, then close self
+                    try {{ var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); }} catch(e) {{}}
+                    window.close();
+                }} else {{
+                    // Iframe: tell parent to remove it
+                    window.parent.postMessage('close-jellyemu', '*');
+                }}
+            }}
 
             if (!autoSave) {{
                 Promise.all([sessionStop, playtimeFlush]).finally(closeIframe);
@@ -357,14 +375,21 @@ namespace JellyEmu.Controllers
 </body>
 </html>";
 
+            // When opened as a new tab (threaded cores), these headers make the page
+            // cross-origin isolated so SharedArrayBuffer is available. Harmless for iframe mode.
+            Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+            Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+
             return Content(html, MediaTypeNames.Text.Html);
         }
 
         /// <summary>
         /// Streams the raw ROM file for the given item directly from disk.
         /// No authentication required.
+        /// HEAD is supported so EmulatorJS can read Content-Length before downloading.
         /// </summary>
         [HttpGet("/jellyemu/rom/{itemId}")]
+        [HttpHead("/jellyemu/rom/{itemId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult Rom(string itemId)
@@ -378,10 +403,45 @@ namespace JellyEmu.Controllers
 
             _logger.LogInformation("[JellyEmu] Serving ROM: {Path}", item.Path);
 
+            var ext = Path.GetExtension(item.Path).TrimStart('.').ToLowerInvariant();
+            var mimeType = ext switch
+            {
+                "zip" => "application/zip",
+                "7z" => "application/x-7z-compressed",
+                "iso" => "application/x-iso9660-image",
+                "cso" => "application/x-compressed",
+                _ => "application/octet-stream"
+            };
+
+            var fileInfo = new System.IO.FileInfo(item.Path);
+            Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
+            Response.Headers["Content-Length"] = fileInfo.Length.ToString();
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Path.GetFileName(item.Path)}\"";
+
+            if (HttpMethods.IsHead(Request.Method))
+                return new FileContentResult(Array.Empty<byte>(), mimeType);
+
             var stream = System.IO.File.OpenRead(item.Path);
-            var fileName = Path.GetFileName(item.Path);
-            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
-            return File(stream, "application/octet-stream", enableRangeProcessing: true);
+            return File(stream, mimeType, enableRangeProcessing: true);
+        }
+
+        /// <summary>
+        /// Returns the resolved core name and whether it requires threads (SharedArrayBuffer)
+        /// for the given item. Used by the UI to decide iframe vs new tab launch.
+        /// </summary>
+        [HttpGet("/jellyemu/core/{itemId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetCore(string itemId)
+        {
+            var item = _libraryManager.GetItemById(itemId);
+            if (item == null)
+                return NotFound();
+
+            var core = ResolveCore(item);
+            var needsThreads = core is "dos" or "psp" or "segaSaturn";
+            return Ok(new { core, needsThreads });
         }
 
         /// <summary>
@@ -592,7 +652,6 @@ namespace JellyEmu.Controllers
                 }
             }
 
-            // Sort: most recently saved first
             results.Sort((a, b) =>
             {
                 var aDate = (string)a.GetType().GetProperty("lastModified")!.GetValue(a)!;
@@ -652,6 +711,56 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// <summary>
+        /// Serves a Cross-Origin Isolation service worker that adds COOP/COEP headers
+        /// to every response, making SharedArrayBuffer available for threaded cores
+        /// (DOS, PSP, Saturn) without requiring Jellyfin itself to send those headers.
+        /// Must be served from the root scope (/jellyemu/coi-sw.js) with
+        /// Service-Worker-Allowed: / so the SW can control the whole origin.
+        /// </summary>
+        [HttpGet("/jellyemu/coi-sw.js")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult CoiServiceWorker()
+        {
+            const string js = """
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+
+function addHeaders(headers) {
+    const newHeaders = new Headers(headers);
+    newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
+    newHeaders.set('Cross-Origin-Embedder-Policy', 'credentialless');
+    newHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    return newHeaders;
+}
+
+self.addEventListener('fetch', function(e) {
+    // Only handle http/https requests
+    if (!e.request.url.startsWith('http')) return;
+
+    e.respondWith(
+        fetch(e.request)
+            .then(function(res) {
+                // Don't modify opaque responses
+                if (res.type === 'opaque' || res.type === 'opaqueredirect') return res;
+                return new Response(res.body, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    headers: addHeaders(res.headers)
+                });
+            })
+            .catch(function() {
+                return fetch(e.request);
+            })
+    );
+});
+""";
+            Response.Headers["Service-Worker-Allowed"] = "/";
+            Response.Headers["Cache-Control"] = "no-cache";
+            return Content(js, "application/javascript");
+        }
+
+        /// <summary>
         /// If the local cache is not ready yet (still downloading or failed),
         /// proxies the request transparently to the CDN so the player always works.
         /// Route: GET /jellyemu/ejs/{*path}  e.g. /jellyemu/ejs/loader.js
@@ -681,6 +790,7 @@ namespace JellyEmu.Controllers
             };
 
             Response.Headers["Cache-Control"] = "public, max-age=86400";
+            Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
             // Local cache
             if (_ejsManager.IsReady)
@@ -696,7 +806,6 @@ namespace JellyEmu.Controllers
                 _logger.LogWarning("[JellyEmu] EJS asset missing from local cache, proxying: {Path}", path);
             }
 
-            // CDN proxy fallback
             var cdnUrl = $"{JellyEmuEjsManager.CdnBase}/{path}";
             _logger.LogDebug("[JellyEmu] Proxying EJS asset from CDN: {Url}", cdnUrl);
 
@@ -733,7 +842,6 @@ namespace JellyEmu.Controllers
                 }
             }
 
-            // Fallback: guess from file extension
             if (!string.IsNullOrEmpty(item.Path))
             {
                 var ext = Path.GetExtension(item.Path).TrimStart('.').ToLowerInvariant();

@@ -134,13 +134,34 @@ namespace JellyEmu.Services
 
                     function launchEmulator(itemId) {
                         console.log('[JellyEmu] Launching emulator for item:', itemId);
-                        const iframe = document.createElement('iframe');
-                        iframe.id = 'jellyemu-iframe';
-                        iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
-                        iframe.src = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
-                        document.body.appendChild(iframe);
-                        document.body.style.overflow = 'hidden';
+                        const playUrl = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
+
+                        fetch('/jellyemu/core/' + itemId)
+                            .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
+                            .catch(function() { return { needsThreads: false }; })
+                            .then(function(info) {
+                                if (info.needsThreads) {
+                                    // Threaded cores (DOS, PSP, Saturn) require SharedArrayBuffer
+                                    // which needs cross-origin isolation — open in a new tab
+                                    const gameTab = window.open(playUrl, '_blank');
+                                    const jellyEmuChannel = new BroadcastChannel('jellyemu-exit');
+                                    jellyEmuChannel.addEventListener('message', function(msg) {
+                                        if (msg.data === 'close-jellyemu') {
+                                            jellyEmuChannel.close();
+                                            if (gameTab && !gameTab.closed) gameTab.close();
+                                        }
+                                    });
+                                } else {
+                                    // Non-threaded cores work fine in an iframe
+                                    const iframe = document.createElement('iframe');
+                                    iframe.id = 'jellyemu-iframe';
+                                    iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
+                                    iframe.src = playUrl;
+                                    document.body.appendChild(iframe);
+                                    document.body.style.overflow = 'hidden';
+                                }
+                            });
                     }
 
                     function dismissActionSheet(sheetRoot) {
@@ -150,9 +171,13 @@ namespace JellyEmu.Services
 
                     window.addEventListener('message', function(e) {
                         if (e.data === 'close-jellyemu') {
+                            // Iframe case — remove it
                             const iframe = document.getElementById('jellyemu-iframe');
-                            if (iframe) document.body.removeChild(iframe);
-                            document.body.style.overflow = '';
+                            if (iframe) {
+                                document.body.removeChild(iframe);
+                                document.body.style.overflow = '';
+                            }
+                            // New tab case — the tab closes itself, nothing to do here
                         }
                     });
 
