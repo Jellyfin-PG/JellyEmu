@@ -137,6 +137,31 @@ namespace JellyEmu
                 // NeoGeo Pocket
                 { "ngp", "NeoGeo Pocket" }, { "neogeo pocket", "NeoGeo Pocket" },
                 { "neo geo pocket", "NeoGeo Pocket" }, { "ngpc", "NeoGeo Pocket" },
+                // DOS / PC
+                { "dos", "DOS" }, { "ms-dos", "DOS" }, { "msdos", "DOS" }, { "pc dos", "DOS" },
+                // Arcade / FBNeo / MAME
+                { "arcade", "Arcade" }, { "fbneo", "Arcade" }, { "finalburn neo", "Arcade" },
+                { "neogeo", "Arcade" }, { "neo geo", "Arcade" },
+                { "mame", "MAME 2003" }, { "mame 2003", "MAME 2003" }, { "mame2003", "MAME 2003" },
+                // PSP
+                { "psp", "PSP" }, { "playstation portable", "PSP" },
+                // Sega Saturn
+                { "saturn", "Sega Saturn" }, { "sega saturn", "Sega Saturn" },
+                // 3DO
+                { "3do", "3DO" }, { "3do interactive multiplayer", "3DO" }, { "panasonic 3do", "3DO" },
+                // Atari 5200
+                { "atari 5200", "Atari 5200" }, { "5200", "Atari 5200" },
+                // Commodore variants (all real EJS systems)
+                { "amiga", "Commodore Amiga" }, { "commodore amiga", "Commodore Amiga" },
+                { "amiga 500", "Commodore Amiga" }, { "amiga 1200", "Commodore Amiga" },
+                { "c64", "Commodore 64" }, { "commodore 64", "Commodore 64" }, { "c-64", "Commodore 64" },
+                { "c128", "Commodore 128" }, { "commodore 128", "Commodore 128" },
+                { "pet", "Commodore PET" }, { "commodore pet", "Commodore PET" },
+                { "plus4", "Commodore Plus/4" }, { "commodore plus4", "Commodore Plus/4" },
+                { "vic20", "Commodore VIC-20" }, { "commodore vic-20", "Commodore VIC-20" },
+                { "vic-20", "Commodore VIC-20" },
+                // PC-FX
+                { "pc-fx", "PC-FX" }, { "pcfx", "PC-FX" }, { "nec pc-fx", "PC-FX" },
             };
 
         /// <summary>
@@ -188,10 +213,13 @@ namespace JellyEmu
                 { ".ngp", "NeoGeo Pocket" }, { ".ngc", "NeoGeo Pocket" },
 
                 // Intentionally absent (ambiguous — need folder or inline token):
-                // .iso  — PlayStation, Sega CD, PC Engine CD, Dreamcast, Saturn...
+                // .iso  — PlayStation, Sega CD, PC Engine CD, Sega Saturn, 3DO...
                 // .chd  — same as above
                 // .cue  — same as above
                 // .pbp  — PlayStation, PSP
+                // .zip  — DOS, Arcade, Amiga, C64, and others — always needs folder/token
+                // .bin  — too generic (Sega CD, PlayStation, Odyssey, Amiga, etc.)
+                // .dsk  — DOS / Amiga / Amstrad — always needs folder/token
             };
 
         private readonly ILogger<PlatformResolver> _logger;
@@ -313,16 +341,28 @@ namespace JellyEmu
         internal static readonly HashSet<string> AllRomExtensions =
             new(StringComparer.OrdinalIgnoreCase)
             {
+                // Cartridge-based systems
                 ".nes", ".fds", ".unf", ".unif",
                 ".smc", ".sfc", ".swc", ".fig",
                 ".z64", ".n64", ".v64",
                 ".gb",  ".gbc", ".gba", ".nds", ".vb",
                 ".sms", ".gg",
                 ".md",  ".smd", ".gen", ".68k", ".sgd", ".32x",
-                ".pbp", ".cue", ".iso", ".chd",
                 ".a26", ".a78", ".lnx", ".jag", ".j64",
                 ".ws",  ".wsc", ".pce",
                 ".col", ".cv", ".ngp", ".ngc",
+                // Disc-based (ambiguous, need folder/token for platform)
+                ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
+                // DOS / Arcade / multi-file platforms — zip is the delivery format
+                ".zip",
+                // Commodore 64 disk/tape/cart formats
+                ".d64", ".t64", ".crt", ".tap", ".prg",
+                // Amiga floppy formats
+                ".adf", ".dms", ".ipf", ".adz",
+                // Generic disk image (DOS, Amiga, MSX etc.)
+                ".dsk",
+                // Catch-all binary ROM (many obscure carts ship as .bin)
+                ".bin",
             };
     }
 }

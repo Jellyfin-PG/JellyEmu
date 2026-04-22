@@ -13,12 +13,14 @@ namespace JellyEmu
             {
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(
                     "JellyEmu/1.0 (Jellyfin plugin; +https://github.com/Jellyfin-PG/JellyEmu)");
-                client.Timeout = TimeSpan.FromMinutes(10); // data.zip can be large
+                client.Timeout = TimeSpan.FromMinutes(10);
             });
 
             serviceCollection.AddSingleton<PlatformResolver>();
 
             serviceCollection.AddSingleton<JellyEmuEjsManager>();
+
+            serviceCollection.AddSingleton<JellyEmuSessionService>();
 
             serviceCollection.AddHostedService<JellyEmuInjectorService>();
         }
