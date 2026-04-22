@@ -115,6 +115,7 @@ namespace JellyEmu.Services
                         "sms","gg",
                         "md","smd","gen","68k","32x",
                         "pbp","cue","iso","chd","gdi","cdi","mdf",
+                        "cso",
                         "a26","a78","lnx","jag","j64",
                         "ws","wsc","pce",
                         "col","cv","ngp","ngc",

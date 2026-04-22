@@ -1,6 +1,7 @@
 using System.Net.Mime;
 using System.Text.Encodings.Web;
 using JellyEmu.Services;
+using MediaBrowser.Model.Entities;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -143,9 +144,9 @@ namespace JellyEmu.Controllers
                 var json = System.IO.File.ReadAllText(path);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
-                var slot   = root.TryGetProperty("slot",          out var s) ? Math.Max(1, s.GetInt32()) : 1;
-                var shader = root.TryGetProperty("shader",        out var sh) ? (sh.GetString() ?? string.Empty) : string.Empty;
-                var rot    = root.TryGetProperty("videoRotation", out var r)  ? r.GetInt32() : 0;
+                var slot = root.TryGetProperty("slot", out var s) ? Math.Max(1, s.GetInt32()) : 1;
+                var shader = root.TryGetProperty("shader", out var sh) ? (sh.GetString() ?? string.Empty) : string.Empty;
+                var rot = root.TryGetProperty("videoRotation", out var r) ? r.GetInt32() : 0;
                 return new UserPrefs(slot, shader, rot);
             }
             catch { return new UserPrefs(1, string.Empty, 0); }
@@ -175,15 +176,19 @@ namespace JellyEmu.Controllers
             var core = ResolveCore(item);
             var romUrl = $"/jellyemu/rom/{itemId}";
 
-            var hasSaves      = !string.IsNullOrEmpty(userId);
-            var userPrefs     = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
-            var activeSlot    = userPrefs.Slot;
-            var activeShader  = userPrefs.Shader;
+            var hasSaves = !string.IsNullOrEmpty(userId);
+            var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
+            var activeSlot = userPrefs.Slot;
+            var activeShader = userPrefs.Shader;
             var videoRotation = userPrefs.VideoRotation;
-            var saveGetUrl    = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
-            var savePostUrl   = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
+            var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
+            var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
             var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId, activeSlot));
+
+            var igdbId = item.GetProviderId("IGDB");
+            var netplayServer = Plugin.Instance?.Configuration.NetplayServer ?? string.Empty;
+            var hasNetplay = !string.IsNullOrWhiteSpace(netplayServer);
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
             var ejsBase = _ejsManager.IsReady
@@ -234,6 +239,17 @@ namespace JellyEmu.Controllers
             'save-state-location': 'browser'{(string.IsNullOrEmpty(activeShader) ? "" : $",\n            'shader': '{activeShader}'")}
         }};
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
+
+        {(!string.IsNullOrEmpty(igdbId) ? $"window.EJS_gameID = {igdbId};" : "")}
+        {(hasNetplay ? $@"window.EJS_netplayServer = '{netplayServer}';
+        window.EJS_netplayICEServers = [
+            {{ urls: 'stun:stun.l.google.com:19302' }},
+            {{ urls: 'stun:stun1.l.google.com:19302' }},
+            {{ urls: 'stun:stun2.l.google.com:19302' }},
+            {{ urls: 'stun:stun.nextcloud.com:3478' }},
+            {{ urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' }},
+            {{ urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }}
+        ];" : "")}
 
         {(saveExists ? $"window.EJS_loadStateURL = '{saveGetUrl}';" : "")}
         {(hasSaves ? $@"
@@ -534,12 +550,12 @@ namespace JellyEmu.Controllers
                 foreach (var stateFile in Directory.GetFiles(slotDir, "*.state"))
                 {
                     var itemId = Path.GetFileNameWithoutExtension(stateFile);
-                    var fi     = new System.IO.FileInfo(stateFile);
+                    var fi = new System.IO.FileInfo(stateFile);
 
                     string gameName = itemId;
                     string platform = string.Empty;
-                    string region   = string.Empty;
-                    bool   hasArt   = false;
+                    string region = string.Empty;
+                    bool hasArt = false;
 
                     try
                     {
@@ -547,14 +563,14 @@ namespace JellyEmu.Controllers
                         if (item != null)
                         {
                             gameName = item.Name;
-                            hasArt   = item.HasImage(MediaBrowser.Model.Entities.ImageType.Primary);
+                            hasArt = item.HasImage(MediaBrowser.Model.Entities.ImageType.Primary);
                             if (item.Tags != null)
                             {
                                 foreach (var tag in item.Tags)
                                 {
                                     if (tag == "Game") continue;
                                     if (knownRegions.Contains(tag)) { if (string.IsNullOrEmpty(region)) region = tag; }
-                                    else                             { if (string.IsNullOrEmpty(platform)) platform = tag; }
+                                    else { if (string.IsNullOrEmpty(platform)) platform = tag; }
                                 }
                             }
                         }
@@ -567,8 +583,8 @@ namespace JellyEmu.Controllers
                         gameName,
                         platform,
                         region,
-                        slot        = slotNumber,
-                        sizeBytes   = fi.Length,
+                        slot = slotNumber,
+                        sizeBytes = fi.Length,
                         lastModified = fi.LastWriteTimeUtc.ToString("o"),
                         hasArt,
                         downloadUrl = $"/jellyemu/save/{itemId}/{userId}?slot={slotNumber}",
@@ -600,8 +616,8 @@ namespace JellyEmu.Controllers
         {
             if (_libraryManager.GetItemById(itemId) == null) return NotFound();
 
-            var remoteIp   = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var deviceId   = Request.Headers["X-JellyEmu-DeviceId"].FirstOrDefault()   ?? $"jellyemu-{userId}";
+            var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var deviceId = Request.Headers["X-JellyEmu-DeviceId"].FirstOrDefault() ?? $"jellyemu-{userId}";
             var deviceName = Request.Headers["X-JellyEmu-DeviceName"].FirstOrDefault() ?? "JellyEmu Browser";
 
             await _sessionService.StartSessionAsync(userId, itemId, "JellyEmu", deviceId, deviceName, remoteIp)
@@ -744,6 +760,8 @@ namespace JellyEmu.Controllers
                     { "32x",  "sega32x"    },
                     // PlayStation (disc formats are ambiguous but psx is the only disc system without a folder hint in most setups)
                     { "pbp",  "psx"        }, { "cue",  "psx"        }, { "chd", "psx"        },
+                    // PSP — .cso is unambiguous; .iso reaches here only if the platform tag path was bypassed
+                    { "cso",  "psp"        }, { "iso",  "psp"        },
                     // Atari
                     { "a26",  "atari2600"  },
                     { "a78",  "atari7800"  },

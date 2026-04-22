@@ -50,6 +50,21 @@
             </div>
 
             <div class="verticalSection" style="margin-top: 1.5em;">
+                <h2 class="sectionTitle">Netplay</h2>
+                <p style="color: #aaa; margin-bottom: 1em;">
+                    Optional. Provide your netplay server address to enable multiplayer via EmulatorJS.
+                    Leave blank to disable netplay. Requires a running
+                    <a href="https://github.com/nicholasstephan/emulatorjs-netplay-server" target="_blank"
+                        style="color: #00a4dc;">EmulatorJS netplay server</a>.
+                </p>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="netplayServer">Netplay Server</label>
+                    <input id="netplayServer" type="text" is="emby-input" class="emby-input"
+                        placeholder="e.g. https://192.168.1.100:3000" autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="verticalSection" style="margin-top: 1.5em;">
                 <h2 class="sectionTitle">RetroArch Integration</h2>
                 <p style="color: #aaa; margin-bottom: 1.25em;">
                     JellyEmu exposes endpoints so RetroArch can stream ROMs directly from your Jellyfin server.
@@ -165,6 +180,7 @@
                     page.querySelector('#igdbClientId').value = config.IgdbClientId || '';
                     page.querySelector('#igdbClientSecret').value = config.IgdbClientSecret || '';
                     page.querySelector('#rawgApiKey').value = config.RawgApiKey || '';
+                    page.querySelector('#netplayServer').value = config.NetplayServer || '';
                 }).catch(function (err) {
                     console.error('[JellyEmu] Failed to load config:', err);
                     showStatus('Failed to load settings.', true);
@@ -176,6 +192,7 @@
                     config.IgdbClientId = page.querySelector('#igdbClientId').value.trim();
                     config.IgdbClientSecret = page.querySelector('#igdbClientSecret').value.trim();
                     config.RawgApiKey = page.querySelector('#rawgApiKey').value.trim();
+                    config.NetplayServer = page.querySelector('#netplayServer').value.trim();
                     return ApiClient.updatePluginConfiguration(pluginId, config);
                 }).then(function () {
                     showStatus('Settings saved successfully!', false);

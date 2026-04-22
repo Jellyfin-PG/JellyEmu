@@ -211,9 +211,11 @@ namespace JellyEmu
                 { ".col", "ColecoVision" }, { ".cv", "ColecoVision" },
                 // NeoGeo Pocket
                 { ".ngp", "NeoGeo Pocket" }, { ".ngc", "NeoGeo Pocket" },
+                // PSP — .cso is a compressed ISO format exclusive to PSP
+                { ".cso", "PSP" },
 
                 // Intentionally absent (ambiguous — need folder or inline token):
-                // .iso  — PlayStation, Sega CD, PC Engine CD, Sega Saturn, 3DO...
+                // .iso  — PlayStation, PSP, Sega CD, PC Engine CD, Sega Saturn, 3DO...
                 // .chd  — same as above
                 // .cue  — same as above
                 // .pbp  — PlayStation, PSP
@@ -353,6 +355,8 @@ namespace JellyEmu
                 ".col", ".cv", ".ngp", ".ngc",
                 // Disc-based (ambiguous, need folder/token for platform)
                 ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
+                // PSP compressed ISO — unambiguous PSP format
+                ".cso",
                 // DOS / Arcade / multi-file platforms — zip is the delivery format
                 ".zip",
                 // Commodore 64 disk/tape/cart formats
