@@ -20,6 +20,10 @@
   <a href="assets/screen03.png">
     <img src="assets/screen03.png" width="45%" alt="Jellyemu home page" />
   </a>
+
+  <a href="assets/screen04.png">
+    <img src="assets/screen04.png" width="45%" alt="Jellyemu save state browser" />
+  </a>
 </p>
 <p align="center">
   <em>Click on an image to view it full size.</em>
