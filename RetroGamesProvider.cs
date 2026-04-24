@@ -52,12 +52,18 @@ namespace JellyEmu
                 var nfoPath = Path.ChangeExtension(info.Path, ".nfo");
                 if (File.Exists(nfoPath))
                 {
+                    var nfoTags = new List<string> { "Game", _platformResolver.Resolve(info.Path) };
+                    var nfoRegion = PlatformResolver.ResolveRegion(info.Path);
+                    var nfoDisc   = PlatformResolver.ResolveDisc(info.Path);
+                    if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
+                    if (!string.IsNullOrEmpty(nfoDisc))   nfoTags.Add(nfoDisc);
+
                     result.HasMetadata = true;
                     result.Item = new Book
                     {
                         Overview = "Parsed successfully from local .nfo file!",
                         PremiereDate = new DateTime(1990, 1, 1),
-                        Tags = new[] { "Game", _platformResolver.Resolve(info.Path) }
+                        Tags = nfoTags.ToArray()
                     };
                 }
             }
@@ -311,9 +317,11 @@ namespace JellyEmu
 
                         var consoleTag = _platformResolver.Resolve(info.Path);
                         var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+                        var discTag    = PlatformResolver.ResolveDisc(info.Path);
 
                         var tags = new List<string> { "Game", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                        if (!string.IsNullOrEmpty(discTag))   tags.Add(discTag);
 
                         var item = new Book
                         {
@@ -480,9 +488,11 @@ namespace JellyEmu
 
                     var consoleTag = _platformResolver.Resolve(info.Path);
                     var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+                    var discTag    = PlatformResolver.ResolveDisc(info.Path);
 
                     var tags = new List<string> { "Game", consoleTag };
                     if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                    if (!string.IsNullOrEmpty(discTag))   tags.Add(discTag);
 
                     var item = new Book
                     {
@@ -688,9 +698,11 @@ namespace JellyEmu
                     {
                         var consoleTag = _platformResolver.Resolve(info.Path);
                         var regionTag  = PlatformResolver.ResolveRegion(info.Path);
+                        var discTag    = PlatformResolver.ResolveDisc(info.Path);
 
                         var tags = new List<string> { "Game", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                        if (!string.IsNullOrEmpty(discTag))   tags.Add(discTag);
 
                         var item = new Book
                         {

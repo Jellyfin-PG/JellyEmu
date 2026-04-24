@@ -84,6 +84,55 @@ namespace JellyEmu
             return null;
         }
 
+        /// <summary>
+        /// Regex that matches disc tokens in a variety of common ROM naming conventions:
+        ///   (Disc 1), (Disc1), [Disc 2], (Disk 3), Disc1, disc2, etc.
+        /// Captures the disc number (digit or Roman numeral up to VIII).
+        /// </summary>
+        private static readonly Regex DiscTokenRegex = new(
+            @"(?:[\[\(]\s*dis[ck]\s*([1-9IVX]{1,4})\s*[\]\)]|(?<![a-zA-Z])dis[ck]\s*([1-9IVX]{1,4})(?![a-zA-Z0-9]))",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// Normalises a raw disc identifier (digit or Roman numeral) to "Disc N" label.
+        /// Roman numerals I–VIII are converted to their Arabic equivalents.
+        /// </summary>
+        private static string? NormaliseDiscLabel(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return null;
+            // Arabic digit — straightforward
+            if (int.TryParse(raw, out var n)) return $"Disc {n}";
+            // Simple Roman numeral map (I–VIII covers virtually all multi-disc games)
+            return raw.ToUpperInvariant() switch
+            {
+                "I"    => "Disc 1",
+                "II"   => "Disc 2",
+                "III"  => "Disc 3",
+                "IV"   => "Disc 4",
+                "V"    => "Disc 5",
+                "VI"   => "Disc 6",
+                "VII"  => "Disc 7",
+                "VIII" => "Disc 8",
+                _      => $"Disc {raw.ToUpperInvariant()}"
+            };
+        }
+
+        /// <summary>
+        /// Attempts to extract a disc label (e.g. "Disc 1") from a ROM filename.
+        /// Returns <c>null</c> when no disc token is present.
+        /// Supports formats: (Disc 1), (Disc1), [Disk 2], Disc1, disc 3, (Disc II), etc.
+        /// </summary>
+        public static string? ResolveDisc(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var fileName = Path.GetFileNameWithoutExtension(path) ?? string.Empty;
+            var m = DiscTokenRegex.Match(fileName);
+            if (!m.Success) return null;
+            // Group 1 = bracketed form, Group 2 = bare form
+            var raw = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+            return NormaliseDiscLabel(raw.Trim());
+        }
+
         public static readonly Dictionary<string, string> Aliases =
             new(StringComparer.OrdinalIgnoreCase)
             {
@@ -298,8 +347,15 @@ namespace JellyEmu
                 if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p)))
                     return "";
 
+                // Strip bracketed disc tokens e.g. (Disc 1), [Disk 2]
+                if (DiscTokenRegex.IsMatch("(" + inner + ")"))
+                    return "";
+
                 return m.Value;
             });
+
+            // Also strip bare disc tokens not wrapped in brackets e.g. "Game Disc1.iso"
+            result = DiscTokenRegex.Replace(result, "");
 
             return Regex.Replace(result, @"\s+", " ").Trim();
         }
