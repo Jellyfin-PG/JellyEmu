@@ -130,6 +130,10 @@ namespace JellyEmu.Services
                         "Asia","Scandinavia","Unlicensed","Prototype","Demo","Sample"
                     ]);
 
+                    function isDiscTag(tag) {
+                        return /^Dis[ck]\s+[1-9IVX]/i.test(tag);
+                    }
+
                     function launchEmulator(itemId) {
                         console.log('[JellyEmu] Launching emulator for item:', itemId);
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
@@ -169,13 +173,11 @@ namespace JellyEmu.Services
 
                     window.addEventListener('message', function(e) {
                         if (e.data === 'close-jellyemu') {
-                            // Iframe case — remove it
                             const iframe = document.getElementById('jellyemu-iframe');
                             if (iframe) {
                                 document.body.removeChild(iframe);
                                 document.body.style.overflow = '';
                             }
-                            // New tab case — the tab closes itself, nothing to do here
                         }
                     });
 
@@ -221,9 +223,10 @@ namespace JellyEmu.Services
 
                         if (miscBar.querySelector('.jellyemu-misc-item')) return;
 
-                        const systemTags = cachedTags.filter(t => t !== 'Game' && !knownRegions.has(t));
+                        const systemTags = cachedTags.filter(t => t !== 'Game' && !knownRegions.has(t) && !isDiscTag(t));
                         const regionTags = cachedTags.filter(t => knownRegions.has(t));
-                        const allTags    = [...systemTags, ...regionTags];
+                        const discTags   = cachedTags.filter(t => isDiscTag(t));
+                        const allTags    = [...systemTags, ...regionTags, ...discTags];
 
                         allTags.forEach(tag => {
                             const div = document.createElement('div');
@@ -371,7 +374,6 @@ namespace JellyEmu.Services
 
                     setInterval(tick, 200);
 
-                    // ── Stamp a card as a JellyEmu game card and wire up the play button ──
                     function applyGameCardTreatment(card) {
                         card.setAttribute('data-collectiontype', 'games');
                         card.setAttribute('data-jellyemu-game', '1');
@@ -389,10 +391,13 @@ namespace JellyEmu.Services
                                     item.Tags.filter(t => t !== 'Game').forEach(function(tag) {
                                         const badge = document.createElement('span');
                                         const isRegion = knownRegions.has(tag);
+                                        const isDisc   = isDiscTag(tag);
                                         badge.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.03em;padding:1px 5px;border-radius:3px;opacity:.88;' +
                                             (isRegion
                                                 ? 'background:rgba(0,164,220,.85);color:#fff;'
-                                                : 'background:rgba(0,0,0,.72);color:#e0e0e0;border:1px solid rgba(255,255,255,.18);');
+                                                : isDisc
+                                                    ? 'background:rgba(220,140,0,.85);color:#fff;'
+                                                    : 'background:rgba(0,0,0,.72);color:#e0e0e0;border:1px solid rgba(255,255,255,.18);');
                                         badge.textContent = tag;
                                         badgeWrap.appendChild(badge);
                                     });
@@ -424,7 +429,6 @@ namespace JellyEmu.Services
                         });
                     }
 
-                    // ── Classify and process a single card element ──
                     function processCard(card) {
                         const path = card.getAttribute('data-path');
                         let isGameCard = card.getAttribute('data-collectiontype') === 'games' ||
@@ -518,7 +522,6 @@ namespace JellyEmu.Services
 
                     observer.observe(document.body, { childList: true, subtree: true });
 
-                    // ── Initial scan: process any cards already rendered before the observer started ──
                     document.querySelectorAll('.card').forEach(processCard);
 
                     const JELLYEMU_PREFS_HASH  = '#/jellyemu-userprefs';
@@ -914,6 +917,10 @@ namespace JellyEmu.Services
                                     background: rgba(0,164,220,0.8);
                                     color: #fff;
                                 }
+                                .je-save-badge-disc {
+                                    background: rgba(220,140,0,0.85);
+                                    color: #fff;
+                                }
                                 .je-save-badge-slot {
                                     background: rgba(82,181,75,0.25);
                                     color: #7ed67a;
@@ -1057,6 +1064,7 @@ namespace JellyEmu.Services
                                 const badges = [
                                     s.platform ? `<span class="je-save-badge je-save-badge-platform">${s.platform}</span>` : '',
                                     s.region   ? `<span class="je-save-badge je-save-badge-region">${s.region}</span>`   : '',
+                                    s.disc     ? `<span class="je-save-badge je-save-badge-disc">${s.disc}</span>`       : '',
                                     `<span class="je-save-badge je-save-badge-slot">Slot ${s.slot}</span>`,
                                 ].join('');
 
