@@ -54,9 +54,9 @@ namespace JellyEmu
                 {
                     var nfoTags = new List<string> { "Game", _platformResolver.Resolve(info.Path) };
                     var nfoRegion = PlatformResolver.ResolveRegion(info.Path);
-                    var nfoDisc   = PlatformResolver.ResolveDisc(info.Path);
+                    var nfoDisc = PlatformResolver.ResolveDisc(info.Path);
                     if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
-                    if (!string.IsNullOrEmpty(nfoDisc))   nfoTags.Add(nfoDisc);
+                    if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
 
                     result.HasMetadata = true;
                     result.Item = new Book
@@ -316,12 +316,12 @@ namespace JellyEmu
                         var root = document.RootElement[0];
 
                         var consoleTag = _platformResolver.Resolve(info.Path);
-                        var regionTag  = PlatformResolver.ResolveRegion(info.Path);
-                        var discTag    = PlatformResolver.ResolveDisc(info.Path);
+                        var regionTag = PlatformResolver.ResolveRegion(info.Path);
+                        var discTag = PlatformResolver.ResolveDisc(info.Path);
 
                         var tags = new List<string> { "Game", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
-                        if (!string.IsNullOrEmpty(discTag))   tags.Add(discTag);
+                        if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
 
                         var item = new Book
                         {
@@ -487,12 +487,12 @@ namespace JellyEmu
                     var root = document.RootElement;
 
                     var consoleTag = _platformResolver.Resolve(info.Path);
-                    var regionTag  = PlatformResolver.ResolveRegion(info.Path);
-                    var discTag    = PlatformResolver.ResolveDisc(info.Path);
+                    var regionTag = PlatformResolver.ResolveRegion(info.Path);
+                    var discTag = PlatformResolver.ResolveDisc(info.Path);
 
                     var tags = new List<string> { "Game", consoleTag };
                     if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
-                    if (!string.IsNullOrEmpty(discTag))   tags.Add(discTag);
+                    if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
 
                     var item = new Book
                     {
@@ -697,12 +697,12 @@ namespace JellyEmu
                         pages.TryGetProperty(pageId, out var page))
                     {
                         var consoleTag = _platformResolver.Resolve(info.Path);
-                        var regionTag  = PlatformResolver.ResolveRegion(info.Path);
-                        var discTag    = PlatformResolver.ResolveDisc(info.Path);
+                        var regionTag = PlatformResolver.ResolveRegion(info.Path);
+                        var discTag = PlatformResolver.ResolveDisc(info.Path);
 
                         var tags = new List<string> { "Game", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
-                        if (!string.IsNullOrEmpty(discTag))   tags.Add(discTag);
+                        if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
 
                         var item = new Book
                         {
@@ -760,6 +760,287 @@ namespace JellyEmu
                         {
                             list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = imgUrl });
                         }
+                    }
+                }
+            }
+            catch { }
+            return list;
+        }
+    }
+
+    public abstract class BaseRommProvider
+    {
+        protected readonly IHttpClientFactory HttpClientFactory;
+        protected readonly ILogger Logger;
+
+        protected static bool IsEnabled => Plugin.Instance?.Configuration.RommEnabled == true;
+        protected static string InstanceUrl => (Plugin.Instance?.Configuration.RommInstanceUrl ?? string.Empty).TrimEnd('/');
+        protected static string Username => Plugin.Instance?.Configuration.RommUsername ?? string.Empty;
+        protected static string Password => Plugin.Instance?.Configuration.RommPassword ?? string.Empty;
+
+        protected BaseRommProvider(IHttpClientFactory httpClientFactory, ILogger logger)
+        {
+            HttpClientFactory = httpClientFactory;
+            Logger = logger;
+        }
+
+        protected HttpClient GetHttpClient()
+        {
+            var client = HttpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+            if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
+            {
+                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Username}:{Password}"));
+                client.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
+            }
+            return client;
+        }
+
+        /// <summary>
+        /// Searches the Romm API for a ROM by name and returns the first matching ROM object,
+        /// or null if nothing is found.
+        /// </summary>
+        protected async Task<JsonElement?> ResolveRomAsync(string name, CancellationToken cancellationToken)
+        {
+            if (!IsEnabled || string.IsNullOrEmpty(InstanceUrl)) return null;
+            var cleanName = RomExtensions.CleanName(name);
+            if (string.IsNullOrEmpty(cleanName)) return null;
+
+            try
+            {
+                var url = $"{InstanceUrl}/api/roms?search_term={Uri.EscapeDataString(cleanName)}&limit=1";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(json);
+                    // Romm returns { "items": [...], "total": N }
+                    if (doc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
+                        return items[0].Clone();
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
+            return GetHttpClient().GetAsync(url, cancellationToken);
+        }
+    }
+
+    public class RommMetadataProvider : BaseRommProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
+    {
+        public string Name => "Romm";
+        public int Order => 4;
+
+        private readonly PlatformResolver _platformResolver;
+
+        public RommMetadataProvider(
+            IHttpClientFactory httpClientFactory,
+            ILogger<RommMetadataProvider> logger,
+            PlatformResolver platformResolver)
+            : base(httpClientFactory, logger)
+        {
+            _platformResolver = platformResolver;
+        }
+
+        public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
+        {
+            var results = new List<RemoteSearchResult>();
+            if (!IsEnabled) return results;
+            if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            var cleanName = RomExtensions.CleanName(searchInfo.Name);
+            if (string.IsNullOrEmpty(cleanName) || string.IsNullOrEmpty(InstanceUrl)) return results;
+
+            try
+            {
+                var url = $"{InstanceUrl}/api/roms?search_term={Uri.EscapeDataString(cleanName)}&limit=5";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("items", out var items))
+                    {
+                        foreach (var rom in items.EnumerateArray())
+                        {
+                            var romId = rom.TryGetProperty("id", out var id) ? id.GetInt32().ToString() : string.Empty;
+                            var romName = rom.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+                            if (string.IsNullOrEmpty(romId)) continue;
+
+                            var searchResult = new RemoteSearchResult
+                            {
+                                Name = romName,
+                                ProviderIds = new Dictionary<string, string> { { "Romm", romId } },
+                                SearchProviderName = Name
+                            };
+                            results.Add(searchResult);
+                        }
+                    }
+                }
+            }
+            catch { }
+            return results;
+        }
+
+        public async Task<MetadataResult<Book>> GetMetadata(BookInfo info, CancellationToken cancellationToken)
+        {
+            var result = new MetadataResult<Book> { HasMetadata = false };
+            if (!IsEnabled) return result;
+            if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
+            if (string.IsNullOrEmpty(InstanceUrl)) return result;
+
+            // Try to get cached ROM id first, otherwise search
+            info.ProviderIds.TryGetValue("Romm", out var romId);
+            JsonElement? rom = null;
+
+            if (!string.IsNullOrEmpty(romId))
+            {
+                try
+                {
+                    var response = await GetHttpClient().GetAsync($"{InstanceUrl}/api/roms/{romId}", cancellationToken).ConfigureAwait(false);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                        using var doc = JsonDocument.Parse(json);
+                        rom = doc.RootElement.Clone();
+                    }
+                }
+                catch { }
+            }
+
+            if (rom == null)
+                rom = await ResolveRomAsync(info.Name, cancellationToken).ConfigureAwait(false);
+
+            if (rom == null) return result;
+
+            try
+            {
+                var resolvedId = rom.Value.TryGetProperty("id", out var idEl) ? idEl.GetInt32().ToString() : romId ?? string.Empty;
+
+                var consoleTag = _platformResolver.Resolve(info.Path);
+                var regionTag = PlatformResolver.ResolveRegion(info.Path);
+                var discTag = PlatformResolver.ResolveDisc(info.Path);
+
+                var tags = new List<string> { "Game", consoleTag };
+                if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+
+                var item = new Book
+                {
+                    Name = rom.Value.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? string.Empty : string.Empty,
+                    Overview = rom.Value.TryGetProperty("summary", out var summaryEl) ? summaryEl.GetString() ?? string.Empty : string.Empty,
+                    Tags = tags.ToArray()
+                };
+
+                // Release year from first_release_date (unix timestamp) or year_released (int)
+                if (rom.Value.TryGetProperty("first_release_date", out var frdEl) && frdEl.ValueKind == JsonValueKind.Number)
+                {
+                    var releaseDate = DateTimeOffset.FromUnixTimeSeconds(frdEl.GetInt64()).UtcDateTime;
+                    item.PremiereDate = releaseDate;
+                    item.ProductionYear = releaseDate.Year;
+                }
+                else if (rom.Value.TryGetProperty("year_released", out var yrEl) && yrEl.ValueKind == JsonValueKind.Number)
+                {
+                    item.ProductionYear = yrEl.GetInt32();
+                    item.PremiereDate = new DateTime(yrEl.GetInt32(), 1, 1);
+                }
+
+                // Genres
+                if (rom.Value.TryGetProperty("genres", out var genresEl) && genresEl.ValueKind == JsonValueKind.Array)
+                    foreach (var g in genresEl.EnumerateArray())
+                    {
+                        var gName = g.TryGetProperty("name", out var gn) ? gn.GetString() : g.GetString();
+                        if (!string.IsNullOrWhiteSpace(gName)) item.AddGenre(gName);
+                    }
+
+                // Platforms / studios from the rom's platform name
+                if (rom.Value.TryGetProperty("platform_name", out var platformEl))
+                {
+                    var pName = platformEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(pName)) item.AddStudio(pName);
+                }
+
+                if (!string.IsNullOrEmpty(resolvedId))
+                    item.SetProviderId("Romm", resolvedId);
+
+                result.HasMetadata = true;
+                result.Item = item;
+            }
+            catch { }
+            return result;
+        }
+    }
+
+    public class RommImageProvider : BaseRommProvider, IRemoteImageProvider, IHasOrder
+    {
+        public string Name => "Romm";
+        public int Order => 4;
+
+        public RommImageProvider(IHttpClientFactory httpClientFactory, ILogger<RommImageProvider> logger)
+            : base(httpClientFactory, logger) { }
+
+        public bool Supports(BaseItem item) => item is Book;
+
+        public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
+
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
+        {
+            var list = new List<RemoteImageInfo>();
+            if (!IsEnabled || string.IsNullOrEmpty(InstanceUrl)) return list;
+            if (!string.IsNullOrEmpty(item.Path) && !RomExtensions.IsRomPath(item.Path)) return list;
+
+            var romId = item.GetProviderId("Romm");
+            JsonElement? rom = null;
+
+            if (!string.IsNullOrEmpty(romId))
+            {
+                try
+                {
+                    var response = await GetHttpClient().GetAsync($"{InstanceUrl}/api/roms/{romId}", cancellationToken).ConfigureAwait(false);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                        using var doc = JsonDocument.Parse(json);
+                        rom = doc.RootElement.Clone();
+                    }
+                }
+                catch { }
+            }
+
+            if (rom == null)
+                rom = await ResolveRomAsync(item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
+
+            if (rom == null) return list;
+
+            try
+            {
+                // cover_url is the primary artwork Romm exposes
+                if (rom.Value.TryGetProperty("url_cover", out var coverEl) && coverEl.ValueKind != JsonValueKind.Null)
+                {
+                    var coverUrl = coverEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(coverUrl))
+                    {
+                        // Romm may return a relative path
+                        if (!Uri.IsWellFormedUriString(coverUrl, UriKind.Absolute))
+                            coverUrl = $"{InstanceUrl}{(coverUrl.StartsWith("/") ? "" : "/")}{coverUrl}";
+                        list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = coverUrl });
+                    }
+                }
+
+                // screenshots as backdrop images
+                if (rom.Value.TryGetProperty("url_screenshots", out var screenshotsEl) && screenshotsEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var shot in screenshotsEl.EnumerateArray())
+                    {
+                        var shotUrl = shot.GetString();
+                        if (string.IsNullOrWhiteSpace(shotUrl)) continue;
+                        if (!Uri.IsWellFormedUriString(shotUrl, UriKind.Absolute))
+                            shotUrl = $"{InstanceUrl}{(shotUrl.StartsWith("/") ? "" : "/")}{shotUrl}";
+                        list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Backdrop, Url = shotUrl });
                     }
                 }
             }

@@ -50,6 +50,40 @@
             </div>
 
             <div class="verticalSection" style="margin-top: 1.5em;">
+                <h2 class="sectionTitle">Romm Metadata <span style="font-size: 0.65em; vertical-align: middle; background: #555; color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px;">Disabled by default</span></h2>
+                <p style="color: #aaa; margin-bottom: 1em;">
+                    Pulls metadata and cover art directly from your self-hosted
+                    <a href="https://github.com/rommapp/romm" target="_blank" style="color: #00a4dc;">Romm</a>
+                    instance. Requires Romm v3.4 or later with the REST API enabled.
+                    Leave the fields blank or keep the toggle off to disable this provider.
+                </p>
+                <div class="inputContainer" style="display: flex; align-items: center; gap: 12px; margin-bottom: 1em;">
+                    <input id="rommEnabled" type="checkbox" is="emby-checkbox" class="emby-checkbox" />
+                    <label for="rommEnabled" style="cursor: pointer; color: #ccc;">Enable Romm metadata provider</label>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="rommInstanceUrl">Romm Instance URL</label>
+                    <input id="rommInstanceUrl" type="text" is="emby-input" class="emby-input"
+                        placeholder="e.g. https://romm.example.com" autocomplete="off" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="rommUsername">Romm Username</label>
+                    <input id="rommUsername" type="text" is="emby-input" class="emby-input"
+                        placeholder="Your Romm username" autocomplete="off" />
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="rommPassword">Romm Password</label>
+                    <input id="rommPassword" type="password" is="emby-input" class="emby-input"
+                        placeholder="Your Romm password" autocomplete="off" />
+                </div>
+                <p style="color: #777; font-size: 0.82em; margin-top: 0.25em;">
+                    Credentials are stored in the Jellyfin plugin configuration and sent as HTTP Basic Auth to your
+                    Romm instance. Use a read-only Romm account for security. A secure HTTPS connection is strongly
+                    recommended.
+                </p>
+            </div>
+
+            <div class="verticalSection" style="margin-top: 1.5em;">
                 <h2 class="sectionTitle">Netplay</h2>
                 <p style="color: #aaa; margin-bottom: 1em;">
                     Optional. Provide your netplay server address to enable multiplayer via EmulatorJS.
@@ -199,6 +233,10 @@
                     page.querySelector('#igdbClientId').value = config.IgdbClientId || '';
                     page.querySelector('#igdbClientSecret').value = config.IgdbClientSecret || '';
                     page.querySelector('#rawgApiKey').value = config.RawgApiKey || '';
+                    page.querySelector('#rommEnabled').checked = config.RommEnabled || false;
+                    page.querySelector('#rommInstanceUrl').value = config.RommInstanceUrl || '';
+                    page.querySelector('#rommUsername').value = config.RommUsername || '';
+                    page.querySelector('#rommPassword').value = config.RommPassword || '';
                     page.querySelector('#netplayServer').value = config.NetplayServer || '';
                 }).catch(function (err) {
                     console.error('[JellyEmu] Failed to load config:', err);
@@ -211,6 +249,10 @@
                     config.IgdbClientId = page.querySelector('#igdbClientId').value.trim();
                     config.IgdbClientSecret = page.querySelector('#igdbClientSecret').value.trim();
                     config.RawgApiKey = page.querySelector('#rawgApiKey').value.trim();
+                    config.RommEnabled = page.querySelector('#rommEnabled').checked;
+                    config.RommInstanceUrl = page.querySelector('#rommInstanceUrl').value.trim();
+                    config.RommUsername = page.querySelector('#rommUsername').value.trim();
+                    config.RommPassword = page.querySelector('#rommPassword').value.trim();
                     config.NetplayServer = page.querySelector('#netplayServer').value.trim();
                     return ApiClient.updatePluginConfiguration(pluginId, config);
                 }).then(function () {

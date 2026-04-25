@@ -61,5 +61,25 @@ namespace JellyEmu
         public string RawgApiKey { get; set; } = string.Empty;
 
         public string NetplayServer { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether the Romm metadata provider is enabled. Disabled by default.
+        /// </summary>
+        public bool RommEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Base URL of the Romm instance, e.g. https://romm.example.com
+        /// </summary>
+        public string RommInstanceUrl { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Romm username for basic authentication.
+        /// </summary>
+        public string RommUsername { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Romm password for basic authentication.
+        /// </summary>
+        public string RommPassword { get; set; } = string.Empty;
     }
 }
