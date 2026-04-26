@@ -770,6 +770,17 @@ namespace JellyEmu.Services
                                             </select>
                                             <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
                                         </div>
+
+                                        <div style="margin-top:1.5em;">
+                                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75em;">
+                                                <h3 style="margin:0;font-size:0.95em;color:#ccc;">Key Bindings</h3>
+                                                <button type="button" id="jellyemu-controls-reset" style="font-size:0.78em;padding:4px 12px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:#aaa;cursor:pointer;">
+                                                    Reset to defaults
+                                                </button>
+                                            </div>
+                                            <p style="font-size:0.8em;color:#777;margin:0 0 1em;">Click a button then press a key to remap it. Changes apply next time you launch a game.</p>
+                                            <div id="jellyemu-bindings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;"></div>
+                                        </div>
                                     </div>
 
                                     <div class="verticalSection">
@@ -839,6 +850,10 @@ namespace JellyEmu.Services
                                         if (data.haptics !== undefined) sel('jellyemu-pref-haptics').value = data.haptics;
                                         if (data.autosave !== undefined) sel('jellyemu-pref-autosave').value = data.autosave;
                                         if (data.videoRotation !== undefined) sel('jellyemu-pref-rotation').value = String(data.videoRotation);
+                                        if (data.controls) {
+                                            loadBindingsFromJson(data.controls);
+                                            renderBindingsGrid();
+                                        }
                                         
                                         // Keep localStorage cache in sync with the server response
                                         saveLocalPrefs(data);
@@ -851,7 +866,154 @@ namespace JellyEmu.Services
                             e.preventDefault();
                         });
 
+                        // ── Key binding editor ────────────────────────────────────────────
+                        // All 30 EJS button indices with human names and EJS defaults
+                        const EJS_BINDINGS = [
+                            { idx: 0,  name: 'B',               def: 'x'          },
+                            { idx: 1,  name: 'Y',               def: 's'          },
+                            { idx: 2,  name: 'Select',          def: 'v'          },
+                            { idx: 3,  name: 'Start',           def: 'Enter'      },
+                            { idx: 4,  name: 'D-Pad Up',        def: 'ArrowUp'    },
+                            { idx: 5,  name: 'D-Pad Down',      def: 'ArrowDown'  },
+                            { idx: 6,  name: 'D-Pad Left',      def: 'ArrowLeft'  },
+                            { idx: 7,  name: 'D-Pad Right',     def: 'ArrowRight' },
+                            { idx: 8,  name: 'A',               def: 'z'          },
+                            { idx: 9,  name: 'X',               def: 'a'          },
+                            { idx: 10, name: 'L',               def: 'q'          },
+                            { idx: 11, name: 'R',               def: 'e'          },
+                            { idx: 12, name: 'L2',              def: 'Tab'        },
+                            { idx: 13, name: 'R2',              def: 'r'          },
+                            { idx: 14, name: 'L3',              def: ''           },
+                            { idx: 15, name: 'R3',              def: ''           },
+                            { idx: 16, name: 'L Stick Right',   def: 'h'          },
+                            { idx: 17, name: 'L Stick Left',    def: 'f'          },
+                            { idx: 18, name: 'L Stick Down',    def: 'g'          },
+                            { idx: 19, name: 'L Stick Up',      def: 't'          },
+                            { idx: 20, name: 'R Stick Right',   def: 'l'          },
+                            { idx: 21, name: 'R Stick Left',    def: 'j'          },
+                            { idx: 22, name: 'R Stick Down',    def: 'k'          },
+                            { idx: 23, name: 'R Stick Up',      def: 'i'          },
+                            { idx: 24, name: 'Quick Save',      def: '1'          },
+                            { idx: 25, name: 'Quick Load',      def: '2'          },
+                            { idx: 26, name: 'Change Slot',     def: '3'          },
+                            { idx: 27, name: 'Fast Forward',    def: '+'          },
+                            { idx: 28, name: 'Rewind',          def: ' '          },
+                            { idx: 29, name: 'Slow Motion',     def: '-'          },
+                        ];
+
+                        // currentBindings: index → key string (event.key)
+                        var currentBindings = {};
+                        EJS_BINDINGS.forEach(function(b) { currentBindings[b.idx] = b.def; });
+
+                        function loadBindingsFromJson(json) {
+                            if (!json) return;
+                            try {
+                                var saved = JSON.parse(json);
+                                Object.keys(saved).forEach(function(k) {
+                                    var entry = saved[k];
+                                    if (entry && entry.value !== undefined) {
+                                        currentBindings[parseInt(k, 10)] = entry.value;
+                                    }
+                                });
+                            } catch(e) {}
+                        }
+
+                        function bindingsToJson() {
+                            var out = {};
+                            EJS_BINDINGS.forEach(function(b) {
+                                out[b.idx] = { value: currentBindings[b.idx] || '' };
+                            });
+                            return JSON.stringify(out);
+                        }
+
+                        function renderBindingLabel(key) {
+                            if (!key || key === '') return '—';
+                            var display = {
+                                ' ': 'Space', 'ArrowUp': '↑', 'ArrowDown': '↓',
+                                'ArrowLeft': '←', 'ArrowRight': '→',
+                                'Enter': 'Enter', 'Tab': 'Tab', 'Escape': 'Esc',
+                                'Backspace': 'Bksp', 'Delete': 'Del',
+                                '+': '+', '-': '-',
+                            };
+                            return display[key] || key.toUpperCase();
+                        }
+
+                        var listeningIdx = null;
+
+                        function renderBindingsGrid() {
+                            var grid = activePage.querySelector('#jellyemu-bindings-grid');
+                            if (!grid) return;
+                            grid.innerHTML = '';
+                            EJS_BINDINGS.forEach(function(b) {
+                                var row = document.createElement('div');
+                                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);';
+
+                                var label = document.createElement('span');
+                                label.textContent = b.name;
+                                label.style.cssText = 'font-size:0.85em;color:#ccc;flex:1;';
+
+                                var btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.dataset.bindingIdx = b.idx;
+                                btn.textContent = renderBindingLabel(currentBindings[b.idx]);
+                                btn.style.cssText = 'min-width:72px;padding:4px 10px;background:rgba(255,255,255,0.07);' +
+                                    'border:1px solid rgba(255,255,255,0.18);border-radius:4px;' +
+                                    'color:#e0e0e0;font-size:0.82em;cursor:pointer;text-align:center;';
+
+                                btn.addEventListener('click', function() {
+                                    // Deselect any previously listening button
+                                    activePage.querySelectorAll('[data-binding-idx]').forEach(function(b2) {
+                                        b2.style.background = 'rgba(255,255,255,0.07)';
+                                        b2.style.borderColor = 'rgba(255,255,255,0.18)';
+                                        b2.style.color = '#e0e0e0';
+                                        if (parseInt(b2.dataset.bindingIdx, 10) === listeningIdx) {
+                                            b2.textContent = renderBindingLabel(currentBindings[listeningIdx]);
+                                        }
+                                    });
+                                    listeningIdx = b.idx;
+                                    btn.textContent = 'Press a key…';
+                                    btn.style.background = 'rgba(0,164,220,0.2)';
+                                    btn.style.borderColor = '#00a4dc';
+                                    btn.style.color = '#00a4dc';
+                                });
+
+                                row.appendChild(label);
+                                row.appendChild(btn);
+                                grid.appendChild(row);
+                            });
+                        }
+
+                        // Global keydown listener for capturing bindings
+                        document.addEventListener('keydown', function(e) {
+                            if (listeningIdx === null) return;
+                            // Don't capture modifier-only presses
+                            if (['Control','Shift','Alt','Meta'].includes(e.key)) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            currentBindings[listeningIdx] = e.key;
+                            var btn = activePage.querySelector('[data-binding-idx="' + listeningIdx + '"]');
+                            if (btn) {
+                                btn.textContent = renderBindingLabel(e.key);
+                                btn.style.background = 'rgba(82,181,75,0.15)';
+                                btn.style.borderColor = 'rgba(82,181,75,0.5)';
+                                btn.style.color = '#52B54B';
+                            }
+                            listeningIdx = null;
+                        }, true);
+
+                        activePage.querySelector('#jellyemu-controls-reset').addEventListener('click', function() {
+                            EJS_BINDINGS.forEach(function(b) { currentBindings[b.idx] = b.def; });
+                            renderBindingsGrid();
+                        });
+
+                        // Render grid immediately with defaults, then overwrite with saved bindings
+                        renderBindingsGrid();
+
+                        // ── Save button ───────────────────────────────────────────────────────
                         sel('jellyemu-prefs-save').addEventListener('click', function() {
+                            // Cancel any active listen
+                            listeningIdx = null;
+
                             const prefsPayload = {
                                 shader:        sel('jellyemu-pref-shader').value,
                                 scale:         sel('jellyemu-pref-scale').value,
@@ -859,7 +1021,8 @@ namespace JellyEmu.Services
                                 controller:    sel('jellyemu-pref-controller').value,
                                 haptics:       sel('jellyemu-pref-haptics').value,
                                 autosave:      sel('jellyemu-pref-autosave').value,
-                                videoRotation: parseInt(sel('jellyemu-pref-rotation').value, 10) || 0
+                                videoRotation: parseInt(sel('jellyemu-pref-rotation').value, 10) || 0,
+                                controls:      bindingsToJson(),
                             };
 
                             // Always save locally so the emulator iframe has instant fallback access
@@ -869,10 +1032,7 @@ namespace JellyEmu.Services
                             const slotUserId  = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
 
                             if (slotUserId) {
-                                // Exclusively POST slot
                                 const saveSlotReq = fetch('/jellyemu/slot/' + slotUserId + '?slot=' + slotVal, { method: 'POST' });
-                                
-                                // POST full preferences JSON
                                 const savePrefsReq = fetch('/jellyemu/prefs/' + slotUserId, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },

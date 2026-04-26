@@ -184,10 +184,11 @@ namespace JellyEmu.Controllers
             string Haptics,
             string Autosave,
             string Shader,
-            int VideoRotation);
+            int VideoRotation,
+            string Controls);   // JSON string — serialised EJS_defaultControls player-0 map
 
         private static readonly UserFullPrefs DefaultFullPrefs =
-            new("fit", "false", "auto", "true", "true", string.Empty, 0);
+            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty);
 
         private string GetPrefsFilePath(string userId)
         {
@@ -216,7 +217,8 @@ namespace JellyEmu.Controllers
                     Haptics: Str("haptics", DefaultFullPrefs.Haptics),
                     Autosave: Str("autosave", DefaultFullPrefs.Autosave),
                     Shader: Str("shader", DefaultFullPrefs.Shader),
-                    VideoRotation: Int("videoRotation", DefaultFullPrefs.VideoRotation));
+                    VideoRotation: Int("videoRotation", DefaultFullPrefs.VideoRotation),
+                    Controls: Str("controls", DefaultFullPrefs.Controls));
             }
             catch (Exception ex)
             {
@@ -237,6 +239,7 @@ namespace JellyEmu.Controllers
                 autosave = prefs.Autosave,
                 shader = prefs.Shader,
                 videoRotation = prefs.VideoRotation,
+                controls = prefs.Controls,
             }));
         }
 
@@ -268,9 +271,11 @@ namespace JellyEmu.Controllers
 
             var hasSaves = !string.IsNullOrEmpty(userId);
             var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
+            var fullPrefs = hasSaves ? ReadFullPrefs(userId!) : DefaultFullPrefs;
             var activeSlot = userPrefs.Slot;
             var activeShader = userPrefs.Shader;
             var videoRotation = userPrefs.VideoRotation;
+            var savedControls = fullPrefs.Controls; // JSON string of player-0 key map
             var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
             var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
@@ -330,6 +335,9 @@ namespace JellyEmu.Controllers
         }};
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
         {(core is "dos" or "psp" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
+
+        // Inject saved key bindings if the user has customised them
+        {(!string.IsNullOrWhiteSpace(savedControls) ? $"window.EJS_defaultControls = {{ 0: {savedControls}, 1: {{}}, 2: {{}}, 3: {{}} }};" : "// EJS_defaultControls: using emulator defaults")}
 
         {(!string.IsNullOrEmpty(igdbId) ? $"window.EJS_gameID = {igdbId};" : "")}
         {(hasNetplay ? $@"window.EJS_netplayServer = '{netplayServer}';
@@ -723,6 +731,7 @@ namespace JellyEmu.Controllers
                 autosave = prefs.Autosave,
                 shader = prefs.Shader,
                 videoRotation = prefs.VideoRotation,
+                controls = prefs.Controls,
             });
         }
 
@@ -759,7 +768,8 @@ namespace JellyEmu.Controllers
                     Haptics: Str("haptics", current.Haptics),
                     Autosave: Str("autosave", current.Autosave),
                     Shader: Str("shader", current.Shader),
-                    VideoRotation: Int("videoRotation", current.VideoRotation));
+                    VideoRotation: Int("videoRotation", current.VideoRotation),
+                    Controls: Str("controls", current.Controls));
             }
             catch { return BadRequest("Body must be a JSON object."); }
 
@@ -775,6 +785,7 @@ namespace JellyEmu.Controllers
                 autosave = current.Autosave,
                 shader = current.Shader,
                 videoRotation = current.VideoRotation,
+                controls = current.Controls,
             });
         }
 
