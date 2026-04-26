@@ -1,3 +1,5 @@
+[![Project Board](https://img.shields.io/badge/GitHub-Project%20Board-blue)](https://github.com/orgs/Jellyfin-PG/projects/2)
+
 <div align="center">
   <img src="assets/jellyemu.svg" alt="JellyEmu Logo" width="120" />
   <h1>JellyEmu</h1>
