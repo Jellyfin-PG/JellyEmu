@@ -1,5 +1,3 @@
-[![Project Preview](https://via.placeholder.com/900x400.png?text=GitHub+Project+Board)](https://github.com/orgs/Jellyfin-PG/projects/2)
-
 <div align="center">
   <img src="assets/jellyemu.svg" alt="JellyEmu Logo" width="120" />
   <h1>JellyEmu</h1>
@@ -36,6 +34,18 @@
 # JellyEmu Plugin Setup Guide
 
 This guide details the process for integrating an emulation collection into Jellyfin for metadata management and direct playback.
+
+<p align="center">
+
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/ci.yml?branch=main)](https://github.com/Jellyfin-PG/JellyEmu/actions)
+
+[![Downloads](https://img.shields.io/github/downloads/Jellyfin-PG/JellyEmu/total?label=downloads)](https://github.com/Jellyfin-PG/JellyEmu/releases)
+
+[![Project Board](https://img.shields.io/badge/Project-Board-blue)](https://github.com/orgs/Jellyfin-PG/projects/2)
+
+[![Discord](https://img.shields.io/discord/1234567890?label=discord&logo=discord&color=5865F2)](https://discord.gg/v7P9CAvCKZ)
+
+</p>
 
 ---
 
