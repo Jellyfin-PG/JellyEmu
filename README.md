@@ -6,7 +6,7 @@
 
 <p align="center">
   
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/release.yml?branch=main)](https://github.com/Jellyfin-PG/JellyEmu/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/release.yml)](https://github.com/Jellyfin-PG/JellyEmu/actions)
 [![Downloads](https://img.shields.io/github/downloads/Jellyfin-PG/JellyEmu/total?label=downloads)](https://github.com/Jellyfin-PG/JellyEmu/releases)
 [![Project Board](https://img.shields.io/badge/Project-Board-blue)](https://github.com/orgs/Jellyfin-PG/projects/2)
 [![Discord](https://img.shields.io/discord/1234567890?label=discord&logo=discord&color=5865F2)](https://discord.gg/v7P9CAvCKZ)
