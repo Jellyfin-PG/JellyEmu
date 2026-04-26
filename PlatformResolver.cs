@@ -425,4 +425,86 @@ namespace JellyEmu
                 ".bin",
             };
     }
+    /// <summary>
+    /// Minimal CUE sheet parser. A .cue file is plain text - no external dependency needed.
+    /// </summary>
+    public static class CueParser
+    {
+        /// <summary>
+        /// Returns all FILE entries referenced by a CUE sheet as absolute paths,
+        /// resolved relative to the directory containing the .cue file.
+        /// </summary>
+        public static List<string> GetReferencedFiles(string cuePath)
+        {
+            var result = new List<string>();
+            try
+            {
+                var dir = Path.GetDirectoryName(cuePath) ?? string.Empty;
+                foreach (var line in File.ReadLines(cuePath))
+                {
+                    var trimmed = line.TrimStart();
+                    if (!trimmed.StartsWith("FILE", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var rest = trimmed.Substring(4).TrimStart();
+                    string fileName;
+                    if (rest.StartsWith("\""))
+                    {
+                        var closing = rest.IndexOf('"', 1);
+                        if (closing < 0) continue;
+                        fileName = rest.Substring(1, closing - 1);
+                    }
+                    else
+                    {
+                        var space = rest.IndexOfAny(new[] { ' ', '\t' });
+                        fileName = space >= 0 ? rest.Substring(0, space) : rest;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(fileName)) continue;
+
+                    var candidate = Path.IsPathRooted(fileName)
+                        ? fileName
+                        : Path.Combine(dir, fileName);
+                    result.Add(candidate);
+                }
+            }
+            catch { }
+            return result;
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="binPath"/> is referenced by any sibling .cue file.
+        /// </summary>
+        public static bool IsReferencedByAnyCue(string binPath)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(binPath) ?? string.Empty;
+                var binName = Path.GetFileName(binPath);
+                foreach (var cueFile in Directory.GetFiles(dir, "*.cue"))
+                    foreach (var referenced in GetReferencedFiles(cueFile))
+                        if (string.Equals(Path.GetFileName(referenced), binName,
+                                StringComparison.OrdinalIgnoreCase))
+                            return true;
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Returns the first existing binary track file referenced by the .cue, or null.
+        /// </summary>
+        public static string? GetFirstBinPath(string cuePath)
+        {
+            foreach (var path in GetReferencedFiles(cuePath))
+                if (File.Exists(path)) return path;
+            return null;
+        }
+
+        /// <summary>
+        /// Returns true if the .cue has at least one referenced FILE that exists on disk.
+        /// </summary>
+        public static bool HasResolvedBin(string cuePath) => GetFirstBinPath(cuePath) != null;
+    }
+
 }

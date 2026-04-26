@@ -535,9 +535,26 @@ namespace JellyEmu.Controllers
                 return NotFound();
             }
 
-            _logger.LogInformation("[JellyEmu] Serving ROM: {Path}", item.Path);
+            // For .cue files, EmulatorJS needs the actual binary track data.
+            // Parse the .cue sheet and serve the first FILE entry's .bin instead.
+            var servePath = item.Path;
+            if (string.Equals(Path.GetExtension(item.Path), ".cue", StringComparison.OrdinalIgnoreCase))
+            {
+                var binPath = CueParser.GetFirstBinPath(item.Path);
+                if (binPath != null)
+                {
+                    _logger.LogInformation("[JellyEmu] CUE sheet resolved to BIN: {Path}", binPath);
+                    servePath = binPath;
+                }
+                else
+                {
+                    _logger.LogWarning("[JellyEmu] CUE sheet has no resolvable BIN track: {Path}", item.Path);
+                }
+            }
 
-            var ext = Path.GetExtension(item.Path).TrimStart('.').ToLowerInvariant();
+            _logger.LogInformation("[JellyEmu] Serving ROM: {Path}", servePath);
+
+            var ext = Path.GetExtension(servePath).TrimStart('.').ToLowerInvariant();
             var mimeType = ext switch
             {
                 "zip" => "application/zip",
@@ -547,15 +564,15 @@ namespace JellyEmu.Controllers
                 _ => "application/octet-stream"
             };
 
-            var fileInfo = new System.IO.FileInfo(item.Path);
+            var fileInfo = new System.IO.FileInfo(servePath);
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
             Response.Headers["Content-Length"] = fileInfo.Length.ToString();
-            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Path.GetFileName(item.Path)}\"";
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Path.GetFileName(servePath)}\"";
 
             if (HttpMethods.IsHead(Request.Method))
                 return new FileContentResult(Array.Empty<byte>(), mimeType);
 
-            var stream = System.IO.File.OpenRead(item.Path);
+            var stream = System.IO.File.OpenRead(servePath);
             return File(stream, mimeType, enableRangeProcessing: true);
         }
 
