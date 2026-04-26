@@ -15,8 +15,42 @@ namespace JellyEmu
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+            // Regular file path
             var ext = Path.GetExtension(path);
-            return !string.IsNullOrEmpty(ext) && PlatformResolver.AllRomExtensions.Contains(ext);
+            if (!string.IsNullOrEmpty(ext)) return PlatformResolver.AllRomExtensions.Contains(ext);
+            // Directory path — valid only if it contains exactly one .cue that references
+            // at least one existing .bin (i.e. it's a CUE+BIN game folder, not a platform folder).
+            if (Directory.Exists(path))
+            {
+                try
+                {
+                    var cues = Directory.GetFiles(path, "*.cue");
+                    return cues.Length == 1 && CueParser.HasResolvedBin(cues[0]);
+                }
+                catch { }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Returns the effective ROM file path for use by metadata providers.
+        /// When <paramref name="path"/> is a directory (folder-as-game), returns the
+        /// single .cue file inside it. Otherwise returns <paramref name="path"/> as-is.
+        /// </summary>
+        public static string EffectiveRomPath(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            if (Directory.Exists(path))
+            {
+                try
+                {
+                    var cues = Directory.GetFiles(path, "*.cue");
+                    if (cues.Length == 1 && CueParser.HasResolvedBin(cues[0]))
+                        return cues[0];
+                }
+                catch { }
+            }
+            return path;
         }
 
         public static string CleanName(string name)
@@ -52,9 +86,9 @@ namespace JellyEmu
                 var nfoPath = Path.ChangeExtension(info.Path, ".nfo");
                 if (File.Exists(nfoPath))
                 {
-                    var nfoTags = new List<string> { "Game", _platformResolver.Resolve(info.Path) };
-                    var nfoRegion = PlatformResolver.ResolveRegion(info.Path);
-                    var nfoDisc = PlatformResolver.ResolveDisc(info.Path);
+                    var nfoTags = new List<string> { "Game", _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path)) };
+                    var nfoRegion = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                    var nfoDisc = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
                     if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
                     if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
 
@@ -80,8 +114,9 @@ namespace JellyEmu
             var list = new List<RemoteImageInfo>();
             if (!string.IsNullOrEmpty(item.Path) && RomExtensions.IsRomPath(item.Path))
             {
-                var dir = Path.GetDirectoryName(item.Path);
-                var baseName = Path.GetFileNameWithoutExtension(item.Path);
+                var effectivePath = RomExtensions.EffectiveRomPath(item.Path);
+                var dir = Path.GetDirectoryName(effectivePath);
+                var baseName = Path.GetFileNameWithoutExtension(effectivePath);
                 var possible = Path.Combine(dir ?? string.Empty, baseName + ".jpg");
                 if (File.Exists(possible))
                 {
@@ -315,9 +350,9 @@ namespace JellyEmu
                     {
                         var root = document.RootElement[0];
 
-                        var consoleTag = _platformResolver.Resolve(info.Path);
-                        var regionTag = PlatformResolver.ResolveRegion(info.Path);
-                        var discTag = PlatformResolver.ResolveDisc(info.Path);
+                        var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
+                        var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                        var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                         var tags = new List<string> { "Game", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
@@ -486,9 +521,9 @@ namespace JellyEmu
                     using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     var root = document.RootElement;
 
-                    var consoleTag = _platformResolver.Resolve(info.Path);
-                    var regionTag = PlatformResolver.ResolveRegion(info.Path);
-                    var discTag = PlatformResolver.ResolveDisc(info.Path);
+                    var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
+                    var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                    var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                     var tags = new List<string> { "Game", consoleTag };
                     if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
@@ -696,9 +731,9 @@ namespace JellyEmu
                         query.TryGetProperty("pages", out var pages) &&
                         pages.TryGetProperty(pageId, out var page))
                     {
-                        var consoleTag = _platformResolver.Resolve(info.Path);
-                        var regionTag = PlatformResolver.ResolveRegion(info.Path);
-                        var discTag = PlatformResolver.ResolveDisc(info.Path);
+                        var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
+                        var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                        var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                         var tags = new List<string> { "Game", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
@@ -927,9 +962,9 @@ namespace JellyEmu
             {
                 var resolvedId = rom.Value.TryGetProperty("id", out var idEl) ? idEl.GetInt32().ToString() : romId ?? string.Empty;
 
-                var consoleTag = _platformResolver.Resolve(info.Path);
-                var regionTag = PlatformResolver.ResolveRegion(info.Path);
-                var discTag = PlatformResolver.ResolveDisc(info.Path);
+                var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
+                var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                 var tags = new List<string> { "Game", consoleTag };
                 if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);

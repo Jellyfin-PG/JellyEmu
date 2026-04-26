@@ -310,7 +310,7 @@ namespace JellyEmu.Services
                                             pill.title = hasSave ? 'Save exists in slot ' + slot : 'No save in slot ' + slot;
                                             pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
                                             pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">' +
-                                                (hasSave ? 'save' : 'save_outlined') + '</span>' +
+                                                (hasSave ? 'save' : 'save_alt') + '</span>' +
                                                 'Slot ' + slot +
                                                 (hasSave ? ' <span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">check_circle</span>' : '');
                                             miscBar.appendChild(pill);
