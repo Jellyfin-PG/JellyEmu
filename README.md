@@ -4,6 +4,13 @@
   <p>A plugin for jellyfin 10.11+ to import, play and share your roms with users.</p>
 </div>
 
+<p align="center">
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/ci.yml?branch=main)](https://github.com/Jellyfin-PG/JellyEmu/actions)
+[![Downloads](https://img.shields.io/github/downloads/Jellyfin-PG/JellyEmu/total?label=downloads)](https://github.com/Jellyfin-PG/JellyEmu/releases)
+[![Project Board](https://img.shields.io/badge/Project-Board-blue)](https://github.com/orgs/Jellyfin-PG/projects/2)
+[![Discord](https://img.shields.io/discord/1234567890?label=discord&logo=discord&color=5865F2)](https://discord.gg/v7P9CAvCKZ)
+</p>
+
 ---
 
 ## Screenshots
@@ -34,18 +41,6 @@
 # JellyEmu Plugin Setup Guide
 
 This guide details the process for integrating an emulation collection into Jellyfin for metadata management and direct playback.
-
-<p align="center">
-
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/ci.yml?branch=main)](https://github.com/Jellyfin-PG/JellyEmu/actions)
-
-[![Downloads](https://img.shields.io/github/downloads/Jellyfin-PG/JellyEmu/total?label=downloads)](https://github.com/Jellyfin-PG/JellyEmu/releases)
-
-[![Project Board](https://img.shields.io/badge/Project-Board-blue)](https://github.com/orgs/Jellyfin-PG/projects/2)
-
-[![Discord](https://img.shields.io/discord/1234567890?label=discord&logo=discord&color=5865F2)](https://discord.gg/v7P9CAvCKZ)
-
-</p>
 
 ---
 
