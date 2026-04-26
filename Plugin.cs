@@ -73,13 +73,33 @@ namespace JellyEmu
         public string RommInstanceUrl { get; set; } = string.Empty;
 
         /// <summary>
-        /// Romm username for basic authentication.
+        /// Romm username for Basic authentication.
         /// </summary>
         public string RommUsername { get; set; } = string.Empty;
 
         /// <summary>
-        /// Romm password for basic authentication.
+        /// Romm password for Basic authentication.
         /// </summary>
         public string RommPassword { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether to sync save states with Romm. Pull if Romm is newer on load; push on save.
+        /// </summary>
+        public bool RommSaveSyncEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Whether to report session playtime to Romm after each play session ends.
+        /// </summary>
+        public bool RommPlaytimeReportEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Whether to synchronise Romm collections into Jellyfin playlists/collections.
+        /// </summary>
+        public bool RommCollectionSyncEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Whether to push EmulatorJS screenshots to Romm.
+        /// </summary>
+        public bool RommScreenshotPushEnabled { get; set; } = true;
     }
 }

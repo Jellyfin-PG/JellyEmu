@@ -778,6 +778,8 @@ namespace JellyEmu
         protected static string Username => Plugin.Instance?.Configuration.RommUsername ?? string.Empty;
         protected static string Password => Plugin.Instance?.Configuration.RommPassword ?? string.Empty;
 
+        // Simple in-process token cache — keyed by InstanceUrl+Username so it auto-invalidates on credential changes.
+
         protected BaseRommProvider(IHttpClientFactory httpClientFactory, ILogger logger)
         {
             HttpClientFactory = httpClientFactory;
@@ -809,7 +811,8 @@ namespace JellyEmu
             try
             {
                 var url = $"{InstanceUrl}/api/roms?search_term={Uri.EscapeDataString(cleanName)}&limit=1";
-                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                var client = GetHttpClient();
+                var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -823,11 +826,12 @@ namespace JellyEmu
             return null;
         }
 
-        public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+        public async Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
-                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
-            return GetHttpClient().GetAsync(url, cancellationToken);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
+            var client = GetHttpClient();
+            return await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -859,7 +863,8 @@ namespace JellyEmu
             try
             {
                 var url = $"{InstanceUrl}/api/roms?search_term={Uri.EscapeDataString(cleanName)}&limit=5";
-                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                var client = GetHttpClient();
+                var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
@@ -901,7 +906,8 @@ namespace JellyEmu
             {
                 try
                 {
-                    var response = await GetHttpClient().GetAsync($"{InstanceUrl}/api/roms/{romId}", cancellationToken).ConfigureAwait(false);
+                    var client = GetHttpClient();
+                    var response = await client.GetAsync($"{InstanceUrl}/api/roms/{romId}", cancellationToken).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode)
                     {
                         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -1000,7 +1006,8 @@ namespace JellyEmu
             {
                 try
                 {
-                    var response = await GetHttpClient().GetAsync($"{InstanceUrl}/api/roms/{romId}", cancellationToken).ConfigureAwait(false);
+                    var client = GetHttpClient();
+                    var response = await client.GetAsync($"{InstanceUrl}/api/roms/{romId}", cancellationToken).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode)
                     {
                         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

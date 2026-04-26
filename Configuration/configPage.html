@@ -50,21 +50,83 @@
             </div>
 
             <div class="verticalSection" style="margin-top: 1.5em;">
-                <h2 class="sectionTitle">Romm Metadata <span style="font-size: 0.65em; vertical-align: middle; background: #555; color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px;">Disabled by default</span></h2>
+                <h2 class="sectionTitle">Romm Integration <span
+                        style="font-size: 0.65em; vertical-align: middle; background: #555; color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px;">Disabled
+                        by default</span></h2>
                 <p style="color: #aaa; margin-bottom: 1em;">
-                    Pulls metadata and cover art directly from your self-hosted
+                    Connects to your self-hosted
                     <a href="https://github.com/rommapp/romm" target="_blank" style="color: #00a4dc;">Romm</a>
-                    instance. Requires Romm v3.4 or later with the REST API enabled.
-                    Leave the fields blank or keep the toggle off to disable this provider.
+                    instance for metadata, cover art, save-state cloud sync, playtime reporting, collection sync, and
+                    screenshot push.
+                    Requires Romm v3.4 or later. Authentication uses OAuth2 (bearer token) with Basic Auth as fallback.
                 </p>
-                <div class="inputContainer" style="display: flex; align-items: center; gap: 12px; margin-bottom: 1em;">
-                    <input id="rommEnabled" type="checkbox" is="emby-checkbox" class="emby-checkbox" />
-                    <label for="rommEnabled" style="cursor: pointer; color: #ccc;">Enable Romm metadata provider</label>
+
+                <style>
+                    .je-toggle-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        margin-bottom: 1em;
+                    }
+
+                    .je-toggle-btn {
+                        flex-shrink: 0;
+                        min-width: 90px;
+                        padding: 5px 14px;
+                        border-radius: 4px;
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        cursor: pointer;
+                        font-size: 0.82em;
+                        font-weight: 600;
+                        letter-spacing: 0.04em;
+                        text-transform: uppercase;
+                        transition: background 0.15s, border-color 0.15s;
+                        background: rgba(255, 255, 255, 0.06);
+                        color: #aaa;
+                    }
+
+                    .je-toggle-btn.je-on {
+                        background: rgba(82, 181, 75, 0.18);
+                        border-color: rgba(82, 181, 75, 0.55);
+                        color: #52B54B;
+                    }
+
+                    .je-toggle-label {
+                        color: #ccc;
+                        font-size: 0.92em;
+                        line-height: 1.3;
+                    }
+
+                    .je-toggle-label small {
+                        display: block;
+                        color: #777;
+                        font-size: 0.88em;
+                        margin-top: 2px;
+                    }
+                </style>
+
+                <div class="je-toggle-row">
+                    <input type="hidden" id="rommEnabled" value="false" />
+                    <button type="button" class="je-toggle-btn" id="rommEnabledBtn"
+                        onclick="jeToggle('rommEnabled')">OFF</button>
+                    <span class="je-toggle-label">
+                        Enable Romm integration
+                        <small>Enables metadata, cover art, save sync, playtime reporting, collection sync and
+                            screenshot push.</small>
+                    </span>
                 </div>
+
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="rommInstanceUrl">Romm Instance URL</label>
                     <input id="rommInstanceUrl" type="text" is="emby-input" class="emby-input"
                         placeholder="e.g. https://romm.example.com" autocomplete="off" />
+                </div>
+                <div style="margin: -0.5em 0 1em 0; display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="btnRommHealth" is="emby-button" class="emby-button"
+                        style="padding: 5px 14px; font-size: 0.82em;">
+                        Test Connection
+                    </button>
+                    <span id="rommHealthStatus" style="font-size: 0.82em; color: #aaa;"></span>
                 </div>
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="rommUsername">Romm Username</label>
@@ -77,10 +139,62 @@
                         placeholder="Your Romm password" autocomplete="off" />
                 </div>
                 <p style="color: #777; font-size: 0.82em; margin-top: 0.25em;">
-                    Credentials are stored in the Jellyfin plugin configuration and sent as HTTP Basic Auth to your
-                    Romm instance. Use a read-only Romm account for security. A secure HTTPS connection is strongly
-                    recommended.
+                    Credentials are sent as HTTP Basic Auth on every request to your Romm instance.
+                    A secure HTTPS connection is strongly recommended.
                 </p>
+
+                <div style="margin-top: 1.25em; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.25em;">
+                    <p style="color: #ccc; font-size: 0.88em; margin-bottom: 1em; font-weight: 600;">Romm Features
+                        (requires Romm enabled above)</p>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="rommSaveSyncEnabled" value="true" />
+                        <button type="button" class="je-toggle-btn je-on" id="rommSaveSyncEnabledBtn"
+                            onclick="jeToggle('rommSaveSyncEnabled')">ON</button>
+                        <span class="je-toggle-label">
+                            Save-state sync
+                            <small>Pull save from Romm on launch if it's newer; push to Romm after each save.</small>
+                        </span>
+                    </div>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="rommPlaytimeReportEnabled" value="true" />
+                        <button type="button" class="je-toggle-btn je-on" id="rommPlaytimeReportEnabledBtn"
+                            onclick="jeToggle('rommPlaytimeReportEnabled')">ON</button>
+                        <span class="je-toggle-label">
+                            Playtime reporting
+                            <small>Send session playtime to Romm when a game session ends.</small>
+                        </span>
+                    </div>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="rommCollectionSyncEnabled" value="true" />
+                        <button type="button" class="je-toggle-btn je-on" id="rommCollectionSyncEnabledBtn"
+                            onclick="jeToggle('rommCollectionSyncEnabled')">ON</button>
+                        <span class="je-toggle-label">
+                            Collection sync
+                            <small>Import Romm collections as Jellyfin collections.</small>
+                        </span>
+                    </div>
+                    <div id="rommCollectionSyncRow" style="margin: -0.25em 0 1em 104px;">
+                        <button id="btnRommSyncCollections" is="emby-button" type="button" class="raised emby-button"
+                            style="padding: 6px 16px; font-size: 0.85em;">
+                            <span>Sync Collections Now</span>
+                        </button>
+                        <span id="rommCollectionSyncStatus"
+                            style="margin-left: 10px; font-size: 0.82em; color: #aaa;"></span>
+                    </div>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="rommScreenshotPushEnabled" value="true" />
+                        <button type="button" class="je-toggle-btn je-on" id="rommScreenshotPushEnabledBtn"
+                            onclick="jeToggle('rommScreenshotPushEnabled')">ON</button>
+                        <span class="je-toggle-label">
+                            Screenshot push
+                            <small>Send in-game screenshots to Romm when you take one.</small>
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <div class="verticalSection" style="margin-top: 1.5em;">
@@ -198,6 +312,29 @@
                 setTimeout(function () { el.style.display = 'none'; }, 4000);
             }
 
+            window.jeToggle = function (id) {
+                var hidden = document.getElementById(id);
+                var btn = document.getElementById(id + 'Btn');
+                if (!hidden || !btn) return;
+                var nowOn = hidden.value !== 'true';
+                hidden.value = nowOn ? 'true' : 'false';
+                btn.textContent = nowOn ? 'ON' : 'OFF';
+                btn.classList.toggle('je-on', nowOn);
+                if (id === 'rommCollectionSyncEnabled') {
+                    var row = document.getElementById('rommCollectionSyncRow');
+                    if (row) row.style.display = nowOn ? '' : 'none';
+                }
+            };
+
+            function jeSet(id, val) {
+                var hidden = document.getElementById(id);
+                var btn = document.getElementById(id + 'Btn');
+                if (!hidden || !btn) return;
+                hidden.value = val ? 'true' : 'false';
+                btn.textContent = val ? 'ON' : 'OFF';
+                btn.classList.toggle('je-on', !!val);
+            }
+
             function loadRetroArchUrl(page) {
                 var base = window.location.origin;
                 var set = function (id, val) { var el = page.querySelector('#' + id); if (el) el.textContent = val; };
@@ -233,10 +370,16 @@
                     page.querySelector('#igdbClientId').value = config.IgdbClientId || '';
                     page.querySelector('#igdbClientSecret').value = config.IgdbClientSecret || '';
                     page.querySelector('#rawgApiKey').value = config.RawgApiKey || '';
-                    page.querySelector('#rommEnabled').checked = config.RommEnabled || false;
                     page.querySelector('#rommInstanceUrl').value = config.RommInstanceUrl || '';
                     page.querySelector('#rommUsername').value = config.RommUsername || '';
                     page.querySelector('#rommPassword').value = config.RommPassword || '';
+                    jeSet('rommEnabled', config.RommEnabled === true);
+                    jeSet('rommSaveSyncEnabled', config.RommSaveSyncEnabled !== false);
+                    jeSet('rommPlaytimeReportEnabled', config.RommPlaytimeReportEnabled !== false);
+                    jeSet('rommCollectionSyncEnabled', config.RommCollectionSyncEnabled !== false);
+                    jeSet('rommScreenshotPushEnabled', config.RommScreenshotPushEnabled !== false);
+                    var collRow = page.querySelector('#rommCollectionSyncRow');
+                    if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
                     page.querySelector('#netplayServer').value = config.NetplayServer || '';
                 }).catch(function (err) {
                     console.error('[JellyEmu] Failed to load config:', err);
@@ -249,10 +392,14 @@
                     config.IgdbClientId = page.querySelector('#igdbClientId').value.trim();
                     config.IgdbClientSecret = page.querySelector('#igdbClientSecret').value.trim();
                     config.RawgApiKey = page.querySelector('#rawgApiKey').value.trim();
-                    config.RommEnabled = page.querySelector('#rommEnabled').checked;
+                    config.RommEnabled = page.querySelector('#rommEnabled').value === 'true';
                     config.RommInstanceUrl = page.querySelector('#rommInstanceUrl').value.trim();
                     config.RommUsername = page.querySelector('#rommUsername').value.trim();
                     config.RommPassword = page.querySelector('#rommPassword').value.trim();
+                    config.RommSaveSyncEnabled = page.querySelector('#rommSaveSyncEnabled').value === 'true';
+                    config.RommPlaytimeReportEnabled = page.querySelector('#rommPlaytimeReportEnabled').value === 'true';
+                    config.RommCollectionSyncEnabled = page.querySelector('#rommCollectionSyncEnabled').value === 'true';
+                    config.RommScreenshotPushEnabled = page.querySelector('#rommScreenshotPushEnabled').value === 'true';
                     config.NetplayServer = page.querySelector('#netplayServer').value.trim();
                     return ApiClient.updatePluginConfiguration(pluginId, config);
                 }).then(function () {
@@ -271,6 +418,108 @@
                 page.querySelector('#btnSaveConfig').addEventListener('click', function () {
                     saveConfig(page);
                 });
+
+                // Romm health check
+                var btnHealth = page.querySelector('#btnRommHealth');
+                if (btnHealth) {
+                    btnHealth.addEventListener('click', function () {
+                        var statusEl = page.querySelector('#rommHealthStatus');
+                        var urlVal = page.querySelector('#rommInstanceUrl').value.trim();
+                        if (!urlVal) {
+                            statusEl.textContent = 'Enter a URL first.';
+                            statusEl.style.color = '#f0c040';
+                            return;
+                        }
+                        statusEl.textContent = 'Checking…';
+                        statusEl.style.color = '#aaa';
+                        fetch('/jellyemu/romm/health')
+                            .then(function (r) { return r.json(); })
+                            .then(function (d) {
+                                if (d.reachable) {
+                                    statusEl.textContent = 'Reachable — ' + d.probe + ' → HTTP ' + d.status;
+                                    statusEl.style.color = '#52B54B';
+                                } else {
+                                    statusEl.textContent = '' + (d.reason || 'Not reachable');
+                                    statusEl.style.color = '#FF4444';
+                                }
+                            })
+                            .catch(function (err) {
+                                statusEl.textContent = 'Request failed: ' + err;
+                                statusEl.style.color = '#FF4444';
+                            });
+                    });
+                }
+                var btnSync = page.querySelector('#btnRommSyncCollections');
+                if (btnSync) {
+                    btnSync.addEventListener('click', function () {
+                        var status = page.querySelector('#rommCollectionSyncStatus');
+                        status.textContent = 'Syncing…';
+                        status.style.color = '#aaa';
+                        var token = ApiClient.accessToken();
+                        var authHeader = 'MediaBrowser Token="' + token + '"';
+
+                        fetch('/jellyemu/romm/collections', {
+                            headers: { 'Authorization': authHeader }
+                        })
+                            .then(function (r) {
+                                if (!r.ok) {
+                                    return r.json().then(function (d) {
+                                        return Promise.reject('Step [' + (d.step || '?') + ']: ' + (d.error || r.status) + (d.detail ? ' — ' + d.detail : '') + (d.url ? ' (' + d.url + ')' : ''));
+                                    }).catch(function (e) {
+                                        if (typeof e === 'string') return Promise.reject(e);
+                                        return Promise.reject('Server error ' + r.status);
+                                    });
+                                }
+                                return r.json();
+                            })
+                            .then(function (collections) {
+                                if (!collections.length) {
+                                    status.textContent = 'No Romm collections found.';
+                                    return [];
+                                }
+                                var created = 0, skipped = 0, failed = 0;
+                                function processNext(i) {
+                                    if (i >= collections.length) {
+                                        status.textContent = 'Done — ' + created + ' created, ' + skipped + ' already existed' + (failed ? ', ' + failed + ' failed' : '') + '.';
+                                        status.style.color = failed ? '#f0c040' : '#52B54B';
+                                        return;
+                                    }
+                                    var col = collections[i];
+                                    ApiClient.getItems(ApiClient.getCurrentUserId(), {
+                                        Recursive: true,
+                                        IncludeItemTypes: 'BoxSet',
+                                        SearchTerm: col.name,
+                                        Limit: 10
+                                    }).then(function (existing) {
+                                        var exists = (existing.Items || []).some(function (item) {
+                                            return item.Name.toLowerCase() === col.name.toLowerCase();
+                                        });
+                                        if (exists) {
+                                            skipped++;
+                                            processNext(i + 1);
+                                            return;
+                                        }
+                                        var qs = 'name=' + encodeURIComponent(col.name);
+                                        if (col.jellyfinItemIds && col.jellyfinItemIds.length) {
+                                            qs += '&ids=' + col.jellyfinItemIds.join(',');
+                                        }
+                                        fetch(ApiClient.getUrl('Collections') + '?' + qs, {
+                                            method: 'POST',
+                                            headers: { 'Authorization': authHeader }
+                                        }).then(function (r) {
+                                            if (r.ok) { created++; } else { failed++; }
+                                            processNext(i + 1);
+                                        }).catch(function () { failed++; processNext(i + 1); });
+                                    }).catch(function () { failed++; processNext(i + 1); });
+                                }
+                                processNext(0);
+                            })
+                            .catch(function (err) {
+                                status.textContent = 'Sync failed: ' + err;
+                                status.style.color = '#FF4444';
+                            });
+                    });
+                }
             });
         })();
     </script>

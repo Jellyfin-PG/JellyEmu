@@ -134,10 +134,29 @@ namespace JellyEmu.Services
                         return /^Dis[ck]\s+[1-9IVX]/i.test(tag);
                     }
 
+                    function jeToast(msg, durationMs) {
+                        durationMs = durationMs || 3500;
+                        var t = document.createElement('div');
+                        t.textContent = msg;
+                        t.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);' +
+                            'background:rgba(0,0,0,0.82);color:#fff;padding:9px 18px;border-radius:6px;' +
+                            'font-size:0.88em;z-index:200000;pointer-events:none;transition:opacity 0.4s;';
+                        document.body.appendChild(t);
+                        setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 420); }, durationMs);
+                    }
+
                     function launchEmulator(itemId) {
                         console.log('[JellyEmu] Launching emulator for item:', itemId);
-                        const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
-                        const playUrl = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
+                        var userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
+                        var playUrl = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
+
+                        // Romm sync-on-launch: pull if Romm has a newer save
+                        if (userId) {
+                            fetch('/jellyemu/romm/sync-on-launch/' + itemId + '/' + userId, { method: 'POST' })
+                                .then(function(r) { return r.ok ? r.json() : null; })
+                                .then(function(d) { if (d && d.pulled) jeToast('\u2601 Loaded save from Romm (newer than local)'); })
+                                .catch(function() {});
+                        }
 
                         fetch('/jellyemu/core/' + itemId)
                             .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
@@ -146,8 +165,8 @@ namespace JellyEmu.Services
                                 if (info.needsThreads) {
                                     // Threaded cores (DOS, PSP) require SharedArrayBuffer
                                     // which needs cross-origin isolation — open in a new tab
-                                    const gameTab = window.open(playUrl, '_blank');
-                                    const jellyEmuChannel = new BroadcastChannel('jellyemu-exit');
+                                    var gameTab = window.open(playUrl, '_blank');
+                                    var jellyEmuChannel = new BroadcastChannel('jellyemu-exit');
                                     jellyEmuChannel.addEventListener('message', function(msg) {
                                         if (msg.data === 'close-jellyemu') {
                                             jellyEmuChannel.close();
@@ -156,7 +175,7 @@ namespace JellyEmu.Services
                                     });
                                 } else {
                                     // Non-threaded cores work fine in an iframe
-                                    const iframe = document.createElement('iframe');
+                                    var iframe = document.createElement('iframe');
                                     iframe.id = 'jellyemu-iframe';
                                     iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
                                     iframe.src = playUrl;
@@ -167,16 +186,55 @@ namespace JellyEmu.Services
                     }
 
                     function dismissActionSheet(sheetRoot) {
-                        const dialog = sheetRoot.closest('.dialog') || sheetRoot.closest('[data-history]') || sheetRoot.parentElement;
+                        var dialog = sheetRoot.closest('.dialog') || sheetRoot.closest('[data-history]') || sheetRoot.parentElement;
                         if (dialog) dialog.remove();
                     }
 
                     window.addEventListener('message', function(e) {
                         if (e.data === 'close-jellyemu') {
-                            const iframe = document.getElementById('jellyemu-iframe');
+                            var iframe = document.getElementById('jellyemu-iframe');
                             if (iframe) {
                                 document.body.removeChild(iframe);
                                 document.body.style.overflow = '';
+                            }
+                        }
+                        // Romm: push save to Romm after a save event from the emulator iframe
+                        if (e.data && e.data.type === 'jellyemu-save-written') {
+                            var userId2 = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
+                            var itemId2 = e.data.itemId;
+                            if (userId2 && itemId2) {
+                                fetch('/jellyemu/romm/sync-after-save/' + itemId2 + '/' + userId2, { method: 'POST' })
+                                    .then(function(r) { return r.ok ? r.json() : null; })
+                                    .then(function(d) { if (d && d.pushed) jeToast('\u2601 Save synced to Romm'); })
+                                    .catch(function() {});
+                            }
+                        }
+                        // Romm: report playtime when session ends
+                        if (e.data && e.data.type === 'jellyemu-session-end') {
+                            var userId3 = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
+                            var itemId3 = e.data.itemId;
+                            var seconds3 = e.data.seconds || 0;
+                            if (userId3 && itemId3 && seconds3 > 0) {
+                                fetch('/jellyemu/romm/report-playtime/' + itemId3 + '/' + userId3, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ seconds: seconds3 })
+                                }).catch(function() {});
+                            }
+                        }
+                        // Romm: push screenshot
+                        if (e.data && e.data.type === 'jellyemu-screenshot') {
+                            var userId4 = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
+                            var itemId4 = e.data.itemId;
+                            var dataUrl = e.data.dataUrl;
+                            if (userId4 && itemId4 && dataUrl) {
+                                fetch('/jellyemu/romm/screenshot/' + itemId4 + '/' + userId4, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ dataUrl: dataUrl })
+                                }).then(function(r) { return r.ok ? r.json() : null; })
+                                  .then(function(d) { if (d && d.pushed) jeToast('\U0001f4f8 Screenshot saved to Romm'); })
+                                  .catch(function() {});
                             }
                         }
                     });
@@ -275,6 +333,37 @@ namespace JellyEmu.Services
                                     const min = Math.floor((data.seconds % 3600) / 60);
                                     const label = h > 0 ? h + 'h ' + min + 'm' : min > 0 ? min + 'm' : '<1m';
                                     pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">schedule</span>' + label + ' played';
+                                    miscBar.appendChild(pill);
+                                })
+                                .catch(() => {});
+                        }
+
+                        // Romm sync-status badge
+                        if (userId && itemId && !miscBar.querySelector('.jellyemu-romm-sync-pill')) {
+                            const slot = 1; // will refetch actual slot below
+                            fetch('/jellyemu/slot/' + userId)
+                                .then(r => r.ok ? r.json() : null)
+                                .then(slotData => {
+                                    const activeSlot = slotData ? slotData.slot : 1;
+                                    return fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + activeSlot);
+                                })
+                                .then(r => r.ok ? r.json() : null)
+                                .then(data => {
+                                    if (!data || data.status === 'Disabled') return;
+                                    const statusMap = {
+                                        Pushed:     { icon: 'cloud_done',     color: '#52B54B', title: 'Saved to Romm' },
+                                        InSync:     { icon: 'cloud_done',     color: '#52B54B', title: 'In sync with Romm' },
+                                        RemoteWins: { icon: 'cloud_download', color: '#f0c040', title: 'Romm has a newer save' },
+                                        LocalOnly:  { icon: 'cloud_upload',   color: '#aaa',    title: 'Not yet pushed to Romm' },
+                                        RemoteOnly: { icon: 'cloud_download', color: '#aaa',    title: 'Remote save only' },
+                                        Error:      { icon: 'cloud_off',      color: '#FF4444', title: 'Romm sync error' },
+                                    };
+                                    const s = statusMap[data.status] || statusMap['Error'];
+                                    const pill = document.createElement('div');
+                                    pill.className = 'mediaInfoItem jellyemu-romm-sync-pill';
+                                    pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
+                                    pill.title = s.title;
+                                    pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:' + s.color + ';">' + s.icon + '</span>Romm';
                                     miscBar.appendChild(pill);
                                 })
                                 .catch(() => {});
@@ -964,6 +1053,18 @@ namespace JellyEmu.Services
                                     border: 1px solid rgba(255,255,255,0.12);
                                 }
                                 .je-save-btn-dl:hover { background: rgba(255,255,255,0.15); }
+                                .je-save-btn-romm-push {
+                                    background: rgba(82,181,75,0.15);
+                                    color: #52B54B;
+                                    border: 1px solid rgba(82,181,75,0.3);
+                                }
+                                .je-save-btn-romm-push:hover { background: rgba(82,181,75,0.28); }
+                                .je-save-btn-romm-pull {
+                                    background: rgba(0,164,220,0.12);
+                                    color: #00a4dc;
+                                    border: 1px solid rgba(0,164,220,0.25);
+                                }
+                                .je-save-btn-romm-pull:hover { background: rgba(0,164,220,0.25); }
                                 .je-saves-empty {
                                     text-align: center;
                                     color: rgba(255,255,255,0.35);
@@ -1074,6 +1175,7 @@ namespace JellyEmu.Services
                                     <div class="je-save-title" title="${s.gameName}">${s.gameName}</div>
                                     <div class="je-save-badges">${badges}</div>
                                     <div class="je-save-meta">${fmtDate(s.lastModified)} · ${fmtSize(s.sizeBytes)}</div>
+                                    <div class="je-save-romm-status" data-item="${s.itemId}" data-slot="${s.slot}" style="font-size:0.75em;color:#aaa;margin:2px 0 4px;min-height:16px;"></div>
                                     <div class="je-save-actions">
                                         <button class="je-save-btn je-save-btn-play">
                                             <span class="material-icons">sports_esports</span>Play
@@ -1081,11 +1183,59 @@ namespace JellyEmu.Services
                                         <a class="je-save-btn je-save-btn-dl" href="${s.downloadUrl}" download="${s.gameName.replace(/[^a-zA-Z0-9 _-]/g,'_')}_slot${s.slot}.state">
                                             <span class="material-icons">download</span>
                                         </a>
+                                        <button class="je-save-btn je-save-btn-romm-push" title="Push to Romm" style="display:none;">
+                                            <span class="material-icons">cloud_upload</span>
+                                        </button>
+                                        <button class="je-save-btn je-save-btn-romm-pull" title="Pull from Romm" style="display:none;">
+                                            <span class="material-icons">cloud_download</span>
+                                        </button>
                                     </div>`;
 
                                 body.querySelector('.je-save-btn-play').addEventListener('click', () => {
                                     launchEmulator(s.itemId);
                                 });
+
+                                // Romm sync status + push/pull buttons
+                                (function(itemId, slot, bodyEl) {
+                                    fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + slot)
+                                        .then(function(r) { return r.ok ? r.json() : null; })
+                                        .then(function(d) {
+                                            if (!d || d.status === 'Disabled') return;
+                                            var statusEl = bodyEl.querySelector('.je-save-romm-status');
+                                            var pushBtn  = bodyEl.querySelector('.je-save-btn-romm-push');
+                                            var pullBtn  = bodyEl.querySelector('.je-save-btn-romm-pull');
+                                            var iconMap = {
+                                                Pushed:     '\u2601\ufe0f In sync with Romm',
+                                                InSync:     '\u2601\ufe0f In sync with Romm',
+                                                RemoteWins: '\u26a0\ufe0f Romm has a newer save',
+                                                LocalOnly:  '\u2191 Not yet pushed to Romm',
+                                                RemoteOnly: '\u2193 Remote save only',
+                                                Error:      '\u274c Romm sync error',
+                                            };
+                                            if (statusEl) statusEl.textContent = iconMap[d.status] || d.status;
+                                            if (pushBtn) { pushBtn.style.display = ''; }
+                                            if (pullBtn) { pullBtn.style.display = ''; }
+                                            pushBtn && pushBtn.addEventListener('click', function() {
+                                                pushBtn.disabled = true;
+                                                fetch('/jellyemu/romm/push/' + itemId + '/' + userId + '/' + slot, { method: 'POST' })
+                                                    .then(function(r) { return r.json(); })
+                                                    .then(function(d2) {
+                                                        if (statusEl) statusEl.textContent = d2.pushed ? '\u2601\ufe0f Pushed to Romm' : '\u274c Push failed';
+                                                        pushBtn.disabled = false;
+                                                    }).catch(function() { pushBtn.disabled = false; });
+                                            });
+                                            pullBtn && pullBtn.addEventListener('click', function() {
+                                                pullBtn.disabled = true;
+                                                fetch('/jellyemu/romm/pull/' + itemId + '/' + userId + '/' + slot, { method: 'POST' })
+                                                    .then(function(r) { return r.json(); })
+                                                    .then(function(d2) {
+                                                        if (statusEl) statusEl.textContent = d2.pulled ? '\u2193 Pulled from Romm' : '\u274c Pull failed';
+                                                        pullBtn.disabled = false;
+                                                    }).catch(function() { pullBtn.disabled = false; });
+                                            });
+                                        })
+                                        .catch(function() {});
+                                })(s.itemId, s.slot, body);
 
                                 card.appendChild(body);
                                 grid.appendChild(card);
