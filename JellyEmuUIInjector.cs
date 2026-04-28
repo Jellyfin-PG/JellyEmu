@@ -28,9 +28,7 @@ namespace JellyEmu.Services
 
                 var injection = """
                 <style data-jellyemu-mods="1">
-                  [data-collectiontype="games"] .cardImageContainer,
-                  [data-jellyemu-game="1"] .cardImageContainer {
-                  }
+
                   #jellyemu-play-btn {
                       display: flex !important;
                       align-items: center !important;
@@ -130,6 +128,24 @@ namespace JellyEmu.Services
                         "Asia","Scandinavia","Unlicensed","Prototype","Demo","Sample"
                     ]);
 
+                    // Platforms recognised for library management but not supported by EmulatorJS.
+                    // Must stay in sync with PlatformResolver.LibraryOnlyAliases canonical values.
+                    const ejsUnsupportedPlatforms = new Set([
+                        "Dreamcast","PlayStation 2","PlayStation 3",
+                        "Xbox","Xbox 360",
+                        "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
+                        "PlayStation Vita"
+                    ]);
+
+                    function isPlayable(tags) {
+                        if (!tags || !tags.length) return false;
+                        for (const tag of tags) {
+                            if (tag === 'Unknown') return false;
+                            if (ejsUnsupportedPlatforms.has(tag)) return false;
+                        }
+                        return true;
+                    }
+
                     function isDiscTag(tag) {
                         return /^Dis[ck]\s+[1-9IVX]/i.test(tag);
                     }
@@ -198,12 +214,12 @@ namespace JellyEmu.Services
                                 document.body.style.overflow = '';
                             }
                         }
+                        var userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
                         // Romm: push save to Romm after a save event from the emulator iframe
                         if (e.data && e.data.type === 'jellyemu-save-written') {
-                            var userId2 = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
                             var itemId2 = e.data.itemId;
-                            if (userId2 && itemId2) {
-                                fetch('/jellyemu/romm/sync-after-save/' + itemId2 + '/' + userId2, { method: 'POST' })
+                            if (userId && itemId2) {
+                                fetch('/jellyemu/romm/sync-after-save/' + itemId2 + '/' + userId, { method: 'POST' })
                                     .then(function(r) { return r.ok ? r.json() : null; })
                                     .then(function(d) { if (d && d.pushed) jeToast('\u2601 Save synced to Romm'); })
                                     .catch(function() {});
@@ -211,11 +227,10 @@ namespace JellyEmu.Services
                         }
                         // Romm: report playtime when session ends
                         if (e.data && e.data.type === 'jellyemu-session-end') {
-                            var userId3 = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
                             var itemId3 = e.data.itemId;
                             var seconds3 = e.data.seconds || 0;
-                            if (userId3 && itemId3 && seconds3 > 0) {
-                                fetch('/jellyemu/romm/report-playtime/' + itemId3 + '/' + userId3, {
+                            if (userId && itemId3 && seconds3 > 0) {
+                                fetch('/jellyemu/romm/report-playtime/' + itemId3 + '/' + userId, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ seconds: seconds3 })
@@ -224,11 +239,10 @@ namespace JellyEmu.Services
                         }
                         // Romm: push screenshot
                         if (e.data && e.data.type === 'jellyemu-screenshot') {
-                            var userId4 = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
                             var itemId4 = e.data.itemId;
                             var dataUrl = e.data.dataUrl;
-                            if (userId4 && itemId4 && dataUrl) {
-                                fetch('/jellyemu/romm/screenshot/' + itemId4 + '/' + userId4, {
+                            if (userId && itemId4 && dataUrl) {
+                                fetch('/jellyemu/romm/screenshot/' + itemId4 + '/' + userId, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ dataUrl: dataUrl })
@@ -255,14 +269,26 @@ namespace JellyEmu.Services
                         const playBtn = sheetRoot.querySelector('button[data-id="resume"]');
                         if (playBtn && !playBtn.getAttribute('data-jellyemu-patched')) {
                             playBtn.setAttribute('data-jellyemu-patched', '1');
-                            const label = playBtn.querySelector('.actionSheetItemText');
-                            if (label) label.textContent = 'Play Game';
-                            playBtn.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                e.stopImmediatePropagation();
-                                dismissActionSheet(sheetRoot);
-                                launchEmulator(itemId);
-                            }, true);
+
+                            // Look up the card's stamped tags to decide if play is available
+                            const sourceCard = document.querySelector('.card[data-id="' + itemId + '"]');
+                            const tags = sourceCard && sourceCard.getAttribute('data-jellyemu-tags')
+                                ? sourceCard.getAttribute('data-jellyemu-tags').split(',')
+                                : null;
+
+                            if (tags && !isPlayable(tags)) {
+                                // Hide the play option entirely for unsupported/unknown platforms
+                                playBtn.style.display = 'none';
+                            } else {
+                                const label = playBtn.querySelector('.actionSheetItemText');
+                                if (label) label.textContent = 'Play Game';
+                                playBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopImmediatePropagation();
+                                    dismissActionSheet(sheetRoot);
+                                    launchEmulator(itemId);
+                                }, true);
+                            }
                         }
 
                         const playFromHereBtn = sheetRoot.querySelector('button[data-id="playallfromhere"]');
@@ -294,37 +320,39 @@ namespace JellyEmu.Services
                         });
 
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
-                        const m = window.location.hash.match(/id=([a-zA-Z0-9]+)/);
-                        const itemId = m ? m[1] : null;
+                        const itemId = currentItemId;
+
+                        // Fetch slot once — shared by the slot pill and the Romm sync badge
+                        const slotPromise = (userId && itemId)
+                            ? fetch('/jellyemu/slot/' + userId).then(r => r.ok ? r.json() : null).catch(() => null)
+                            : Promise.resolve(null);
+
                         if (userId && itemId && !miscBar.querySelector('.jellyemu-slot-pill')) {
-                            fetch('/jellyemu/slot/' + userId)
-                                .then(r => r.ok ? r.json() : null)
-                                .then(data => {
-                                    if (!data) return;
-                                    const slot = data.slot || 1;
-                                    fetch('/jellyemu/save/' + itemId + '/' + userId, { method: 'HEAD' })
-                                        .then(r => {
-                                            const hasSave = r.ok;
-                                            const pill = document.createElement('div');
-                                            pill.className = 'mediaInfoItem jellyemu-slot-pill';
-                                            pill.title = hasSave ? 'Save exists in slot ' + slot : 'No save in slot ' + slot;
-                                            pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
-                                            pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">' +
-                                                (hasSave ? 'save' : 'save_alt') + '</span>' +
-                                                'Slot ' + slot +
-                                                (hasSave ? ' <span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">check_circle</span>' : '');
-                                            miscBar.appendChild(pill);
-                                        })
-                                        .catch(() => {});
-                                })
-                                .catch(() => {});
+                            slotPromise.then(data => {
+                                if (!data) return;
+                                const slot = data.slot || 1;
+                                fetch('/jellyemu/save/' + itemId + '/' + userId, { method: 'HEAD' })
+                                    .then(r => {
+                                        const hasSave = r.ok;
+                                        const pill = document.createElement('div');
+                                        pill.className = 'mediaInfoItem jellyemu-slot-pill';
+                                        pill.title = hasSave ? 'Save exists in slot ' + slot : 'No save in slot ' + slot;
+                                        pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
+                                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">' +
+                                            (hasSave ? 'save' : 'save_alt') + '</span>' +
+                                            'Slot ' + slot +
+                                            (hasSave ? ' <span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">check_circle</span>' : '');
+                                        miscBar.appendChild(pill);
+                                    })
+                                    .catch(() => {});
+                            });
                         }
 
                         if (userId && itemId && !miscBar.querySelector('.jellyemu-playtime-pill')) {
                             fetch('/jellyemu/playtime/' + itemId + '/' + userId)
                                 .then(r => r.ok ? r.json() : null)
                                 .then(data => {
-                                    if (!data || !data.seconds) return; // hide pill if zero playtime
+                                    if (!data || !data.seconds) return;
                                     const pill = document.createElement('div');
                                     pill.className = 'mediaInfoItem jellyemu-playtime-pill';
                                     pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
@@ -338,11 +366,9 @@ namespace JellyEmu.Services
                                 .catch(() => {});
                         }
 
-                        // Romm sync-status badge
+                        // Romm sync-status badge — reuses the already-in-flight slotPromise
                         if (userId && itemId && !miscBar.querySelector('.jellyemu-romm-sync-pill')) {
-                            const slot = 1; // will refetch actual slot below
-                            fetch('/jellyemu/slot/' + userId)
-                                .then(r => r.ok ? r.json() : null)
+                            slotPromise
                                 .then(slotData => {
                                     const activeSlot = slotData ? slotData.slot : 1;
                                     return fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + activeSlot);
@@ -368,6 +394,25 @@ namespace JellyEmu.Services
                                 })
                                 .catch(() => {});
                         }
+
+                        // Unsupported / Unknown platform pill
+                        if (!miscBar.querySelector('.jellyemu-platform-status-pill')) {
+                            const unknownTag  = cachedTags.includes('Unknown');
+                            const unsupported = !unknownTag && cachedTags.some(t => ejsUnsupportedPlatforms.has(t));
+                            if (unknownTag || unsupported) {
+                                const pill = document.createElement('div');
+                                pill.className = 'mediaInfoItem jellyemu-platform-status-pill';
+                                pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;' +
+                                    'color:rgba(255,255,255,0.55);';
+                                pill.title = unknownTag
+                                    ? 'Platform could not be detected — add a folder name or [Console] token to the filename'
+                                    : 'This platform is not supported by EmulatorJS — use an external emulator';
+                                pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">' +
+                                    (unknownTag ? 'help' : 'info') + '</span>' +
+                                    (unknownTag ? 'Unknown Platform' : 'External Only');
+                                miscBar.appendChild(pill);
+                            }
+                        }
                     }
 
                     function injectPlayButton() {
@@ -390,8 +435,7 @@ namespace JellyEmu.Services
                             e.preventDefault();
                             e.stopPropagation();
                             e.stopImmediatePropagation();
-                            const m = window.location.hash.match(/id=([a-zA-Z0-9]+)/);
-                            if (m) launchEmulator(m[1]);
+                            if (currentItemId) launchEmulator(currentItemId);
                         });
 
                         detailButtonsContainer.insertBefore(btn, detailButtonsContainer.firstChild);
@@ -399,7 +443,11 @@ namespace JellyEmu.Services
 
                     function injectAll() {
                         if (!currentItemIsGame) return;
-                        injectPlayButton();
+                        // Always mark the page as a game so the CSS rule hides the native
+                        // Resume/Play buttons regardless of whether EJS supports the platform.
+                        const page = getVisibleDetailPage();
+                        if (page) page.classList.add('jellyemu-game-page');
+                        if (isPlayable(cachedTags)) injectPlayButton();
                         injectMiscInfo();
                     }
 
@@ -408,13 +456,37 @@ namespace JellyEmu.Services
                         currentItemIsGame = false;
                         cachedTags        = [];
 
-                        document.querySelectorAll('.itemDetailPage').forEach(p => p.classList.remove('jellyemu-game-page'));
+                        const allDetailPages = document.querySelectorAll('.itemDetailPage');
+                        allDetailPages.forEach(p => p.classList.remove('jellyemu-game-page'));
+                        const visiblePage = getVisibleDetailPage();
+                        if (visiblePage) visiblePage.classList.add('jellyemu-game-page');
 
+                        // Fast path: if the card was already processed in the library view,
+                        // its tags are stamped on the element — use them immediately without
+                        // waiting for a network round trip.
+                        const cachedCard = document.querySelector('.card[data-id="' + id + '"][data-jellyemu-tags]');
+                        if (cachedCard) {
+                            const tags = cachedCard.getAttribute('data-jellyemu-tags').split(',');
+                            if (tags.includes('Game')) {
+                                currentItemIsGame = true;
+                                cachedTags        = tags;
+                                injectAll();
+                            }
+                        }
+
+                        // Always confirm via getItem — covers direct URL navigation and
+                        // updates cachedTags with the full server-side tag list.
                         window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), id).then(item => {
                             if (item && item.Tags && item.Tags.includes('Game')) {
+                                const wasAlreadyInjected = currentItemIsGame;
                                 currentItemIsGame = true;
                                 cachedTags        = item.Tags;
-                                injectAll();
+                                // Only call injectAll again if the fast path didn't already run
+                                if (!wasAlreadyInjected) injectAll();
+                            } else {
+                                currentItemIsGame = false;
+                                cachedTags        = [];
+                                if (visiblePage) visiblePage.classList.remove('jellyemu-game-page');
                             }
                         });
                     }
@@ -461,7 +533,11 @@ namespace JellyEmu.Services
                         }
                     }
 
-                    setInterval(tick, 200);
+                    // Drive navigation from hashchange — fast and zero overhead when idle.
+                    // A low-frequency fallback interval handles edge cases where Jellyfin
+                    // mutates the page without changing the hash (e.g. back-navigation).
+                    window.addEventListener('hashchange', tick);
+                    setInterval(tick, 1000);
 
                     function applyGameCardTreatment(card) {
                         card.setAttribute('data-collectiontype', 'games');
@@ -469,18 +545,34 @@ namespace JellyEmu.Services
                         const iconSpan = card.querySelector('.cardImageIcon');
                         if (iconSpan) iconSpan.innerHTML = 'sports_esports';
 
+                        // Always hide native play/resume buttons synchronously so Jellyfin's
+                        // default "Read book" action can never fire on game cards.
+                        card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(b) {
+                            b.style.display = 'none';
+                        });
+
+                        // Badges + overlay — only fetched once per card lifetime
                         if (!card.querySelector('.jellyemu-card-badge-wrap')) {
                             const cardId = card.getAttribute('data-id');
                             if (cardId && window.ApiClient) {
                                 window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), cardId).then(function(item) {
                                     if (!item || !item.Tags) return;
+                                    const imgCtr = card.querySelector('.cardImageContainer');
+                                    if (!imgCtr) return;
+
+                                    // Stamp tags so patchActionSheet can read them without another API call
+                                    card.setAttribute('data-jellyemu-tags', item.Tags.join(','));
+
+                                    // Console / region / disc / status badges — bottom-left
                                     const badgeWrap = document.createElement('div');
                                     badgeWrap.className = 'jellyemu-card-badge-wrap';
                                     badgeWrap.style.cssText = 'position:absolute;bottom:4px;left:4px;display:flex;gap:3px;flex-wrap:wrap;z-index:2;pointer-events:none;';
                                     item.Tags.filter(t => t !== 'Game').forEach(function(tag) {
                                         const badge = document.createElement('span');
-                                        const isRegion = knownRegions.has(tag);
-                                        const isDisc   = isDiscTag(tag);
+                                        const isRegion      = knownRegions.has(tag);
+                                        const isDisc        = isDiscTag(tag);
+                                        const isUnknown     = tag === 'Unknown';
+                                        const isUnsupported = ejsUnsupportedPlatforms.has(tag);
                                         badge.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.03em;padding:1px 5px;border-radius:3px;opacity:.88;' +
                                             (isRegion
                                                 ? 'background:rgba(0,164,220,.85);color:#fff;'
@@ -489,40 +581,64 @@ namespace JellyEmu.Services
                                                     : 'background:rgba(0,0,0,.72);color:#e0e0e0;border:1px solid rgba(255,255,255,.18);');
                                         badge.textContent = tag;
                                         badgeWrap.appendChild(badge);
+                                        // Add a secondary status label next to unsupported/unknown console tags
+                                        if (isUnsupported || isUnknown) {
+                                            const statusBadge = document.createElement('span');
+                                            statusBadge.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.03em;padding:1px 5px;border-radius:3px;opacity:.88;' +
+                                                'background:rgba(200,120,0,.75);color:#fff;border:1px solid rgba(255,180,0,.3);';
+                                            statusBadge.textContent = isUnknown ? 'Unknown' : 'Unsupported';
+                                            badgeWrap.appendChild(statusBadge);
+                                        }
                                     });
-                                    if (badgeWrap.children.length > 0) {
-                                        const imgCtr = card.querySelector('.cardImageContainer');
-                                        if (imgCtr) imgCtr.appendChild(badgeWrap);
+                                    if (badgeWrap.children.length > 0) imgCtr.appendChild(badgeWrap);
+
+                                    // Rating badge — top-right
+                                    const rating = item.CommunityRating;
+                                    const pids = item.ProviderIds || {};
+                                    if (typeof rating === 'number' && (pids['IGDB'] || pids['Romm'])) {
+                                        const ratingBadge = document.createElement('div');
+                                        ratingBadge.className = 'jellyemu-card-rating-badge';
+                                        ratingBadge.title = (pids['IGDB'] ? 'IGDB' : 'RoMM') + ' rating: ' + rating.toFixed(1) + ' / 10';
+                                        ratingBadge.style.cssText = 'position:absolute;top:4px;right:4px;z-index:2;pointer-events:none;' +
+                                            'display:inline-flex;align-items:center;gap:2px;' +
+                                            'background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.18);' +
+                                            'border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700;color:#e0e0e0;opacity:.92;';
+                                        ratingBadge.innerHTML =
+                                            '<span class="material-icons starIcon star" aria-hidden="true" style="font-size:9px;line-height:1;"></span>' +
+                                            rating.toFixed(1);
+                                        imgCtr.appendChild(ratingBadge);
+                                    }
+
+                                    // Play overlay — only for EJS-supported platforms
+                                    // cardId is captured from outer scope — no extra getAttribute call needed
+                                    if (isPlayable(item.Tags)) {
+                                        card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(playBtn) {
+                                            if (playBtn.parentNode && !playBtn.parentNode.querySelector('.jellyemu-card-play')) {
+                                                const sterileBtn = document.createElement('button');
+                                                sterileBtn.type = 'button';
+                                                sterileBtn.className = 'cardOverlayButton cardOverlayButton-hover jellyemu-card-play';
+                                                sterileBtn.title = 'Play Game';
+                                                sterileBtn.innerHTML = '<span class="material-icons" aria-hidden="true">sports_esports</span>';
+                                                sterileBtn.addEventListener('click', function(e) {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    e.stopImmediatePropagation();
+                                                    launchEmulator(cardId);
+                                                });
+                                                playBtn.parentNode.insertBefore(sterileBtn, playBtn);
+                                            }
+                                        });
                                     }
                                 }).catch(function() {});
                             }
                         }
-
-                        const playBtns = card.querySelectorAll('button[data-action="resume"], button[data-action="play"]');
-                        playBtns.forEach(playBtn => {
-                            playBtn.style.display = 'none';
-                            if (playBtn.parentNode && !playBtn.parentNode.querySelector('.jellyemu-card-play')) {
-                                const sterileBtn = document.createElement('button');
-                                sterileBtn.type = 'button';
-                                sterileBtn.className = 'cardOverlayButton cardOverlayButton-hover jellyemu-card-play';
-                                sterileBtn.title = 'Play Game';
-                                sterileBtn.innerHTML = '<span class="material-icons" aria-hidden="true">sports_esports</span>';
-                                sterileBtn.addEventListener('click', function(e) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    e.stopImmediatePropagation();
-                                    launchEmulator(card.getAttribute('data-id'));
-                                });
-                                playBtn.parentNode.insertBefore(sterileBtn, playBtn);
-                            }
-                        });
                     }
 
                     function processCard(card) {
                         const path = card.getAttribute('data-path');
                         let isGameCard = card.getAttribute('data-collectiontype') === 'games' ||
                                          card.getAttribute('data-jellyemu-game') === '1' ||
-                                         (card.querySelector('.cardText') && (card.querySelector('.cardText').innerText.includes('Games') || card.querySelector('.cardText').innerText.includes('Emulators')));
+                                         (card.querySelector('.cardText') && (card.querySelector('.cardText').textContent.includes('Games') || card.querySelector('.cardText').textContent.includes('Emulators')));
 
                         if (path) {
                             const extMatch = path.match(/\.([a-zA-Z0-9]+)$/);
@@ -551,61 +667,75 @@ namespace JellyEmu.Services
 
                     const observer = new MutationObserver((mutations) => {
                         let checkDetails = false;
+                        // Resolved once per batch — avoids repeated querySelectorAll('.itemDetailPage')
+                        let cachedDetailPage = null;
+                        function getDetailPage() {
+                            if (cachedDetailPage === null) cachedDetailPage = getVisibleDetailPage() || undefined;
+                            return cachedDetailPage || null;
+                        }
 
                         mutations.forEach((mutation) => {
                             if (!mutation.addedNodes) return;
 
                             mutation.addedNodes.forEach((node) => {
-                                if (node.nodeType === 1) {
+                                // Skip text/comment nodes and JellyEmu's own injected nodes
+                                if (node.nodeType !== 1) return;
+                                if (node.getAttribute && (node.getAttribute('data-jellyemu-mods') || node.closest?.('[data-jellyemu-mods]'))) return;
 
-                                    const actionSheetContent = node.classList?.contains('actionSheetContent')
-                                        ? node
-                                        : node.querySelector?.('.actionSheetContent');
-                                    if (actionSheetContent) {
-                                        patchActionSheet(actionSheetContent);
-                                    }
+                                const actionSheetContent = node.classList?.contains('actionSheetContent')
+                                    ? node
+                                    : node.querySelector?.('.actionSheetContent');
+                                if (actionSheetContent) {
+                                    patchActionSheet(actionSheetContent);
+                                }
 
-                                    const prefsMenuPage = node.id === 'myPreferencesMenuPage'
-                                        ? node
-                                        : node.querySelector?.('#myPreferencesMenuPage');
-                                    if (prefsMenuPage) {
-                                        injectPrefsMenuEntry(prefsMenuPage);
-                                    }
+                                const prefsMenuPage = node.id === 'myPreferencesMenuPage'
+                                    ? node
+                                    : node.querySelector?.('#myPreferencesMenuPage');
+                                if (prefsMenuPage) {
+                                    injectPrefsMenuEntry(prefsMenuPage);
+                                }
 
-                                    if ((node.classList && node.classList.contains('mainDetailButtons')) || (node.querySelector && node.querySelector('.mainDetailButtons'))) {
-                                        checkDetails = true;
-                                    }
-                                    if (node.classList && (node.classList.contains('btnPlay') || node.getAttribute('data-action') === 'resume')) {
-                                        checkDetails = true;
-                                    }
+                                if ((node.classList && node.classList.contains('mainDetailButtons')) || (node.querySelector && node.querySelector('.mainDetailButtons'))) {
+                                    checkDetails = true;
+                                    const dp = getDetailPage();
+                                    if (dp) dp.classList.add('jellyemu-game-page');
+                                }
+                                if (node.classList && (node.classList.contains('btnPlay') || node.getAttribute('data-action') === 'resume')) {
+                                    checkDetails = true;
+                                    const dp = getDetailPage();
+                                    if (dp) dp.classList.add('jellyemu-game-page');
+                                }
+                                if ((node.classList && node.classList.contains('itemMiscInfo-primary')) || (node.querySelector && node.querySelector('.itemMiscInfo-primary'))) {
+                                    if (currentItemIsGame) injectMiscInfo();
+                                }
 
-                                    let cardsToProcess = [];
-                                    if (node.classList && node.classList.contains('card')) {
-                                        cardsToProcess.push(node);
-                                    } else if (node.querySelectorAll) {
-                                        node.querySelectorAll('.card').forEach(c => cardsToProcess.push(c));
-                                    }
+                                let cardsToProcess = [];
+                                if (node.classList && node.classList.contains('card')) {
+                                    cardsToProcess.push(node);
+                                } else if (node.querySelectorAll) {
+                                    node.querySelectorAll('.card').forEach(c => cardsToProcess.push(c));
+                                }
 
-                                    if (cardsToProcess.length === 0 && node.closest) {
-                                        const parentCard = node.closest('.card');
-                                        if (parentCard) cardsToProcess.push(parentCard);
-                                    }
+                                if (cardsToProcess.length === 0 && node.closest) {
+                                    const parentCard = node.closest('.card');
+                                    if (parentCard) cardsToProcess.push(parentCard);
+                                }
 
-                                    cardsToProcess.forEach(processCard);
+                                cardsToProcess.forEach(processCard);
 
-                                    if (node.tagName === 'BUTTON' && node.classList.contains('headerButton')) {
-                                        const titleStr = node.getAttribute('title') || '';
-                                        if (titleStr.includes('Games')) {
-                                            const iconSpan = node.querySelector('.material-icons');
-                                            if (iconSpan) iconSpan.innerHTML = 'sports_esports';
-                                        }
+                                if (node.tagName === 'BUTTON' && node.classList.contains('headerButton')) {
+                                    const titleStr = node.getAttribute('title') || '';
+                                    if (titleStr.includes('Games')) {
+                                        const iconSpan = node.querySelector('.material-icons');
+                                        if (iconSpan) iconSpan.innerHTML = 'sports_esports';
                                     }
                                 }
                             });
                         });
 
                         if (checkDetails) {
-                            mutateDetailsButtons();
+                            injectAll();
                         }
                     });
 
