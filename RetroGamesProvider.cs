@@ -340,7 +340,7 @@ namespace JellyEmu
             try
             {
                 var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
-                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;", Encoding.UTF8, "text/plain");
+                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,total_rating,total_rating_count;", Encoding.UTF8, "text/plain");
                 var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
@@ -387,6 +387,17 @@ namespace JellyEmu
                                     if (!string.IsNullOrWhiteSpace(name)) item.AddStudio(name);
                                 }
                             }
+
+                        // IGDB total_rating is 0–100 (weighted avg of critic + user scores)
+                        // Jellyfin CommunityRating is 0–10, so divide by 10
+                        if (root.TryGetProperty("total_rating", out var totalRating) &&
+                            totalRating.ValueKind == JsonValueKind.Number &&
+                            root.TryGetProperty("total_rating_count", out var ratingCount) &&
+                            ratingCount.ValueKind == JsonValueKind.Number &&
+                            ratingCount.GetInt32() > 0)
+                        {
+                            item.CommunityRating = (float)Math.Round(totalRating.GetDouble() / 10.0, 1);
+                        }
 
                         item.SetProviderId("IGDB", gameId);
                         result.HasMetadata = true;
@@ -1007,6 +1018,21 @@ namespace JellyEmu
 
                 if (!string.IsNullOrEmpty(resolvedId))
                     item.SetProviderId("Romm", resolvedId);
+
+                // RoMM proxies IGDB metadata — pull rating from igdb_metadata.total_rating if available
+                // igdb_metadata.total_rating is 0–100; Jellyfin CommunityRating is 0–10
+                if (rom.Value.TryGetProperty("igdb_metadata", out var igdbMeta) &&
+                    igdbMeta.ValueKind == JsonValueKind.Object)
+                {
+                    if (igdbMeta.TryGetProperty("total_rating", out var ratingEl) &&
+                        ratingEl.ValueKind == JsonValueKind.Number &&
+                        igdbMeta.TryGetProperty("total_rating_count", out var countEl) &&
+                        countEl.ValueKind == JsonValueKind.Number &&
+                        countEl.GetInt32() > 0)
+                    {
+                        item.CommunityRating = (float)Math.Round(ratingEl.GetDouble() / 10.0, 1);
+                    }
+                }
 
                 result.HasMetadata = true;
                 result.Item = item;

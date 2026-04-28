@@ -105,15 +105,15 @@ namespace JellyEmu
             // Simple Roman numeral map (I–VIII covers virtually all multi-disc games)
             return raw.ToUpperInvariant() switch
             {
-                "I"    => "Disc 1",
-                "II"   => "Disc 2",
-                "III"  => "Disc 3",
-                "IV"   => "Disc 4",
-                "V"    => "Disc 5",
-                "VI"   => "Disc 6",
-                "VII"  => "Disc 7",
+                "I" => "Disc 1",
+                "II" => "Disc 2",
+                "III" => "Disc 3",
+                "IV" => "Disc 4",
+                "V" => "Disc 5",
+                "VI" => "Disc 6",
+                "VII" => "Disc 7",
                 "VIII" => "Disc 8",
-                _      => $"Disc {raw.ToUpperInvariant()}"
+                _ => $"Disc {raw.ToUpperInvariant()}"
             };
         }
 
@@ -273,6 +273,77 @@ namespace JellyEmu
                 // .dsk  — DOS / Amiga / Amstrad — always needs folder/token
             };
 
+        /// <summary>
+        /// Platforms that JellyEmu recognises and tags for library management,
+        /// but which EmulatorJS does not support. ROMs on these platforms will
+        /// appear in the library with a proper console tag but without a Play button.
+        /// </summary>
+        public static readonly Dictionary<string, string> LibraryOnlyAliases =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                // Dreamcast
+                { "dreamcast",          "Dreamcast" }, { "dc",             "Dreamcast" },
+                { "sega dreamcast",     "Dreamcast" },
+                // PlayStation 2
+                { "ps2",                "PlayStation 2" }, { "playstation 2", "PlayStation 2" },
+                { "playstation2",       "PlayStation 2" },
+                // PlayStation 3
+                { "ps3",                "PlayStation 3" }, { "playstation 3", "PlayStation 3" },
+                { "playstation3",       "PlayStation 3" },
+                // Xbox
+                { "xbox",               "Xbox" }, { "microsoft xbox", "Xbox" },
+                // Xbox 360
+                { "xbox 360",           "Xbox 360" }, { "xbox360", "Xbox 360" },
+                { "x360",               "Xbox 360" },
+                // GameCube
+                { "gamecube",           "GameCube" }, { "game cube", "GameCube" },
+                { "nintendo gamecube",  "GameCube" }, { "gc", "GameCube" },
+                // Wii
+                { "wii",                "Wii" }, { "nintendo wii", "Wii" },
+                // Wii U
+                { "wii u",              "Wii U" }, { "wiiu", "Wii U" },
+                { "nintendo wii u",     "Wii U" },
+                // Nintendo Switch
+                { "switch",             "Nintendo Switch" }, { "nintendo switch", "Nintendo Switch" },
+                { "nx",                 "Nintendo Switch" },
+                // Nintendo 3DS
+                { "3ds",                "Nintendo 3DS" }, { "nintendo 3ds", "Nintendo 3DS" },
+                { "new 3ds",            "Nintendo 3DS" },
+                // PlayStation Portable — already in EJS, but PSVita is not
+                { "psvita",             "PlayStation Vita" }, { "ps vita", "PlayStation Vita" },
+                { "playstation vita",   "PlayStation Vita" },
+            };
+
+        /// <summary>
+        /// File extensions that unambiguously map to a library-only (non-EJS) platform.
+        /// </summary>
+        private static readonly Dictionary<string, string> LibraryOnlyExtensions =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                { ".nds", "Nintendo DS" },  // already in EJS but listed for completeness
+                { ".3ds", "Nintendo 3DS" },
+                { ".cci", "Nintendo 3DS" },
+                { ".cia", "Nintendo 3DS" },
+                { ".gcm", "GameCube"     },
+                { ".gcz", "GameCube"     },
+                { ".rvz", "Wii"          },
+                { ".wbfs", "Wii"         },
+                { ".wad", "Wii"          },
+                { ".xex", "Xbox 360"     },
+                { ".xiso", "Xbox"        },
+                { ".vpk", "PlayStation Vita" },
+            };
+
+        /// <summary>
+        /// Returns true when the resolved platform tag is supported by EmulatorJS.
+        /// "Unknown" and all library-only platforms return false.
+        /// </summary>
+        public static bool IsEjsSupported(string? tag)
+        {
+            if (string.IsNullOrEmpty(tag) || tag == "Unknown") return false;
+            return !LibraryOnlyAliases.Values.Contains(tag, StringComparer.OrdinalIgnoreCase);
+        }
+
         private readonly ILogger<PlatformResolver> _logger;
 
         public PlatformResolver(ILogger<PlatformResolver> logger)
@@ -310,6 +381,13 @@ namespace JellyEmu
             {
                 _logger.LogDebug("[JellyEmu] Platform from extension '{Ext}': {Tag}", ext, extTag);
                 return extTag;
+            }
+
+            // Check library-only extensions (e.g. .3ds, .gcm, .wbfs) before giving up
+            if (!string.IsNullOrEmpty(ext) && LibraryOnlyExtensions.TryGetValue(ext, out var libTag))
+            {
+                _logger.LogDebug("[JellyEmu] Library-only platform from extension '{Ext}': {Tag}", ext, libTag);
+                return libTag;
             }
 
             _logger.LogDebug(
@@ -377,6 +455,9 @@ namespace JellyEmu
 
                 if (Aliases.TryGetValue(inner, out var tag))
                     return tag;
+
+                if (LibraryOnlyAliases.TryGetValue(inner, out var libTag))
+                    return libTag;
             }
             return null;
         }
@@ -388,6 +469,9 @@ namespace JellyEmu
             {
                 if (Aliases.TryGetValue(dir.Name, out var tag))
                     return tag;
+
+                if (LibraryOnlyAliases.TryGetValue(dir.Name, out var libTag))
+                    return libTag;
             }
             return null;
         }
@@ -423,6 +507,12 @@ namespace JellyEmu
                 ".dsk",
                 // Catch-all binary ROM (many obscure carts ship as .bin)
                 ".bin",
+                // Library-only platforms (recognised but not emulated by EJS)
+                ".3ds", ".cci", ".cia",         // Nintendo 3DS
+                ".gcm", ".gcz", ".rvz",         // GameCube / Wii
+                ".wbfs", ".wad",                // Wii
+                ".xex", ".xiso",                // Xbox / Xbox 360
+                ".vpk",                         // PlayStation Vita
             };
     }
     /// <summary>
