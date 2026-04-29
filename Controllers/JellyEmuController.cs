@@ -185,10 +185,11 @@ namespace JellyEmu.Controllers
             string Autosave,
             string Shader,
             int VideoRotation,
-            string Controls);   // JSON string — serialised EJS_defaultControls player-0 map
+            string Controls,           // JSON — keyboard bindings for EJS player-0
+            string ControllerControls); // JSON — gamepad button bindings for EJS player-0
 
         private static readonly UserFullPrefs DefaultFullPrefs =
-            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty);
+            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty);
 
         private string GetPrefsFilePath(string userId)
         {
@@ -218,7 +219,8 @@ namespace JellyEmu.Controllers
                     Autosave: Str("autosave", DefaultFullPrefs.Autosave),
                     Shader: Str("shader", DefaultFullPrefs.Shader),
                     VideoRotation: Int("videoRotation", DefaultFullPrefs.VideoRotation),
-                    Controls: Str("controls", DefaultFullPrefs.Controls));
+                    Controls: Str("controls", DefaultFullPrefs.Controls),
+                    ControllerControls: Str("controllerControls", DefaultFullPrefs.ControllerControls));
             }
             catch (Exception ex)
             {
@@ -240,6 +242,7 @@ namespace JellyEmu.Controllers
                 shader = prefs.Shader,
                 videoRotation = prefs.VideoRotation,
                 controls = prefs.Controls,
+                controllerControls = prefs.ControllerControls,
             }));
         }
 
@@ -257,7 +260,8 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Play(string itemId, [FromQuery] string? userId)
+        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId,
+            [FromServices] IHttpClientFactory httpClientFactory)
         {
             var item = _libraryManager.GetItemById(itemId);
             if (item == null)
@@ -275,7 +279,8 @@ namespace JellyEmu.Controllers
             var activeSlot = userPrefs.Slot;
             var activeShader = userPrefs.Shader;
             var videoRotation = userPrefs.VideoRotation;
-            var savedControls = fullPrefs.Controls; // JSON string of player-0 key map
+            var savedControls = fullPrefs.Controls;           // keyboard bindings JSON
+            var savedControllerControls = fullPrefs.ControllerControls; // gamepad bindings JSON
             var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
             var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
@@ -289,6 +294,10 @@ namespace JellyEmu.Controllers
             var ejsBase = _ejsManager.IsReady
                 ? $"/jellyemu/ejs"
                 : JellyEmuEjsManager.CdnBase;
+
+            // Fetch cheats server-side so they're inlined before loader.js runs.
+            // GetCheatsJson handles disk cache — this is a fast local read on repeat plays.
+            var cheatsJson = await GetCheatsJsonAsync(item, httpClientFactory);
 
             var html = $@"<!DOCTYPE html>
 <html>
@@ -307,7 +316,10 @@ namespace JellyEmu.Controllers
             border-radius: 5px; cursor: pointer;
             backdrop-filter: blur(5px);
             display: flex; align-items: center; gap: 8px;
+            opacity: 1;
+            transition: opacity 0.4s ease;
         }}
+        #exit-btn.je-hidden {{ opacity: 0; pointer-events: none; }}
     </style>
 </head>
 <body>
@@ -318,6 +330,35 @@ namespace JellyEmu.Controllers
         Exit Game
     </button>
     <div id=""game""></div>
+    <script>
+        (function() {{
+            var btn = document.getElementById('exit-btn');
+            var hideTimer = null;
+            var HIDE_AFTER_MS = 3000;
+
+            function showBtn() {{
+                btn.classList.remove('je-hidden');
+                clearTimeout(hideTimer);
+                hideTimer = setTimeout(function() {{
+                    btn.classList.add('je-hidden');
+                }}, HIDE_AFTER_MS);
+            }}
+
+            // Show on any mouse or touch activity
+            document.addEventListener('mousemove',  showBtn, {{ passive: true }});
+            document.addEventListener('mousedown',  showBtn, {{ passive: true }});
+            document.addEventListener('touchstart', showBtn, {{ passive: true }});
+            document.addEventListener('touchmove',  showBtn, {{ passive: true }});
+            document.addEventListener('keydown',    showBtn, {{ passive: true }});
+
+            // Never hide while the cursor is over the button itself
+            btn.addEventListener('mouseenter', function() {{ clearTimeout(hideTimer); btn.classList.remove('je-hidden'); }});
+            btn.addEventListener('mouseleave', showBtn);
+
+            // Kick off the initial hide timer
+            showBtn();
+        }})();
+    </script>
     <script>
         window.EJS_player        = '#game';
         window.EJS_core          = '{core}';
@@ -336,10 +377,16 @@ namespace JellyEmu.Controllers
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
         {(core is "dos" or "psp" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
 
-        // Inject saved key bindings if the user has customised them
-        {(!string.IsNullOrWhiteSpace(savedControls) ? $"window.EJS_defaultControls = {{ 0: {savedControls}, 1: {{}}, 2: {{}}, 3: {{}} }};" : "// EJS_defaultControls: using emulator defaults")}
+        // Inject saved key and/or gamepad bindings
+        {((!string.IsNullOrWhiteSpace(savedControls) || !string.IsNullOrWhiteSpace(savedControllerControls))
+            ? $@"window.EJS_defaultControls = {{
+            0: Object.assign({{}}, {(string.IsNullOrWhiteSpace(savedControls) ? "{}" : savedControls)}, {(string.IsNullOrWhiteSpace(savedControllerControls) ? "{}" : savedControllerControls)}),
+            1: {{}}, 2: {{}}, 3: {{}}
+        }};"
+            : "// EJS_defaultControls: using emulator defaults")}
 
         {(!string.IsNullOrEmpty(igdbId) ? $"window.EJS_gameID = {igdbId};" : "")}
+        {(!string.IsNullOrEmpty(cheatsJson) ? $"window.EJS_cheats = {cheatsJson};" : "")}
         {(hasNetplay ? $@"window.EJS_netplayServer = '{netplayServer}';
         window.EJS_netplayICEServers = [
             {{ urls: 'stun:stun.l.google.com:19302' }},
@@ -514,6 +561,326 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Returns the cheats JSON string for inline injection into the EJS launch page,
+        /// or null if no cheats are available. Handles caching internally.
+        /// </summary>
+        /// <summary>
+        /// Strips No-Intro parenthetical tokens from a filename — regions, revisions,
+        /// publisher tags, disc numbers, cheat-device labels, etc. — leaving just the
+        /// bare game title for comparison.
+        /// e.g. "Super Mario Bros (USA) (Rev 1)" → "super mario bros"
+        /// </summary>
+        private static readonly System.Text.RegularExpressions.Regex ParenRegex =
+            new(@"\s*\([^)]*\)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static string StripParens(string name) =>
+            ParenRegex.Replace(name, "").Trim().ToLowerInvariant();
+
+        /// <summary>
+        /// Fetches and caches the list of .cht filenames for a system folder from the
+        /// GitHub Contents API. Cache lifetime is 30 days — the libretro database
+        /// doesn't change frequently enough to warrant shorter.
+        /// Returns bare filenames (without path), or null on failure.
+        /// </summary>
+        private async Task<List<string>?> GetSystemCheatListAsync(
+            string dbFolder, IHttpClientFactory httpClientFactory)
+        {
+            var cacheDir = Path.Combine(_appPaths.DataPath, "jellyemu-cheats", "index");
+            Directory.CreateDirectory(cacheDir);
+            // Safe filename from folder name
+            var safeName = string.Concat(dbFolder.Select(c => char.IsLetterOrDigit(c) ? c : '_'));
+            var cacheFile = Path.Combine(cacheDir, safeName + ".json");
+
+            if (System.IO.File.Exists(cacheFile) &&
+                (DateTime.UtcNow - System.IO.File.GetLastWriteTimeUtc(cacheFile)).TotalDays < 30)
+            {
+                try
+                {
+                    var cached = await System.IO.File.ReadAllTextAsync(cacheFile);
+                    return System.Text.Json.JsonSerializer.Deserialize<List<string>>(cached);
+                }
+                catch { /* fall through to re-fetch */ }
+            }
+
+            try
+            {
+                var encoded = Uri.EscapeDataString(dbFolder);
+                var url = $"https://api.github.com/repos/libretro/libretro-database/contents/cht/{encoded}";
+                var client = httpClientFactory.CreateClient("JellyEmuCheats");
+                // GitHub API requires a User-Agent header
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("User-Agent", "JellyEmu-Plugin");
+                var response = await client.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("[JellyEmu] GitHub Contents API returned {Status} for {Folder}",
+                        response.StatusCode, dbFolder);
+                    return null;
+                }
+
+                var body = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+
+                var names = doc.RootElement.EnumerateArray()
+                    .Where(e => e.TryGetProperty("name", out var n) &&
+                                n.GetString()?.EndsWith(".cht", StringComparison.OrdinalIgnoreCase) == true)
+                    .Select(e => e.GetProperty("name").GetString()!)
+                    .ToList();
+
+                var json = System.Text.Json.JsonSerializer.Serialize(names);
+                await System.IO.File.WriteAllTextAsync(cacheFile, json);
+                _logger.LogInformation("[JellyEmu] Cached {Count} cheat entries for {Folder}", names.Count, dbFolder);
+                return names;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Failed to fetch cheat index for {Folder}", dbFolder);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Finds the best-matching .cht filename from a system's listing for the given
+        /// ROM name, using stripped-paren comparison. Returns null if no confident match.
+        /// </summary>
+        private static string? FuzzyMatchCht(string romName, List<string> candidates)
+        {
+            var stripped = StripParens(romName);
+            if (string.IsNullOrWhiteSpace(stripped)) return null;
+
+            // 1. Exact match after stripping parens from both sides
+            foreach (var c in candidates)
+            {
+                if (StripParens(Path.GetFileNameWithoutExtension(c)) == stripped)
+                    return c;
+            }
+
+            // 2. Candidate starts-with match — handles cases where the DB entry has
+            //    extra subtitle tokens the ROM name omits, e.g. "Zelda" vs "Zelda - A Link to the Past"
+            var startsWith = candidates
+                .Where(c => StripParens(Path.GetFileNameWithoutExtension(c)).StartsWith(stripped,
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.Length) // prefer shortest (fewest extra tokens)
+                .FirstOrDefault();
+            if (startsWith != null) return startsWith;
+
+            // 3. ROM-name starts-with candidate — ROM has more info than DB entry
+            var romStartsWith = candidates
+                .Where(c => stripped.StartsWith(
+                    StripParens(Path.GetFileNameWithoutExtension(c)),
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(c => c.Length) // prefer longest match
+                .FirstOrDefault();
+            return romStartsWith;
+        }
+
+        /// <summary>
+        /// Resolves and returns the EJS-ready cheats JSON for a given item,
+        /// using fuzzy filename matching against the libretro cheat database.
+        /// Results are cached to disk for 7 days per item.
+        /// </summary>
+        private async Task<string?> GetCheatsJsonAsync(MediaBrowser.Controller.Entities.BaseItem item,
+            IHttpClientFactory httpClientFactory)
+        {
+            var consoleTags = (item.Tags ?? Array.Empty<string>())
+                .Where(t => CheatDbFolderMap.ContainsKey(t))
+                .ToList();
+            if (consoleTags.Count == 0) return null;
+
+            var dbFolder = CheatDbFolderMap[consoleTags[0]];
+            var romName = Path.GetFileNameWithoutExtension(item.Path ?? item.Name ?? "");
+
+            var cacheDir = Path.Combine(_appPaths.DataPath, "jellyemu-cheats");
+            Directory.CreateDirectory(cacheDir);
+            var cacheFile = Path.Combine(cacheDir, item.Id + ".json");
+
+            if (System.IO.File.Exists(cacheFile) &&
+                (DateTime.UtcNow - System.IO.File.GetLastWriteTimeUtc(cacheFile)).TotalDays < 7)
+            {
+                var cached = await System.IO.File.ReadAllTextAsync(cacheFile);
+                return cached == "[]" ? null : cached;
+            }
+
+            try
+            {
+                // Step 1: get the directory listing for this system (cached 30 days)
+                var candidates = await GetSystemCheatListAsync(dbFolder, httpClientFactory);
+                if (candidates == null || candidates.Count == 0)
+                {
+                    await System.IO.File.WriteAllTextAsync(cacheFile, "[]");
+                    return null;
+                }
+
+                // Step 2: fuzzy-match the ROM name against the listing
+                var matched = FuzzyMatchCht(romName, candidates);
+                if (matched == null)
+                {
+                    _logger.LogDebug("[JellyEmu] No cheat match for '{Rom}' in {Folder}", romName, dbFolder);
+                    await System.IO.File.WriteAllTextAsync(cacheFile, "[]");
+                    return null;
+                }
+
+                _logger.LogInformation("[JellyEmu] Matched '{Rom}' → '{Matched}'", romName, matched);
+
+                // Step 3: fetch the matched .cht file
+                var encodedFolder = Uri.EscapeDataString(dbFolder);
+                var encodedFile = Uri.EscapeDataString(matched);
+                var url = $"https://raw.githubusercontent.com/libretro/libretro-database/master/cht/{encodedFolder}/{encodedFile}";
+
+                var client = httpClientFactory.CreateClient("JellyEmuCheats");
+                var response = await client.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    await System.IO.File.WriteAllTextAsync(cacheFile, "[]");
+                    return null;
+                }
+
+                var chtText = await response.Content.ReadAsStringAsync();
+                var cheats = ParseChtFile(chtText);
+                var json = System.Text.Json.JsonSerializer.Serialize(cheats);
+                await System.IO.File.WriteAllTextAsync(cacheFile, json);
+                _logger.LogInformation("[JellyEmu] Loaded {Count} cheats for '{Rom}'", cheats.Count, romName);
+                return cheats.Count > 0 ? json : null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Failed to fetch cheats for '{Rom}'", romName);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Maps JellyEmu console tags to their folder names in the libretro cheat database.
+        /// https://github.com/libretro/libretro-database/tree/master/cht
+        /// </summary>
+        private static readonly Dictionary<string, string> CheatDbFolderMap =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "NES",              "Nintendo - Nintendo Entertainment System" },
+                { "SNES",             "Nintendo - Super Nintendo Entertainment System" },
+                { "N64",              "Nintendo - Nintendo 64" },
+                { "Game Boy",         "Nintendo - Game Boy" },
+                { "Game Boy Color",   "Nintendo - Game Boy Color" },
+                { "Game Boy Advance", "Nintendo - Game Boy Advance" },
+                { "Nintendo DS",      "Nintendo - Nintendo DS" },
+                { "Virtual Boy",      "Nintendo - Virtual Boy" },
+                { "Master System",    "Sega - Master System - Mark III" },
+                { "Game Gear",        "Sega - Game Gear" },
+                { "Sega Genesis",     "Sega - Mega Drive - Genesis" },
+                { "Sega CD",          "Sega - Mega-CD - Sega CD" },
+                { "Sega 32X",         "Sega - 32X" },
+                { "PlayStation",      "Sony - PlayStation" },
+                { "PSP",              "Sony - PlayStation Portable" },
+                { "Atari 2600",       "Atari - 2600" },
+                { "Atari 7800",       "Atari - 7800" },
+                { "Atari Lynx",       "Atari - Lynx" },
+                { "TurboGrafx-16",    "NEC - PC Engine - TurboGrafx 16" },
+                { "ColecoVision",     "Coleco - ColecoVision" },
+                { "NeoGeo Pocket",    "SNK - Neo Geo Pocket Color" },
+                { "Arcade",           "FBNeo - Arcade Games" },
+            };
+
+        /// <summary>
+        /// Fetches and parses cheats for a ROM from the libretro cheat database on GitHub.
+        /// Results are cached to disk for 7 days so subsequent launches are instant.
+        /// 
+        /// Path: GET /jellyemu/cheats/{itemId}
+        /// Returns: JSON array of [name, code] pairs, or empty array if no cheats found.
+        /// </summary>
+        [HttpGet("/jellyemu/cheats/{itemId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetCheats(string itemId,
+            [FromServices] IHttpClientFactory httpClientFactory)
+        {
+            var item = _libraryManager.GetItemById(itemId);
+            if (item == null) return Ok(Array.Empty<object>());
+
+            var json = await GetCheatsJsonAsync(item, httpClientFactory);
+            return Content(json ?? "[]", "application/json");
+        }
+
+        /// <summary>
+        /// Parses a libretro .cht file into EJS-compatible [description, code, status] triples.
+        /// EJS_cheats format: [[name, code, ""], ...] where "" = disabled, "+" = enabled.
+        /// All cheats start disabled — the user enables them from the in-game cheat menu.
+        /// </summary>
+        private static List<string[]> ParseChtFile(string cht)
+        {
+            var result = new List<string[]>();
+            var entries = new Dictionary<int, (string? Name, string? Code)>();
+
+            foreach (var rawLine in cht.Split('\n'))
+            {
+                var line = rawLine.Trim();
+                if (!line.Contains('=')) continue;
+
+                var eqIdx = line.IndexOf('=');
+                var key = line[..eqIdx].Trim();
+                var value = line[(eqIdx + 1)..].Trim().Trim('"');
+
+                if (!key.StartsWith("cheat", StringComparison.OrdinalIgnoreCase)) continue;
+
+                var parts = key.Split('_', 2);
+                if (parts.Length < 2) continue;
+                if (!int.TryParse(parts[0]["cheat".Length..], out var idx)) continue;
+
+                var field = parts[1].ToLowerInvariant();
+                if (!entries.ContainsKey(idx)) entries[idx] = (null, null);
+                var entry = entries[idx];
+
+                if (field == "desc") entries[idx] = (value, entry.Code);
+                else if (field == "code") entries[idx] = (entry.Name, value);
+            }
+
+            foreach (var (_, (name, code)) in entries.OrderBy(e => e.Key))
+            {
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(code))
+                    result.Add(new[] { name, code, "" }); // "" = disabled by default
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Returns lightweight card metadata for a batch of item IDs — only the fields
+        /// JellyEmu actually needs for card badge rendering: Tags, CommunityRating, ProviderIds.
+        /// This replaces N individual getItem calls with a single request per batch.
+        ///
+        /// Path: GET /jellyemu/cardmeta?ids=id1,id2,...
+        /// Returns: JSON object keyed by item ID: { "id": { tags, communityRating, providerIds } }
+        /// </summary>
+        [HttpGet("/jellyemu/cardmeta")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult CardMeta([FromQuery] string ids)
+        {
+            if (string.IsNullOrWhiteSpace(ids))
+                return Ok(new { });
+
+            var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                            .Take(100) // hard cap — client should batch to ≤50 but protect server
+                            .ToList();
+
+            var result = new Dictionary<string, object>(idList.Count);
+
+            foreach (var id in idList)
+            {
+                var item = _libraryManager.GetItemById(id);
+                if (item == null) continue;
+
+                result[id] = new
+                {
+                    tags = item.Tags ?? Array.Empty<string>(),
+                    communityRating = item.CommunityRating,
+                    providerIds = item.ProviderIds ?? new Dictionary<string, string>(),
+                };
+            }
+
+            return new JsonResult(result);
+        }
+
+        /// <summary>
         /// Streams the raw ROM file for the given item directly from disk.
         /// No authentication required. HEAD is supported so EmulatorJS can read Content-Length before downloading.
         /// 
@@ -565,9 +932,29 @@ namespace JellyEmu.Controllers
             };
 
             var fileInfo = new System.IO.FileInfo(servePath);
+            var lastModified = fileInfo.LastWriteTimeUtc;
+            // ETag: size + last-modified ticks — unique per file version, no hashing required
+            var etag = $"\"{fileInfo.Length}-{lastModified.Ticks}\"";
+
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
             Response.Headers["Content-Length"] = fileInfo.Length.ToString();
             Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Path.GetFileName(servePath)}\"";
+            Response.Headers["ETag"] = etag;
+            Response.Headers["Last-Modified"] = lastModified.ToString("R"); // RFC1123
+            // ROMs are immutable in practice — allow EJS to cache for 7 days before re-validating
+            Response.Headers["Cache-Control"] = "public, max-age=604800, must-revalidate";
+
+            // Conditional GET/HEAD — return 304 if EJS already has a fresh cached copy
+            var ifNoneMatch = Request.Headers["If-None-Match"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(ifNoneMatch) && ifNoneMatch == etag)
+                return StatusCode(304);
+
+            if (DateTimeOffset.TryParseExact(
+                    Request.Headers["If-Modified-Since"].FirstOrDefault() ?? "",
+                    "R", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var ifModifiedSince)
+                && lastModified <= ifModifiedSince.UtcDateTime)
+                return StatusCode(304);
 
             if (HttpMethods.IsHead(Request.Method))
                 return new FileContentResult(Array.Empty<byte>(), mimeType);
@@ -786,7 +1173,8 @@ namespace JellyEmu.Controllers
                     Autosave: Str("autosave", current.Autosave),
                     Shader: Str("shader", current.Shader),
                     VideoRotation: Int("videoRotation", current.VideoRotation),
-                    Controls: Str("controls", current.Controls));
+                    Controls: Str("controls", current.Controls),
+                    ControllerControls: Str("controllerControls", current.ControllerControls));
             }
             catch { return BadRequest("Body must be a JSON object."); }
 
@@ -803,6 +1191,7 @@ namespace JellyEmu.Controllers
                 shader = current.Shader,
                 videoRotation = current.VideoRotation,
                 controls = current.Controls,
+                controllerControls = current.ControllerControls,
             });
         }
 
