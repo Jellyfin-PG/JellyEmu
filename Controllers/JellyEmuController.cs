@@ -88,6 +88,13 @@ namespace JellyEmu.Controllers
             return Path.Combine(dir, $"{itemId}.state");
         }
 
+        private string GetSaveScreenshotPath(string userId, string itemId, int slot)
+        {
+            var dir = Path.Combine(_appPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, $"{itemId}.screenshot.json");
+        }
+
         private string GetSlotFilePath(string userId)
         {
             var dir = Path.Combine(_appPaths.DataPath, "jellyemu-saves", userId);
@@ -331,6 +338,20 @@ namespace JellyEmu.Controllers
     </button>
     <div id=""game""></div>
     <script>
+        // Patch getContext BEFORE loader.js so EJS gets a WebGL context with
+        // preserveDrawingBuffer:true — without this, toDataURL always returns black
+        // because the buffer is cleared after each frame is composited to screen.
+        (function() {{
+            var _origGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type, attrs) {{
+                if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {{
+                    attrs = Object.assign({{}}, attrs || {{}}, {{ preserveDrawingBuffer: true }});
+                }}
+                return _origGetContext.call(this, type, attrs);
+            }};
+        }})();
+    </script>
+    <script>
         (function() {{
             var btn = document.getElementById('exit-btn');
             var hideTimer = null;
@@ -437,24 +458,49 @@ namespace JellyEmu.Controllers
         var _jellyEmuSessionStart = Date.now();
 
         // Auto-upload save state whenever EmulatorJS writes one
+        // Capture the canvas and POST as save-state screenshot.
+        // preserveDrawingBuffer:true is patched onto getContext above so
+        // toDataURL works at any time, not just during the render tick.
+        function _jePostCanvasScreenshot(savePostPromise) {{
+            var dataUrl = null;
+            try {{
+                var canvas = document.querySelector('canvas.ejs_canvas') ||
+                             document.querySelector('#game canvas') ||
+                             document.querySelector('canvas');
+                if (canvas && canvas.width > 0 && canvas.height > 0) {{
+                    dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+                }}
+            }} catch(e) {{ console.warn('[JellyEmu] Screenshot capture failed:', e); }}
+            if (!dataUrl || !dataUrl.startsWith('data:image')) return;
+            (savePostPromise || Promise.resolve()).then(function() {{
+                fetch('/jellyemu/save-screenshot/{itemId}/{userId}/{activeSlot}', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ dataUrl: dataUrl }})
+                }}).catch(function() {{}});
+            }});
+        }}
+
         window.EJS_onSaveState = function(e) {{
             if (!e || !e.state) return;
-            fetch('{savePostUrl}', {{
+            // Capture canvas NOW — synchronously, before the fetch, so we get the
+            // current game frame rather than whatever is on screen after the round-trip
+            var savePromise = fetch('{savePostUrl}', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/octet-stream' }},
                 body: e.state
             }}).then(function(r) {{
                 console.log('[JellyEmu] Save uploaded, status:', r.status);
-                // Notify parent window so it can push to Romm
                 try {{ window.parent.postMessage({{ type: 'jellyemu-save-written', itemId: '{itemId}' }}, '*'); }} catch(_) {{}}
             }}).catch(function(err) {{
                 console.error('[JellyEmu] Save upload failed:', err);
             }});
+            _jePostCanvasScreenshot(savePromise);
         }};
-        // Also upload on any incremental save update (e.g. battery saves)
+        // EJS_onSaveUpdate fires on battery/SRAM saves detected by hash comparison.
         window.EJS_onSaveUpdate = function(e) {{
             if (!e || !e.save) return;
-            fetch('{savePostUrl}', {{
+            var savePromise = fetch('{savePostUrl}', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/octet-stream' }},
                 body: e.save
@@ -463,6 +509,7 @@ namespace JellyEmu.Controllers
             }}).catch(function(err) {{
                 console.error('[JellyEmu] Save update upload failed:', err);
             }});
+            _jePostCanvasScreenshot(savePromise);
         }};
         // Auto-save on exit if the user pref is enabled.
         // EJS_onExit is called by both EmulatorJS's own exit menu item and our
@@ -518,6 +565,7 @@ namespace JellyEmu.Controllers
                 }});
                 return;
             }}
+            // Capture before the fetch so rAF fires on the current frame
             var saveFlush = fetch('{savePostUrl}', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/octet-stream' }},
@@ -525,6 +573,7 @@ namespace JellyEmu.Controllers
             }}).then(function() {{
                 try {{ window.parent.postMessage({{ type: 'jellyemu-save-written', itemId: '{itemId}' }}, '*'); }} catch(_) {{}}
             }}).catch(function() {{}});
+            _jePostCanvasScreenshot(saveFlush);
             Promise.all([sessionStop, playtimeFlush, saveFlush]).finally(function() {{
                 // Notify parent of session end for Romm playtime reporting
                 try {{ window.parent.postMessage({{ type: 'jellyemu-session-end', itemId: '{itemId}', seconds: sessionSeconds }}, '*'); }} catch(_) {{}}
@@ -1326,6 +1375,7 @@ namespace JellyEmu.Controllers
                         sizeBytes = fi.Length,
                         lastModified = fi.LastWriteTimeUtc.ToString("o"),
                         hasArt,
+                        hasScreenshot = System.IO.File.Exists(GetSaveScreenshotPath(userId, itemId, slotNumber)),
                         downloadUrl = $"/jellyemu/save/{itemId}/{userId}?slot={slotNumber}",
                     });
                 }
@@ -2235,6 +2285,58 @@ self.addEventListener('fetch', function(e) {
                 _logger.LogError(ex, "[JellyEmu] Romm screenshot push error for {ItemId}", itemId);
                 return StatusCode(502, new { error = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Returns the save-state screenshot as JSON { dataUrl: "data:image/png;base64,..." }.
+        /// The frontend assigns dataUrl directly to img.src — no URL-as-image-src needed.
+        /// Path: GET /jellyemu/save-screenshot/{itemId}/{userId}/{slot}
+        /// </summary>
+        [HttpGet("/jellyemu/save-screenshot/{itemId}/{userId}/{slot}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetSaveScreenshot(string itemId, string userId, int slot)
+        {
+            var path = GetSaveScreenshotPath(userId, itemId, slot);
+            if (!System.IO.File.Exists(path)) return NotFound();
+            try
+            {
+                var json = await System.IO.File.ReadAllTextAsync(path).ConfigureAwait(false);
+                Response.Headers["Cache-Control"] = "no-cache";
+                return Content(json, MediaTypeNames.Application.Json);
+            }
+            catch { return NotFound(); }
+        }
+
+        /// <summary>
+        /// Stores a save-state screenshot for a given user/item/slot.
+        /// Body: { "dataUrl": "data:image/png;base64,..." }
+        /// The dataUrl is stored as-is in a JSON file and decoded on read.
+        /// Path: POST /jellyemu/save-screenshot/{itemId}/{userId}/{slot}
+        /// </summary>
+        [HttpPost("/jellyemu/save-screenshot/{itemId}/{userId}/{slot}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> PostSaveScreenshot(string itemId, string userId, int slot)
+        {
+            try
+            {
+                var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync().ConfigureAwait(false);
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                var dataUrl = doc.RootElement.TryGetProperty("dataUrl", out var d)
+                    ? d.GetString() ?? string.Empty : string.Empty;
+                if (!dataUrl.StartsWith("data:image"))
+                    return BadRequest("Body must contain a valid dataUrl.");
+                var path = GetSaveScreenshotPath(userId, itemId, slot);
+                await System.IO.File.WriteAllTextAsync(path,
+                    System.Text.Json.JsonSerializer.Serialize(new { dataUrl }),
+                    System.Text.Encoding.UTF8).ConfigureAwait(false);
+                _logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} user {UserId} slot {Slot}",
+                    itemId, userId, slot);
+                return Ok(new { saved = true });
+            }
+            catch { return BadRequest("Could not read image data."); }
         }
 
         private string? GetRommIdForItem(string itemId)
