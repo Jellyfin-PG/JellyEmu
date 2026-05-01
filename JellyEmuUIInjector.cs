@@ -502,7 +502,7 @@ namespace JellyEmu.Services
                                     if (currentItemId !== id) { clearInterval(_pollId); return; }
                                     var p = visiblePage || getVisibleDetailPage();
                                     if (!p) { if (++_pollAttempts > 20) clearInterval(_pollId); return; }
-                                    injectPlayButton(p);
+                                    if (isPlayable(cachedTags)) injectPlayButton(p);
                                     var bar = p.querySelector('.itemMiscInfo-primary');
                                     if (bar) { clearInterval(_pollId); injectMiscInfo(p); return; }
                                     if (++_pollAttempts > 20) clearInterval(_pollId);
