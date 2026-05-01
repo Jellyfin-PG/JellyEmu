@@ -314,28 +314,281 @@ namespace JellyEmu.Controllers
     <title>{gameName}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        html, body {{ width: 100%; height: 100%; background: #000; overflow: hidden; }}
+        html, body {{ width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }}
         #game {{ width: 100%; height: 100%; }}
-        #exit-btn {{
-            position: fixed; top: 20px; left: 20px; z-index: 2147483647;
-            background: rgba(0,0,0,0.7); color: #fff;
-            border: 1px solid #fff; padding: 10px 20px; font-size: 16px;
-            border-radius: 5px; cursor: pointer;
-            backdrop-filter: blur(5px);
-            display: flex; align-items: center; gap: 8px;
-            opacity: 1;
-            transition: opacity 0.4s ease;
+
+        /* ── Hide native EJS UI (specific selectors only — preserve ejs_parent for keyboard focus) ── */
+        .ejs_bottom_bar_area, .ejs_loading_text, .ejs_start_button,
+        .ejs_settings_parent, .ejs_cheat_parent, .ejs_menu_bar_area,
+        .ejs_control_bar, .ejs_menu_bar, .ejs_menu_button, .ejs_bar_top {{ display: none !important; }}
+
+        /* ── Loading Screen ── */
+        #je-loader {{ position: fixed; inset: 0; z-index: 99999; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; transition: opacity .4s ease, transform .4s ease; }}
+        #je-loader.je-dismiss {{ opacity: 0; transform: scale(1.03); pointer-events: none; }}
+        #je-loader-title {{ font-size: 28px; font-weight: 700; text-align: center; padding: 0 20px; }}
+        #je-loader-system {{ display: inline-block; padding: 4px 16px; border-radius: 20px; background: rgba(255,255,255,.12); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }}
+        #je-loader-status {{ font-size: 14px; opacity: .6; }}
+        .je-spinner {{ width: 56px; height: 56px; border: 3px solid rgba(255,255,255,.15); border-top-color: #fff; border-radius: 50%; animation: je-spin 1s linear infinite; }}
+        @keyframes je-spin {{ to {{ transform: rotate(360deg); }} }}
+        .je-pulse-ring {{ position: absolute; width: 90px; height: 90px; border-radius: 50%; border: 2px solid rgba(255,255,255,.08); animation: je-pulse 2s ease-out infinite; }}
+        .je-pulse-ring:nth-child(2) {{ animation-delay: .6s; }}
+        .je-pulse-ring:nth-child(3) {{ animation-delay: 1.2s; }}
+        @keyframes je-pulse {{ 0% {{ transform: scale(.8); opacity: 1; }} 100% {{ transform: scale(2); opacity: 0; }} }}
+        .je-loader-anim {{ position: relative; display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; }}
+
+        /* ── Shared Dock Styles ── */
+        .je-bar {{ position: fixed; z-index: 90000; transition: opacity .3s ease, transform .3s ease; }}
+        .je-bar.je-hidden {{ opacity: 0; pointer-events: none; }}
+
+        /* ── Top Bar ── */
+        #je-topbar {{ top: 0; left: 0; right: 0; height: 48px; display: none; align-items: center; justify-content: space-between; padding: 0 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); }}
+        #je-topbar.je-active {{ display: flex; }}
+        #je-topbar-title {{ font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }}
+        .je-topbtn {{ background: none; border: none; color: #fff; cursor: pointer; padding: 8px; border-radius: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: background .15s; }}
+        .je-topbtn:hover {{ background: rgba(255,255,255,.1); }}
+        .je-topbtn:active {{ transform: scale(.93); }}
+        .je-topbtn svg {{ width: 20px; height: 20px; fill: currentColor; }}
+
+        /* ── Bottom Dock ── */
+        #je-dock {{ bottom: 16px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 28px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1); }}
+        #je-dock.je-active {{ display: flex; }}
+        #je-dock.je-hidden {{ transform: translateX(-50%) translateY(20px); }}
+        .je-dockbtn {{ background: none; border: none; color: #fff; cursor: pointer; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .1s; position: relative; }}
+        .je-dockbtn:hover {{ background: rgba(255,255,255,.12); }}
+        .je-dockbtn:active {{ transform: scale(.88); }}
+        .je-dockbtn svg {{ width: 22px; height: 22px; fill: currentColor; }}
+        .je-dockbtn.je-active {{ background: rgba(255,255,255,.2); }}
+        .je-dock-sep {{ width: 1px; height: 24px; background: rgba(255,255,255,.15); margin: 0 2px; flex-shrink: 0; }}
+
+        /* ── Popup / Modal ── */
+        .je-overlay {{ position: fixed; inset: 0; z-index: 95000; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; }}
+        .je-overlay.je-open {{ display: flex; }}
+        .je-popup {{ background: rgba(20,20,20,.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.1); border-radius: 16px; width: 90%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; animation: je-pop-in .2s ease; }}
+        .je-popup-lg {{ max-width: 680px; }}
+        @keyframes je-pop-in {{ from {{ opacity: 0; transform: scale(.95); }} to {{ opacity: 1; transform: scale(1); }} }}
+        .je-popup-hdr {{ display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }}
+        .je-popup-hdr h3 {{ font-size: 16px; font-weight: 600; }}
+        .je-closebtn {{ background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; line-height: 1; }}
+        .je-closebtn:hover {{ background: rgba(255,255,255,.1); }}
+        .je-popup-body {{ padding: 16px 20px; overflow-y: auto; flex: 1; }}
+
+        /* ── Save Slots ── */
+        .je-slot {{ display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); margin-bottom: 8px; transition: border-color .2s; }}
+        .je-slot.je-slot-active {{ border-color: rgba(255,255,255,.35); }}
+        .je-slot-num {{ width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }}
+        .je-slot-thumb {{ width: 64px; height: 48px; border-radius: 6px; background: rgba(255,255,255,.05); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: .5; }}
+        .je-slot-thumb img {{ width: 100%; height: 100%; object-fit: cover; }}
+        .je-slot-info {{ flex: 1; min-width: 0; }}
+        .je-slot-info small {{ opacity: .5; font-size: 11px; }}
+        .je-slot-actions {{ display: flex; gap: 6px; flex-shrink: 0; }}
+        .je-btn {{ padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; font-size: 12px; transition: background .15s; }}
+        .je-btn:hover {{ background: rgba(255,255,255,.14); }}
+        .je-btn-primary {{ background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.25); }}
+
+        /* ── Volume ── */
+        .je-vol-wrap {{ display: flex; flex-direction: column; gap: 16px; align-items: center; }}
+        .je-vol-pct {{ font-size: 36px; font-weight: 700; }}
+        .je-vol-slider {{ width: 100%; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); outline: none; }}
+        .je-vol-slider::-webkit-slider-thumb {{ -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; cursor: pointer; }}
+
+        /* ── Cheats ── */
+        .je-cheat-row {{ display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); }}
+        .je-cheat-row:last-child {{ border-bottom: none; }}
+        .je-cheat-name {{ flex: 1; font-size: 13px; }}
+        .je-cheat-del {{ background: none; border: none; color: rgba(255,255,255,.4); cursor: pointer; font-size: 18px; padding: 2px 6px; }}
+        .je-cheat-del:hover {{ color: #f44; }}
+        .je-cheat-add {{ display: flex; gap: 8px; margin-top: 12px; }}
+        .je-cheat-add input, .je-cheat-add textarea {{ flex: 1; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 13px; resize: none; }}
+
+        /* ── Toggle Switch ── */
+        .je-toggle {{ position: relative; width: 40px; height: 22px; flex-shrink: 0; }}
+        .je-toggle input {{ opacity: 0; width: 0; height: 0; }}
+        .je-toggle-track {{ position: absolute; inset: 0; border-radius: 11px; background: rgba(255,255,255,.15); transition: background .2s; cursor: pointer; }}
+        .je-toggle-track::after {{ content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }}
+        .je-toggle input:checked + .je-toggle-track {{ background: rgba(100,200,255,.6); }}
+        .je-toggle input:checked + .je-toggle-track::after {{ transform: translateX(18px); }}
+
+        /* ── Settings Rows ── */
+        .je-setting {{ display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }}
+        .je-setting:last-child {{ border-bottom: none; }}
+        .je-setting-label {{ font-size: 13px; }}
+        .je-setting select {{ background: rgba(30,30,30,.95); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 13px; -webkit-appearance: none; appearance: none; background-image: url(""data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E""); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; cursor: pointer; }}
+        .je-setting select option {{ background: #1a1a1a; color: #fff; padding: 6px; }}
+        .je-section-title {{ font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: .4; margin: 16px 0 8px; }}
+        .je-section-title:first-child {{ margin-top: 0; }}
+
+        /* ── Input Mapping ── */
+        .je-tabs {{ display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 12px; }}
+        .je-tab {{ padding: 8px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; opacity: .5; transition: opacity .2s; background: none; border-top: none; border-left: none; border-right: none; color: #fff; }}
+        .je-tab.je-tab-active {{ opacity: 1; border-bottom-color: #fff; }}
+        .je-tab-panel {{ display: none; }}
+        .je-tab-panel.je-tab-active {{ display: block; }}
+        .je-bind-row {{ display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }}
+        .je-bind-key {{ padding: 4px 12px; border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); cursor: pointer; min-width: 80px; text-align: center; font-size: 12px; transition: background .2s; }}
+        .je-bind-key:hover {{ background: rgba(255,255,255,.15); }}
+        .je-bind-key.je-listening {{ background: rgba(100,200,255,.2); border-color: rgba(100,200,255,.5); animation: je-pulse-bind 1s ease infinite; }}
+        @keyframes je-pulse-bind {{ 0%,100% {{ opacity: 1; }} 50% {{ opacity: .6; }} }}
+        .je-gp-status {{ font-size: 12px; opacity: .5; margin-bottom: 12px; }}
+
+        /* ── FPS Counter ── */
+        #je-fps {{ position: fixed; top: 56px; left: 16px; z-index: 89999; font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace; color: #0f0; background: rgba(0,0,0,.6); padding: 2px 8px; border-radius: 4px; pointer-events: none; display: none; text-shadow: 0 0 4px rgba(0,255,0,.5); }}
+        #je-fps.je-active {{ display: block; }}
+
+        /* ── Dock Minimize ── */
+        #je-dock-min {{ position: fixed; bottom: 16px; right: 16px; z-index: 90000; width: 42px; height: 42px; border-radius: 50%; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; transition: opacity .3s ease, transform .3s ease; }}
+        #je-dock-min.je-active {{ display: flex; }}
+        #je-dock-min.je-hidden {{ opacity: 0; pointer-events: none; }}
+        #je-dock-min:hover {{ background: rgba(255,255,255,.12); }}
+        #je-dock-min:active {{ transform: scale(.88); }}
+        #je-dock-min svg {{ width: 22px; height: 22px; fill: currentColor; }}
+        #je-dock.je-minimized {{ display: none !important; }}
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {{
+            #je-dock {{ gap: 2px; padding: 5px 8px; bottom: 8px; }}
+            .je-dockbtn {{ width: 38px; height: 38px; }}
+            .je-dockbtn svg {{ width: 20px; height: 20px; }}
+            .je-popup {{ width: 96%; max-height: 85vh; border-radius: 12px; }}
+            #je-topbar {{ height: 42px; padding: 0 10px; }}
+            #je-topbar-title {{ font-size: 13px; }}
+            #je-loader-title {{ font-size: 22px; }}
+            #je-dock-min {{ bottom: 8px; right: 8px; width: 38px; height: 38px; }}
         }}
-        #exit-btn.je-hidden {{ opacity: 0; pointer-events: none; }}
     </style>
 </head>
 <body>
-    <button id=""exit-btn"" onclick=""(function(){{if(window.EJS_onExit){{EJS_onExit();}}else{{if(window.opener){{window.close();}}else{{window.parent.postMessage('close-jellyemu','*');}}}}}})()"">
-        <svg width=""24"" height=""24"" viewBox=""0 0 24 24"" fill=""white"">
-            <path d=""M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z""/>
-        </svg>
-        Exit Game
+    <!-- ═══ Loading Screen ═══ -->
+    <div id=""je-loader"">
+        <div class=""je-loader-anim"">
+            <div class=""je-pulse-ring""></div>
+            <div class=""je-pulse-ring""></div>
+            <div class=""je-pulse-ring""></div>
+            <div class=""je-spinner""></div>
+        </div>
+        <div id=""je-loader-title"">{gameName}</div>
+        <div id=""je-loader-system""></div>
+        <div id=""je-loader-status"">Loading ROM…</div>
+    </div>
+
+    <!-- ═══ Top Bar ═══ -->
+    <div id=""je-topbar"" class=""je-bar"">
+        <span id=""je-topbar-title"">{gameName}</span>
+        <button class=""je-topbtn"" id=""je-exit-btn"" title=""Exit"">
+            <svg viewBox=""0 0 24 24""><path d=""M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z""/></svg>
+            Exit
+        </button>
+    </div>
+
+    <!-- ═══ Bottom Dock ═══ -->
+    <div id=""je-dock"" class=""je-bar"">
+        <button class=""je-dockbtn"" id=""je-btn-pause"" title=""Pause""><svg viewBox=""0 0 24 24""><path d=""M6 19h4V5H6v14zm8-14v14h4V5h-4z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-play"" title=""Play"" style=""display:none""><svg viewBox=""0 0 24 24""><path d=""M8 5v14l11-7z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-restart"" title=""Restart""><svg viewBox=""0 0 24 24""><path d=""M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z""/></svg></button>
+        <div class=""je-dock-sep""></div>
+        <button class=""je-dockbtn"" id=""je-btn-ff"" title=""Fast Forward""><svg viewBox=""0 0 24 24""><path d=""M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-slow"" title=""Slow Motion""><svg viewBox=""0 0 24 24""><path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2V8h-2v8zm-3 0h2V8H8v8z""/></svg></button>
+        <div class=""je-dock-sep""></div>
+        <button class=""je-dockbtn"" id=""je-btn-saves"" title=""Save States""><svg viewBox=""0 0 24 24""><path d=""M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-vol"" title=""Volume""><svg viewBox=""0 0 24 24""><path d=""M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-3.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-cheats"" title=""Cheats""><svg viewBox=""0 0 24 24""><path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-inputmap"" title=""Input Mapping""><svg viewBox=""0 0 24 24""><path d=""M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z""/></svg></button>
+        <div class=""je-dock-sep""></div>
+        <button class=""je-dockbtn"" id=""je-btn-screenshot"" title=""Screenshot""><svg viewBox=""0 0 24 24""><path d=""M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-settings"" title=""Settings""><svg viewBox=""0 0 24 24""><path d=""M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z""/></svg></button>
+    </div>
+
+    <!-- ═══ Dock Minimize FAB ═══ -->
+    <button id=""je-dock-min"" title=""Expand Controls"">
+        <svg viewBox=""0 0 24 24""><path d=""M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z""/></svg>
     </button>
+
+    <!-- ═══ Popup: Save States ═══ -->
+    <div class=""je-overlay"" id=""je-pop-saves"">
+        <div class=""je-popup"">
+            <div class=""je-popup-hdr""><h3>Save States</h3><button class=""je-closebtn"" data-close=""je-pop-saves"">&times;</button></div>
+            <div class=""je-popup-body"" id=""je-saves-body""></div>
+        </div>
+    </div>
+
+    <!-- ═══ Popup: Volume ═══ -->
+    <div class=""je-overlay"" id=""je-pop-vol"">
+        <div class=""je-popup"" style=""max-width:340px"">
+            <div class=""je-popup-hdr""><h3>Volume</h3><button class=""je-closebtn"" data-close=""je-pop-vol"">&times;</button></div>
+            <div class=""je-popup-body"">
+                <div class=""je-vol-wrap"">
+                    <div id=""je-vol-pct"" class=""je-vol-pct"">50%</div>
+                    <input type=""range"" min=""0"" max=""1"" step=""0.01"" value=""0.5"" class=""je-vol-slider"" id=""je-vol-slider"">
+                    <button class=""je-btn"" id=""je-vol-mute"">Mute</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Popup: Cheats ═══ -->
+    <div class=""je-overlay"" id=""je-pop-cheats"">
+        <div class=""je-popup"">
+            <div class=""je-popup-hdr""><h3>Cheats</h3><button class=""je-closebtn"" data-close=""je-pop-cheats"">&times;</button></div>
+            <div class=""je-popup-body"">
+                <div id=""je-cheat-list""></div>
+                <div class=""je-section-title"" style=""margin-top:16px"">Add Cheat</div>
+                <div style=""display:flex;flex-direction:column;gap:8px"">
+                    <input id=""je-cheat-name"" placeholder=""Cheat name"" style=""background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px"">
+                    <textarea id=""je-cheat-code"" placeholder=""Cheat code"" rows=""2"" style=""background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px;resize:none""></textarea>
+                    <button class=""je-btn je-btn-primary"" id=""je-cheat-add"">Add Cheat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Popup: Input Mapping ═══ -->
+    <div class=""je-overlay"" id=""je-pop-inputmap"">
+        <div class=""je-popup je-popup-lg"">
+            <div class=""je-popup-hdr""><h3>Input Mapping</h3><button class=""je-closebtn"" data-close=""je-pop-inputmap"">&times;</button></div>
+            <div class=""je-popup-body"">
+                <div class=""je-tabs"">
+                    <button class=""je-tab je-tab-active"" data-tab=""kb"">Keyboard</button>
+                    <button class=""je-tab"" data-tab=""gp"">Gamepad</button>
+                    <button class=""je-tab"" data-tab=""vg"">Virtual Controls</button>
+                </div>
+                <div class=""je-tab-panel je-tab-active"" id=""je-tab-kb""></div>
+                <div class=""je-tab-panel"" id=""je-tab-gp"">
+                    <div class=""je-gp-status"" id=""je-gp-status"">No gamepad detected</div>
+                    <div id=""je-gp-binds""></div>
+                </div>
+                <div class=""je-tab-panel"" id=""je-tab-vg"">
+                    <div class=""je-setting"">
+                        <span class=""je-setting-label"">Enable Virtual Controls</span>
+                        <label class=""je-toggle""><input type=""checkbox"" id=""je-vg-toggle""><span class=""je-toggle-track""></span></label>
+                    </div>
+                    <div class=""je-setting"">
+                        <span class=""je-setting-label"">Left-Handed Mode</span>
+                        <label class=""je-toggle""><input type=""checkbox"" id=""je-vg-lefty""><span class=""je-toggle-track""></span></label>
+                    </div>
+                </div>
+                <div style=""margin-top:12px""><button class=""je-btn"" id=""je-input-reset"">Reset to Defaults</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Popup: Settings ═══ -->
+    <div class=""je-overlay"" id=""je-pop-settings"">
+        <div class=""je-popup"">
+            <div class=""je-popup-hdr""><h3>Settings</h3><button class=""je-closebtn"" data-close=""je-pop-settings"">&times;</button></div>
+            <div class=""je-popup-body"">
+                <div class=""je-section-title"">Graphics</div>
+                <div class=""je-setting""><span class=""je-setting-label"">Shader</span><select id=""je-set-shader""><option value=""disabled"">None</option><option value=""2xScaleHQ.glslp"">2x ScaleHQ</option><option value=""4xScaleHQ.glslp"">4x ScaleHQ</option><option value=""sabr"">SABR</option><option value=""crt-aperture.glslp"">CRT Aperture</option><option value=""crt-easymode.glslp"">CRT Easymode</option><option value=""crt-geom.glslp"">CRT Geom</option><option value=""crt-mattias.glslp"">CRT Mattias</option><option value=""crt-beam"">CRT Beam</option><option value=""crt-caligari"">CRT Caligari</option><option value=""crt-lottes"">CRT Lottes</option><option value=""crt-zfast"">CRT ZFast</option><option value=""crt-yeetron"">CRT Yeetron</option><option value=""bicubic"">Bicubic</option><option value=""mix-frames"">Mix Frames</option></select></div>
+                <div class=""je-setting""><span class=""je-setting-label"">VSync</span><label class=""je-toggle""><input type=""checkbox"" id=""je-set-vsync"" checked><span class=""je-toggle-track""></span></label></div>
+                <div class=""je-setting""><span class=""je-setting-label"">Video Rotation</span><select id=""je-set-rotation""><option value=""0"">0°</option><option value=""1"">90°</option><option value=""2"">180°</option><option value=""3"">270°</option></select></div>
+                <div class=""je-section-title"">Performance</div>
+                <div class=""je-setting""><span class=""je-setting-label"">Fast Forward Rate</span><select id=""je-set-ffrate""><option value=""2"">2x</option><option value=""3"" selected>3x</option><option value=""4"">4x</option><option value=""5"">5x</option><option value=""8"">8x</option><option value=""10"">10x</option><option value=""unlimited"">Unlimited</option></select></div>
+                <div class=""je-setting""><span class=""je-setting-label"">Slow Motion Rate</span><select id=""je-set-smrate""><option value=""2"">2x</option><option value=""3"" selected>3x</option><option value=""4"">4x</option><option value=""5"">5x</option></select></div>
+                <div class=""je-section-title"">Display</div>
+                <div class=""je-setting""><span class=""je-setting-label"">Screen Size</span><select id=""je-set-screensize""><option value=""fit"" selected>Fit to Screen</option><option value=""native"">Native</option><option value=""2x"">2x</option><option value=""3x"">3x</option><option value=""4x"">4x</option></select></div>
+                <div class=""je-setting""><span class=""je-setting-label"">Show FPS</span><label class=""je-toggle""><input type=""checkbox"" id=""je-set-fps""><span class=""je-toggle-track""></span></label></div>
+            </div>
+        </div>
+    </div>
+    <div id=""je-fps""></div>
     <div id=""game""></div>
     <script>
         // Patch getContext BEFORE loader.js so EJS gets a WebGL context with
@@ -353,31 +606,718 @@ namespace JellyEmu.Controllers
     </script>
     <script>
         (function() {{
-            var btn = document.getElementById('exit-btn');
-            var hideTimer = null;
-            var HIDE_AFTER_MS = 3000;
+            // ── Core name map for loading screen badge ──
+            var coreNames = {{nes:'NES',snes:'SNES',n64:'N64',gb:'Game Boy',gba:'Game Boy Advance',nds:'Nintendo DS',
+                vb:'Virtual Boy',segaMD:'Sega Genesis',segaGG:'Game Gear',segaMS:'Master System',segaCD:'Sega CD',
+                sega32x:'Sega 32X',psx:'PlayStation',psp:'PSP',a2600:'Atari 2600',a7800:'Atari 7800',lynx:'Atari Lynx',
+                pce:'TurboGrafx-16',coleco:'ColecoVision',ngp:'Neo Geo Pocket',arcade:'Arcade',dos:'DOS',
+                '3do':'3DO',jaguar:'Atari Jaguar',mame2003:'MAME',ws:'WonderSwan'}};
+            var sysEl = document.getElementById('je-loader-system');
+            if (sysEl) {{ var cn = coreNames[window.EJS_core] || window.EJS_core || ''; sysEl.textContent = cn; }}
 
-            function showBtn() {{
-                btn.classList.remove('je-hidden');
+            // ── Loading screen lifecycle ──
+            var loader = document.getElementById('je-loader');
+            var topbar = document.getElementById('je-topbar');
+            var dock   = document.getElementById('je-dock');
+
+            function dismissLoader() {{
+                if (!loader || loader.classList.contains('je-dismiss')) return;
+                loader.classList.add('je-dismiss');
+                setTimeout(function() {{ loader.style.display = 'none'; }}, 450);
+                topbar.classList.add('je-active');
+                dock.classList.add('je-active');
+                startAutoHide();
+            }}
+            // Fallback: auto-dismiss after 30s
+            setTimeout(dismissLoader, 30000);
+
+            // Hook into EJS start event
+            window.EJS_onGameStart = function() {{
+                dismissLoader();
+                setTimeout(refocusGame, 500);
+                // CRITICAL: EJS checks settingsMenu.style.display !== 'none' in keyChange()
+                // to decide whether to block keyboard input. Our CSS class-based hiding
+                // doesn't set inline style, so EJS thinks settings menu is open and blocks
+                // ALL keyboard input. Force inline style to 'none'.
+                setTimeout(function() {{
+                    var e = emu();
+                    if (e) {{
+                        if (e.settingsMenu) e.settingsMenu.style.display = 'none';
+                        if (e.controlMenu) e.controlMenu.style.display = 'none';
+                    }}
+                }}, 200);
+            }};
+
+            // ── Auto-hide docks ──
+            var hideTimer = null;
+            var HIDE_MS = 3000;
+            var popupOpen = false;
+
+            function showDocks() {{
+                if (!topbar.classList.contains('je-active')) return;
+                topbar.classList.remove('je-hidden');
+                dock.classList.remove('je-hidden');
                 clearTimeout(hideTimer);
-                hideTimer = setTimeout(function() {{
-                    btn.classList.add('je-hidden');
-                }}, HIDE_AFTER_MS);
+                if (!popupOpen) {{
+                    hideTimer = setTimeout(function() {{
+                        topbar.classList.add('je-hidden');
+                        dock.classList.add('je-hidden');
+                    }}, HIDE_MS);
+                }}
+            }}
+            function startAutoHide() {{
+                ['mousemove','mousedown','touchstart','touchmove','keydown'].forEach(function(evt) {{
+                    document.addEventListener(evt, showDocks, {{ passive: true }});
+                }});
+                [topbar, dock].forEach(function(el) {{
+                    el.addEventListener('mouseenter', function() {{ clearTimeout(hideTimer); topbar.classList.remove('je-hidden'); dock.classList.remove('je-hidden'); }});
+                    el.addEventListener('mouseleave', showDocks);
+                }});
+                showDocks();
             }}
 
-            // Show on any mouse or touch activity
-            document.addEventListener('mousemove',  showBtn, {{ passive: true }});
-            document.addEventListener('mousedown',  showBtn, {{ passive: true }});
-            document.addEventListener('touchstart', showBtn, {{ passive: true }});
-            document.addEventListener('touchmove',  showBtn, {{ passive: true }});
-            document.addEventListener('keydown',    showBtn, {{ passive: true }});
+            // ── Refocus game on any click on the game area or after dock button press ──
+            document.getElementById('game').addEventListener('mousedown', function() {{
+                setTimeout(refocusGame, 50);
+            }});
+            // Dock buttons: refocus game after each click (unless a popup opened)
+            document.addEventListener('click', function(ev) {{
+                var btn = ev.target.closest && ev.target.closest('.je-dockbtn');
+                if (btn && !popupOpen) {{ setTimeout(refocusGame, 50); }}
+            }}, true);
 
-            // Never hide while the cursor is over the button itself
-            btn.addEventListener('mouseenter', function() {{ clearTimeout(hideTimer); btn.classList.remove('je-hidden'); }});
-            btn.addEventListener('mouseleave', showBtn);
+            // ── Popup management ──
+            function openPopup(id) {{
+                closeAllPopups();
+                var el = document.getElementById(id);
+                if (el) {{ el.classList.add('je-open'); popupOpen = true; clearTimeout(hideTimer); }}
+            }}
+            function closePopup(id) {{
+                var el = document.getElementById(id);
+                if (el) el.classList.remove('je-open');
+                popupOpen = false;
+                showDocks();
+                refocusGame();
+            }}
+            function closeAllPopups() {{
+                document.querySelectorAll('.je-overlay.je-open').forEach(function(el) {{ el.classList.remove('je-open'); }});
+                popupOpen = false;
+                refocusGame();
+            }}
+            // Close buttons
+            document.querySelectorAll('[data-close]').forEach(function(btn) {{
+                btn.addEventListener('click', function() {{ closePopup(btn.getAttribute('data-close')); }});
+            }});
+            // Click outside popup to close
+            document.querySelectorAll('.je-overlay').forEach(function(ov) {{
+                ov.addEventListener('click', function(e) {{ if (e.target === ov) {{ closeAllPopups(); showDocks(); refocusGame(); }} }});
+            }});
 
-            // Kick off the initial hide timer
-            showBtn();
+            // ── Tab switching ──
+            document.querySelectorAll('.je-tab').forEach(function(tab) {{
+                tab.addEventListener('click', function() {{
+                    var tabs = tab.parentElement.querySelectorAll('.je-tab');
+                    tabs.forEach(function(t) {{ t.classList.remove('je-tab-active'); }});
+                    tab.classList.add('je-tab-active');
+                    var panels = tab.closest('.je-popup-body').querySelectorAll('.je-tab-panel');
+                    panels.forEach(function(p) {{ p.classList.remove('je-tab-active'); }});
+                    var target = document.getElementById('je-tab-' + tab.getAttribute('data-tab'));
+                    if (target) target.classList.add('je-tab-active');
+                }});
+            }});
+
+            // ── Helper: get emulator ──
+            function emu() {{ return window.EJS_emulator; }}
+            function gm()  {{ var e = emu(); return e ? e.gameManager : null; }}
+
+            // ── Focus management: EJS listens for keyboard on ejs_parent, not document ──
+            function refocusGame() {{
+                var e = emu();
+                if (e && e.elements && e.elements.parent) {{
+                    e.elements.parent.focus();
+                }} else {{
+                    var gp = document.querySelector('.ejs_parent');
+                    if (gp) gp.focus();
+                }}
+            }}
+
+            // ── Server sync for controls & settings ──
+            var _syncTimer = null;
+            function syncControlsToServer() {{
+                clearTimeout(_syncTimer);
+                _syncTimer = setTimeout(function() {{
+                    var e = emu(); if (!e) return;
+                    var c = e.controls && e.controls[0] ? e.controls[0] : {{}};
+                    // Split keyboard (value) and gamepad (value2) bindings
+                    var kb = {{}}, gp = {{}};
+                    for (var k in c) {{
+                        if (c[k].value !== undefined) {{
+                            if (!kb[k]) kb[k] = {{}};
+                            kb[k].value = c[k].value;
+                        }}
+                        if (c[k].value2 !== undefined) {{
+                            if (!gp[k]) gp[k] = {{}};
+                            gp[k].value2 = c[k].value2;
+                        }}
+                    }}
+                    var payload = {{
+                        controls: JSON.stringify(kb),
+                        controllerControls: JSON.stringify(gp)
+                    }};
+                    // Also sync settings if available
+                    if (e.settings) {{
+                        if (e.settings['shader']) payload.shader = e.settings['shader'];
+                        if (e.settings['videoRotation'] !== undefined) payload.videoRotation = parseInt(e.settings['videoRotation']) || 0;
+                    }}
+                    fetch('/jellyemu/prefs/{userId}', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify(payload)
+                    }}).catch(function(err) {{ console.warn('[JellyEmu] Controls sync failed:', err); }});
+                }}, 800);
+            }}
+
+            // ── Exit button ──
+            document.getElementById('je-exit-btn').addEventListener('click', function() {{
+                if (window.EJS_onExit) {{ EJS_onExit(); }}
+                else if (window.opener) {{ window.close(); }}
+                else {{ window.parent.postMessage('close-jellyemu','*'); }}
+            }});
+
+            // ── Pause / Play ──
+            var btnPause = document.getElementById('je-btn-pause');
+            var btnPlay  = document.getElementById('je-btn-play');
+            btnPause.addEventListener('click', function() {{
+                var e = emu(); if (!e || !e.started) return;
+                e.pause();
+                btnPause.style.display = 'none'; btnPlay.style.display = '';
+            }});
+            btnPlay.addEventListener('click', function() {{
+                var e = emu(); if (!e || !e.started) return;
+                e.play();
+                btnPlay.style.display = 'none'; btnPause.style.display = '';
+            }});
+
+            // ── Restart ──
+            document.getElementById('je-btn-restart').addEventListener('click', function() {{
+                var g = gm(); if (g) g.restart();
+            }});
+
+            // ── Fast Forward ──
+            var ffActive = false;
+            document.getElementById('je-btn-ff').addEventListener('click', function() {{
+                var g = gm(); if (!g) return;
+                ffActive = !ffActive;
+                g.toggleFastForward(ffActive ? 1 : 0);
+                this.classList.toggle('je-active', ffActive);
+            }});
+
+            // ── Slow Motion ──
+            var slowActive = false;
+            document.getElementById('je-btn-slow').addEventListener('click', function() {{
+                var g = gm(); if (!g) return;
+                slowActive = !slowActive;
+                g.toggleSlowMotion(slowActive ? 1 : 0);
+                this.classList.toggle('je-active', slowActive);
+            }});
+
+            // ── Save States popup ──
+            document.getElementById('je-btn-saves').addEventListener('click', function() {{
+                buildSaveSlots();
+                openPopup('je-pop-saves');
+            }});
+
+            function buildSaveSlots() {{
+                var body = document.getElementById('je-saves-body');
+                body.innerHTML = '';
+                for (var i = 1; i <= 5; i++) {{
+                    var slot = document.createElement('div');
+                    slot.className = 'je-slot';
+                    slot.innerHTML = '<div class=""je-slot-num"">' + i + '</div>' +
+                        '<div class=""je-slot-info""><div>Slot ' + i + '</div><small id=""je-slot-status-' + i + '"">Checking…</small></div>' +
+                        '<div class=""je-slot-actions"">' +
+                        '<button class=""je-btn"" data-save=""' + i + '"">Save</button>' +
+                        '<button class=""je-btn je-btn-primary"" data-load=""' + i + '"">Load</button></div>';
+                    body.appendChild(slot);
+                    // Check if slot has data
+                    (function(s) {{
+                        fetch('/jellyemu/save/{itemId}/{userId}?slot=' + s, {{ method: 'HEAD' }})
+                            .then(function(r) {{
+                                var el = document.getElementById('je-slot-status-' + s);
+                                if (el) el.textContent = r.ok ? 'Has save data' : 'Empty';
+                            }}).catch(function() {{
+                                var el = document.getElementById('je-slot-status-' + s);
+                                if (el) el.textContent = 'Empty';
+                            }});
+                    }})(i);
+                }}
+                // Wire save/load button(s)
+                body.querySelectorAll('[data-save]').forEach(function(btn) {{
+                    btn.addEventListener('click', function() {{
+                        var s = parseInt(btn.getAttribute('data-save'));
+                        var g = gm(); if (!g) return;
+                        var state = g.getState();
+                        if (!state) return;
+                        // Upload save state to server
+                        fetch('/jellyemu/save/{itemId}/{userId}?slot=' + s, {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/octet-stream' }},
+                            body: state
+                        }}).then(function() {{
+                            var el = document.getElementById('je-slot-status-' + s);
+                            if (el) el.textContent = 'Saved!';
+                            // Capture and upload screenshot for this slot
+                            var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('canvas');
+                            if (canvas) {{
+                                try {{
+                                    var dataUrl = canvas.toDataURL('image/png');
+                                    fetch('/jellyemu/save-screenshot/{itemId}/{userId}/' + s, {{
+                                        method: 'POST',
+                                        headers: {{ 'Content-Type': 'application/json' }},
+                                        body: JSON.stringify({{ dataUrl: dataUrl }})
+                                    }}).catch(function(err) {{ console.warn('[JellyEmu] Screenshot upload failed:', err); }});
+                                }} catch(ex) {{ console.warn('[JellyEmu] Screenshot capture failed:', ex); }}
+                            }}
+                        }}).catch(function() {{}});
+                    }});
+                }});
+                body.querySelectorAll('[data-load]').forEach(function(btn) {{
+                    btn.addEventListener('click', function() {{
+                        var s = parseInt(btn.getAttribute('data-load'));
+                        fetch('/jellyemu/save/{itemId}/{userId}?slot=' + s)
+                            .then(function(r) {{
+                                if (!r.ok) throw new Error('No save');
+                                return r.arrayBuffer();
+                            }}).then(function(buf) {{
+                                var g = gm(); if (!g) return;
+                                g.loadState(new Uint8Array(buf));
+                                closePopup('je-pop-saves');
+                            }}).catch(function() {{
+                                var el = document.getElementById('je-slot-status-' + s);
+                                if (el) el.textContent = 'No save to load';
+                            }});
+                    }});
+                }});
+            }}
+
+            // ── Volume popup ──
+            document.getElementById('je-btn-vol').addEventListener('click', function() {{
+                var e = emu();
+                if (e) {{
+                    var slider = document.getElementById('je-vol-slider');
+                    slider.value = e.volume;
+                    document.getElementById('je-vol-pct').textContent = Math.round(e.volume * 100) + '%';
+                }}
+                openPopup('je-pop-vol');
+            }});
+            document.getElementById('je-vol-slider').addEventListener('input', function() {{
+                var v = parseFloat(this.value);
+                document.getElementById('je-vol-pct').textContent = Math.round(v * 100) + '%';
+                var e = emu();
+                if (e) {{ e.volume = v; e.muted = false; e.setVolume(v); }}
+            }});
+            document.getElementById('je-vol-mute').addEventListener('click', function() {{
+                var e = emu(); if (!e) return;
+                e.muted = !e.muted;
+                e.setVolume(e.muted ? 0 : e.volume);
+                this.textContent = e.muted ? 'Unmute' : 'Mute';
+                document.getElementById('je-vol-pct').textContent = e.muted ? '0%' : Math.round(e.volume * 100) + '%';
+            }});
+
+            // ── Cheats popup ──
+            document.getElementById('je-btn-cheats').addEventListener('click', function() {{
+                buildCheats();
+                openPopup('je-pop-cheats');
+            }});
+            function buildCheats() {{
+                var e = emu(); if (!e) return;
+                var list = document.getElementById('je-cheat-list');
+                list.innerHTML = '';
+                for (var i = 0; i < e.cheats.length; i++) {{
+                    (function(idx) {{
+                        var ch = e.cheats[idx];
+                        var row = document.createElement('div');
+                        row.className = 'je-cheat-row';
+                        row.innerHTML = '<label class=""je-toggle""><input type=""checkbox""' + (ch.checked ? ' checked' : '') +
+                            '><span class=""je-toggle-track""></span></label><span class=""je-cheat-name"">' +
+                            ch.desc + '</span>' + (!ch.is_permanent ? '<button class=""je-cheat-del"">&times;</button>' : '');
+                        var cb = row.querySelector('input');
+                        cb.addEventListener('change', function() {{
+                            e.cheats[idx].checked = cb.checked;
+                            e.cheatChanged(cb.checked, ch.code, idx);
+                            e.saveSettings();
+                        }});
+                        var del = row.querySelector('.je-cheat-del');
+                        if (del) {{
+                            del.addEventListener('click', function() {{
+                                e.cheatChanged(false, ch.code, idx);
+                                e.cheats.splice(idx, 1);
+                                e.updateCheatUI();
+                                e.saveSettings();
+                                buildCheats();
+                            }});
+                        }}
+                        list.appendChild(row);
+                    }})(i);
+                }}
+                if (e.cheats.length === 0) {{ list.innerHTML = '<div style=""opacity:.4;font-size:13px"">No cheats loaded</div>'; }}
+            }}
+            document.getElementById('je-cheat-add').addEventListener('click', function() {{
+                var name = document.getElementById('je-cheat-name').value.trim();
+                var code = document.getElementById('je-cheat-code').value.trim();
+                if (!name || !code) return;
+                var e = emu(); if (!e) return;
+                e.cheats.push({{ desc: name, code: code, checked: false }});
+                e.updateCheatUI();
+                e.saveSettings();
+                document.getElementById('je-cheat-name').value = '';
+                document.getElementById('je-cheat-code').value = '';
+                buildCheats();
+            }});
+
+            // EJS uses numeric button indices internally
+            var inputButtons = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29];
+            var inputLabels  = ['B','Y','Select','Start','D-Up','D-Down','D-Left','D-Right','A','X','L','R','L2','R2','L3','R3',
+                'L-Stick Right','L-Stick Left','L-Stick Down','L-Stick Up','R-Stick Right','R-Stick Left','R-Stick Down','R-Stick Up',
+                'Quick Save','Quick Load','Change State','FF','Rewind','Slow-Mo'];
+
+            document.getElementById('je-btn-inputmap').addEventListener('click', function() {{
+                buildKeyboardBinds();
+                buildGamepadBinds();
+                syncVGToggles();
+                openPopup('je-pop-inputmap');
+            }});
+
+            function buildKeyboardBinds() {{
+                var panel = document.getElementById('je-tab-kb');
+                panel.innerHTML = '';
+                var e = emu(); if (!e) return;
+                var c = (e.controls && e.controls[0]) || {{}};
+                // EJS keyMap: keyCode(number) → friendly name(string)
+                var km = e.keyMap || {{}};
+                function keyName(code) {{
+                    if (code === undefined || code === null || code === 0) return '—';
+                    if (typeof code === 'number') return km[code] || ('key ' + code);
+                    return String(code);
+                }}
+                for (var i = 0; i < inputButtons.length; i++) {{
+                    (function(idx) {{
+                        var key = inputButtons[idx];
+                        var row = document.createElement('div');
+                        row.className = 'je-bind-row';
+                        var rawVal = (c[key] && c[key].value !== undefined) ? c[key].value : null;
+                        var displayName = rawVal !== null ? keyName(rawVal) : '—';
+                        row.innerHTML = '<span>' + inputLabels[idx] + '</span><span class=""je-bind-key"" data-btn=""' + key + '"">' + displayName + '</span>';
+                        var bk = row.querySelector('.je-bind-key');
+                        bk.addEventListener('click', function() {{
+                            if (bk.classList.contains('je-listening')) return;
+                            bk.classList.add('je-listening');
+                            bk.textContent = 'Press a key…';
+                            function onKey(ev) {{
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                if (ev.keyCode === 27) {{ bk.textContent = displayName; bk.classList.remove('je-listening'); document.removeEventListener('keydown', onKey, true); return; }}
+                                var kc = ev.keyCode;
+                                bk.textContent = keyName(kc);
+                                bk.classList.remove('je-listening');
+                                document.removeEventListener('keydown', onKey, true);
+                                if (!e.controls) e.controls = {{ 0: {{}}, 1: {{}}, 2: {{}}, 3: {{}} }};
+                                if (!e.controls[0]) e.controls[0] = {{}};
+                                if (!e.controls[0][key]) e.controls[0][key] = {{}};
+                                e.controls[0][key].value = kc;
+                                e.saveSettings();
+                                syncControlsToServer();
+                            }}
+                            document.addEventListener('keydown', onKey, true);
+                        }});
+                        panel.appendChild(row);
+                    }})(i);
+                }}
+            }}
+
+            function buildGamepadBinds() {{
+                var panel = document.getElementById('je-gp-binds');
+                panel.innerHTML = '';
+                // Detect gamepad
+                var gps = navigator.getGamepads ? navigator.getGamepads() : [];
+                var gp = null;
+                for (var g = 0; g < gps.length; g++) {{ if (gps[g]) {{ gp = gps[g]; break; }} }}
+                document.getElementById('je-gp-status').textContent = gp ? ('Detected: ' + gp.id) : 'No gamepad detected';
+                var e = emu(); if (!e) return;
+                var c = (e.controls && e.controls[0]) || {{}};
+
+                // Friendly display for gamepad value2
+                var gpLabels = {{
+                    'BUTTON_1': 'A', 'BUTTON_2': 'B', 'BUTTON_3': 'X', 'BUTTON_4': 'Y',
+                    'SELECT': 'Back', 'START': 'Start',
+                    'LEFT_TOP_SHOULDER': 'LB', 'RIGHT_TOP_SHOULDER': 'RB',
+                    'LEFT_BOTTOM_SHOULDER': 'LT', 'RIGHT_BOTTOM_SHOULDER': 'RT',
+                    'LEFT_STICK': 'L3', 'RIGHT_STICK': 'R3',
+                    'DPAD_UP': 'D-Up', 'DPAD_DOWN': 'D-Down', 'DPAD_LEFT': 'D-Left', 'DPAD_RIGHT': 'D-Right',
+                    'LEFT_STICK_X:+1': 'L-Stick →', 'LEFT_STICK_X:-1': 'L-Stick ←',
+                    'LEFT_STICK_Y:+1': 'L-Stick ↓', 'LEFT_STICK_Y:-1': 'L-Stick ↑',
+                    'RIGHT_STICK_X:+1': 'R-Stick →', 'RIGHT_STICK_X:-1': 'R-Stick ←',
+                    'RIGHT_STICK_Y:+1': 'R-Stick ↓', 'RIGHT_STICK_Y:-1': 'R-Stick ↑'
+                }};
+                function gpLabel(v) {{ return gpLabels[v] || v || '—'; }}
+
+                for (var i = 0; i < inputButtons.length; i++) {{
+                    (function(idx) {{
+                        var key = inputButtons[idx];
+                        var row = document.createElement('div');
+                        row.className = 'je-bind-row';
+                        var rawMapped = (c[key] && c[key].value2 !== undefined) ? c[key].value2 : null;
+                        var displayMapped = rawMapped !== null ? gpLabel(String(rawMapped)) : '—';
+                        row.innerHTML = '<span>' + inputLabels[idx] + '</span><span class=""je-bind-key"" data-btn=""' + key + '"">' + displayMapped + '</span>';
+                        var bk = row.querySelector('.je-bind-key');
+                        bk.addEventListener('click', function() {{
+                            if (bk.classList.contains('je-listening')) return;
+                            bk.classList.add('je-listening');
+                            bk.textContent = 'Move stick or press…';
+                            // Snapshot current axes to detect movement
+                            var baseAxes = [];
+                            var gps0 = navigator.getGamepads ? navigator.getGamepads() : [];
+                            for (var gi0 = 0; gi0 < gps0.length; gi0++) {{
+                                var p0 = gps0[gi0]; if (!p0) continue;
+                                for (var ai0 = 0; ai0 < p0.axes.length; ai0++) {{ baseAxes[ai0] = p0.axes[ai0]; }}
+                                break;
+                            }}
+                            var AXIS_THRESHOLD = 0.5;
+                            var pollId = setInterval(function() {{
+                                var gps2 = navigator.getGamepads ? navigator.getGamepads() : [];
+                                for (var gi = 0; gi < gps2.length; gi++) {{
+                                    var pad = gps2[gi]; if (!pad) continue;
+                                    // Check buttons first
+                                    for (var bi = 0; bi < pad.buttons.length; bi++) {{
+                                        if (pad.buttons[bi].pressed) {{
+                                            clearInterval(pollId);
+                                            // Map standard gamepad buttons to EJS names
+                                            var btnMap = ['BUTTON_2','BUTTON_4','BUTTON_1','BUTTON_3',
+                                                'LEFT_TOP_SHOULDER','RIGHT_TOP_SHOULDER','LEFT_BOTTOM_SHOULDER','RIGHT_BOTTOM_SHOULDER',
+                                                'SELECT','START','LEFT_STICK','RIGHT_STICK',
+                                                'DPAD_UP','DPAD_DOWN','DPAD_LEFT','DPAD_RIGHT'];
+                                            var ejsVal = bi < btnMap.length ? btnMap[bi] : ('BUTTON_' + bi);
+                                            bk.textContent = gpLabel(ejsVal);
+                                            bk.classList.remove('je-listening');
+                                            if (!e.controls) e.controls = {{ 0: {{}}, 1: {{}}, 2: {{}}, 3: {{}} }};
+                                            if (!e.controls[0]) e.controls[0] = {{}};
+                                            if (!e.controls[0][key]) e.controls[0][key] = {{}};
+                                            e.controls[0][key].value2 = ejsVal;
+                                            e.saveSettings();
+                                            syncControlsToServer();
+                                            return;
+                                        }}
+                                    }}
+                                    // Check axes (analog sticks)
+                                    for (var ai = 0; ai < pad.axes.length; ai++) {{
+                                        var base = baseAxes[ai] || 0;
+                                        var val = pad.axes[ai];
+                                        if (Math.abs(val - base) > AXIS_THRESHOLD) {{
+                                            clearInterval(pollId);
+                                            // Map axis index + direction to EJS names
+                                            // Standard: 0=LX, 1=LY, 2=RX, 3=RY
+                                            var axisNames = ['LEFT_STICK_X','LEFT_STICK_Y','RIGHT_STICK_X','RIGHT_STICK_Y'];
+                                            var axisName = ai < axisNames.length ? axisNames[ai] : ('AXIS_' + ai);
+                                            var dir = val > base ? ':+1' : ':-1';
+                                            var ejsVal = axisName + dir;
+                                            bk.textContent = gpLabel(ejsVal);
+                                            bk.classList.remove('je-listening');
+                                            if (!e.controls) e.controls = {{ 0: {{}}, 1: {{}}, 2: {{}}, 3: {{}} }};
+                                            if (!e.controls[0]) e.controls[0] = {{}};
+                                            if (!e.controls[0][key]) e.controls[0][key] = {{}};
+                                            e.controls[0][key].value2 = ejsVal;
+                                            e.saveSettings();
+                                            syncControlsToServer();
+                                            return;
+                                        }}
+                                    }}
+                                }}
+                            }}, 100);
+                            // Timeout after 10s
+                            setTimeout(function() {{ clearInterval(pollId); bk.classList.remove('je-listening'); bk.textContent = displayMapped; }}, 10000);
+                        }});
+                        panel.appendChild(row);
+                    }})(i);
+                }}
+            }}
+
+            function syncVGToggles() {{
+                var e = emu(); if (!e) return;
+                var vgOn = document.getElementById('je-vg-toggle');
+                if (e.virtualGamepad) {{ vgOn.checked = e.virtualGamepad.style.display !== 'none'; }}
+            }}
+            document.getElementById('je-vg-toggle').addEventListener('change', function() {{
+                var e = emu(); if (!e || !e.toggleVirtualGamepad) return;
+                e.toggleVirtualGamepad(this.checked);
+            }});
+            document.getElementById('je-vg-lefty').addEventListener('change', function() {{
+                var e = emu(); if (!e || !e.toggleVirtualGamepadLeftHanded) return;
+                e.toggleVirtualGamepadLeftHanded(this.checked);
+            }});
+            document.getElementById('je-input-reset').addEventListener('click', function() {{
+                var e = emu(); if (!e) return;
+                e.controls = JSON.parse(JSON.stringify(e.defaultControllers));
+                e.saveSettings();
+                syncControlsToServer();
+                buildKeyboardBinds();
+                buildGamepadBinds();
+            }});
+
+            // ── Screenshot ──
+            document.getElementById('je-btn-screenshot').addEventListener('click', function() {{
+                var g = gm(); if (!g) return;
+                g.screenshot().then(function(pngBytes) {{
+                    var blob = new Blob([pngBytes], {{ type: 'image/png' }});
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = (window.EJS_gameName || 'screenshot') + '.png';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    // Also post to parent
+                    try {{
+                        var canvas = document.querySelector('canvas');
+                        if (canvas) window.parent.postMessage({{ type: 'jellyemu-screenshot', itemId: '{itemId}', dataUrl: canvas.toDataURL('image/png') }}, '*');
+                    }} catch(ex) {{}}
+                }}).catch(function(err) {{ console.warn('[JellyEmu] Screenshot failed:', err); }});
+            }});
+
+            // ── Settings popup ──
+            document.getElementById('je-btn-settings').addEventListener('click', function() {{
+                syncSettingsUI();
+                openPopup('je-pop-settings');
+            }});
+            function syncSettingsUI() {{
+                var e = emu(); if (!e) return;
+                var sel = document.getElementById('je-set-shader');
+                // Sync current values
+                if (e.settings) {{
+                    if (e.settings['shader']) sel.value = e.settings['shader'];
+                    if (e.settings['ff-ratio']) document.getElementById('je-set-ffrate').value = e.settings['ff-ratio'];
+                    if (e.settings['sm-ratio']) document.getElementById('je-set-smrate').value = e.settings['sm-ratio'];
+                    var rot = e.settings['videoRotation'];
+                    if (rot !== undefined) document.getElementById('je-set-rotation').value = rot;
+                    document.getElementById('je-set-vsync').checked = e.settings['vsync'] !== 'disabled';
+                }}
+            }}
+            document.getElementById('je-set-shader').addEventListener('change', function() {{
+                var e = emu(); if (!e) return;
+                e.changeSettingOption('shader', this.value);
+                syncControlsToServer();
+            }});
+            document.getElementById('je-set-vsync').addEventListener('change', function() {{
+                var e = emu(); if (!e) return;
+                e.changeSettingOption('vsync', this.checked ? 'enabled' : 'disabled');
+                syncControlsToServer();
+            }});
+            document.getElementById('je-set-rotation').addEventListener('change', function() {{
+                var e = emu(); if (!e) return;
+                e.changeSettingOption('videoRotation', parseInt(this.value));
+                syncControlsToServer();
+            }});
+            document.getElementById('je-set-ffrate').addEventListener('change', function() {{
+                var e = emu(); if (!e) return;
+                e.changeSettingOption('ff-ratio', this.value);
+                syncControlsToServer();
+            }});
+            document.getElementById('je-set-smrate').addEventListener('change', function() {{
+                var e = emu(); if (!e) return;
+                e.changeSettingOption('sm-ratio', this.value);
+                syncControlsToServer();
+            }});
+
+            // ── Screen Size ──
+            document.getElementById('je-set-screensize').addEventListener('change', function() {{
+                var val = this.value;
+                var e = emu(); if (!e) return;
+                var canvas = e.canvas || document.querySelector('canvas');
+                var parent = canvas ? canvas.parentElement : null;
+                if (!canvas || !parent) return;
+                if (val === 'fit') {{
+                    canvas.style.width = '100%';
+                    canvas.style.height = '100%';
+                    canvas.style.objectFit = 'contain';
+                    parent.style.display = 'flex';
+                    parent.style.alignItems = 'center';
+                    parent.style.justifyContent = 'center';
+                }} else {{
+                    var w = e.gameManager ? e.gameManager.getVideoDimensions('width') : 256;
+                    var h = e.gameManager ? e.gameManager.getVideoDimensions('height') : 224;
+                    var mult = val === 'native' ? 1 : parseInt(val);
+                    canvas.style.width = (w * mult) + 'px';
+                    canvas.style.height = (h * mult) + 'px';
+                    canvas.style.objectFit = '';
+                    parent.style.display = 'flex';
+                    parent.style.alignItems = 'center';
+                    parent.style.justifyContent = 'center';
+                }}
+            }});
+
+            // ── FPS Counter ──
+            var fpsEl = document.getElementById('je-fps');
+            var fpsOn = false;
+            var fpsFrames = 0;
+            var fpsLast = performance.now();
+            function fpsLoop() {{
+                if (!fpsOn) return;
+                fpsFrames++;
+                var now = performance.now();
+                if (now - fpsLast >= 1000) {{
+                    fpsEl.textContent = fpsFrames + ' FPS';
+                    fpsFrames = 0;
+                    fpsLast = now;
+                }}
+                requestAnimationFrame(fpsLoop);
+            }}
+            document.getElementById('je-set-fps').addEventListener('change', function() {{
+                fpsOn = this.checked;
+                if (fpsOn) {{
+                    fpsEl.classList.add('je-active');
+                    fpsFrames = 0;
+                    fpsLast = performance.now();
+                    requestAnimationFrame(fpsLoop);
+                }} else {{
+                    fpsEl.classList.remove('je-active');
+                }}
+            }});
+
+            // ── Dock minimize / expand ──
+            var dockMinimized = false;
+            var dockMinBtn = document.getElementById('je-dock-min');
+            // Add minimize button to end of dock
+            var minDockBtn = document.createElement('button');
+            minDockBtn.className = 'je-dockbtn';
+            minDockBtn.title = 'Minimize';
+            minDockBtn.innerHTML = '<svg viewBox=""0 0 24 24""><path d=""M19 13H5v-2h14v2z"" fill=""currentColor""/></svg>';
+            dock.appendChild(minDockBtn);
+            minDockBtn.addEventListener('click', function() {{
+                dockMinimized = true;
+                dock.classList.add('je-minimized');
+                dockMinBtn.classList.add('je-active');
+                dockMinBtn.classList.remove('je-hidden');
+            }});
+            dockMinBtn.addEventListener('click', function() {{
+                dockMinimized = false;
+                dock.classList.remove('je-minimized');
+                dockMinBtn.classList.remove('je-active');
+                showDocks();
+            }});
+            // Override showDocks to handle minimize FAB visibility
+            var _origShowDocks = showDocks;
+            showDocks = function() {{
+                _origShowDocks();
+                if (dockMinimized) {{
+                    dockMinBtn.classList.remove('je-hidden');
+                }}
+            }};
+
+            // ── Dock popup buttons ──
+            document.getElementById('je-btn-inputmap').addEventListener('click', function() {{
+                buildKeyboardBinds();
+                buildGamepadBinds();
+                syncVGToggles();
+                openPopup('je-pop-inputmap');
+            }});
         }})();
     </script>
     <script>
@@ -398,13 +1338,47 @@ namespace JellyEmu.Controllers
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
         {(core is "dos" or "psp" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
 
-        // Inject saved key and/or gamepad bindings
+        // Inject saved key and/or gamepad bindings (or defaults)
         {((!string.IsNullOrWhiteSpace(savedControls) || !string.IsNullOrWhiteSpace(savedControllerControls))
             ? $@"window.EJS_defaultControls = {{
             0: Object.assign({{}}, {(string.IsNullOrWhiteSpace(savedControls) ? "{}" : savedControls)}, {(string.IsNullOrWhiteSpace(savedControllerControls) ? "{}" : savedControllerControls)}),
             1: {{}}, 2: {{}}, 3: {{}}
         }};"
-            : "// EJS_defaultControls: using emulator defaults")}
+            : @"window.EJS_defaultControls = {
+            0: {
+                0:  { 'value': 'x',           'value2': 'BUTTON_2' },
+                1:  { 'value': 's',           'value2': 'BUTTON_4' },
+                2:  { 'value': 'v',           'value2': 'SELECT' },
+                3:  { 'value': 'enter',       'value2': 'START' },
+                4:  { 'value': 'up arrow',    'value2': 'DPAD_UP' },
+                5:  { 'value': 'down arrow',  'value2': 'DPAD_DOWN' },
+                6:  { 'value': 'left arrow',  'value2': 'DPAD_LEFT' },
+                7:  { 'value': 'right arrow', 'value2': 'DPAD_RIGHT' },
+                8:  { 'value': 'z',           'value2': 'BUTTON_1' },
+                9:  { 'value': 'a',           'value2': 'BUTTON_3' },
+                10: { 'value': 'q',           'value2': 'LEFT_TOP_SHOULDER' },
+                11: { 'value': 'e',           'value2': 'RIGHT_TOP_SHOULDER' },
+                12: { 'value': 'tab',         'value2': 'LEFT_BOTTOM_SHOULDER' },
+                13: { 'value': 'r',           'value2': 'RIGHT_BOTTOM_SHOULDER' },
+                14: { 'value': '',            'value2': 'LEFT_STICK' },
+                15: { 'value': '',            'value2': 'RIGHT_STICK' },
+                16: { 'value': 'h',           'value2': 'LEFT_STICK_X:+1' },
+                17: { 'value': 'f',           'value2': 'LEFT_STICK_X:-1' },
+                18: { 'value': 'g',           'value2': 'LEFT_STICK_Y:+1' },
+                19: { 'value': 't',           'value2': 'LEFT_STICK_Y:-1' },
+                20: { 'value': 'l',           'value2': 'RIGHT_STICK_X:+1' },
+                21: { 'value': 'j',           'value2': 'RIGHT_STICK_X:-1' },
+                22: { 'value': 'k',           'value2': 'RIGHT_STICK_Y:+1' },
+                23: { 'value': 'i',           'value2': 'RIGHT_STICK_Y:-1' },
+                24: { 'value': '1' },
+                25: { 'value': '2' },
+                26: { 'value': '3' },
+                27: { 'value': 'add' },
+                28: { 'value': 'space' },
+                29: { 'value': 'subtract' }
+            },
+            1: {}, 2: {}, 3: {}
+        };")}
 
         {(!string.IsNullOrEmpty(igdbId) ? $"window.EJS_gameID = {igdbId};" : "")}
         {(!string.IsNullOrEmpty(cheatsJson) ? $"window.EJS_cheats = {cheatsJson};" : "")}
@@ -1049,11 +2023,10 @@ namespace JellyEmu.Controllers
         [HttpHead("/jellyemu/save/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult HeadSave(string itemId, string userId)
+        public IActionResult HeadSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            var userPrefs = ReadUserPrefs(userId);
-            var slot = userPrefs.Slot;
-            var path = GetSavePath(userId, itemId, slot);
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSavePath(userId, itemId, slotNum);
             return System.IO.File.Exists(path) ? Ok() : NotFound();
         }
 
@@ -1099,19 +2072,19 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/save/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> PostSave(string itemId, string userId)
+        public async Task<IActionResult> PostSave(string itemId, string userId, [FromQuery] int? slot)
         {
             if (Request.ContentLength == 0 || Request.ContentLength == null)
                 return BadRequest("Empty save body.");
 
-            var slot = ReadUserPrefs(userId).Slot;
-            var path = GetSavePath(userId, itemId, slot);
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSavePath(userId, itemId, slotNum);
 
             using var fs = System.IO.File.Create(path);
             await Request.Body.CopyToAsync(fs);
 
             _logger.LogInformation("[JellyEmu] Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                itemId, userId, slot, fs.Length);
+                itemId, userId, slotNum, fs.Length);
 
             return Ok();
         }
