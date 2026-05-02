@@ -2138,12 +2138,16 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public IActionResult DeleteSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            var authenticatedUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            
-            if (!string.Equals(authenticatedUserId, userId, System.StringComparison.OrdinalIgnoreCase))
+            var authenticatedUserId = User.FindFirstValue("Jellyfin-UserId") 
+                                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            bool isValidAuthGuid = Guid.TryParse(authenticatedUserId, out Guid authUserGuid);
+            bool isValidTargetGuid = Guid.TryParse(userId, out Guid targetUserGuid);
+
+            if (string.IsNullOrEmpty(authenticatedUserId) || !isValidAuthGuid || !isValidTargetGuid || authUserGuid != targetUserGuid)
             {
-                _logger.LogWarning("[JellyEmu] Unauthorized delete attempt. User {AuthUser} tried to delete save for User {TargetUser}", authenticatedUserId, userId);
-                return Forbid();
+                _logger.LogWarning("[JellyEmu] Unauthorized delete attempt.");
+                return Forbid(); 
             }
 
             var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
