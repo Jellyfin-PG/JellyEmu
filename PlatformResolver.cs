@@ -164,6 +164,8 @@ namespace JellyEmu
                 { "sega-cd", "Sega CD" },
                 // Sega 32X
                 { "32x", "Sega 32X" }, { "sega 32x", "Sega 32X" },
+                // Sega Saturn
+                { "ss", "Sega Saturn"},
                 // PlayStation
                 { "psx", "PlayStation" }, { "ps1", "PlayStation" }, { "playstation", "PlayStation" },
                 { "playstation 1", "PlayStation" }, { "ps one", "PlayStation" },
