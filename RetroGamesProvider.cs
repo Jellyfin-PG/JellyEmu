@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
+using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -29,11 +31,6 @@ namespace JellyEmu
             return false;
         }
 
-        /// <summary>
-        /// Returns the effective ROM file path for use by metadata providers.
-        /// When <paramref name="path"/> is a directory (folder-as-game), returns the
-        /// single .cue file inside it. Otherwise returns <paramref name="path"/> as-is.
-        /// </summary>
         public static string EffectiveRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return string.Empty;
@@ -89,13 +86,73 @@ namespace JellyEmu
                     if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
                     if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
 
-                    result.HasMetadata = true;
-                    result.Item = new Book
+                    var item = new Book
                     {
-                        Overview = "Parsed successfully from local .nfo file!",
-                        PremiereDate = new DateTime(1990, 1, 1),
                         Tags = nfoTags.ToArray()
                     };
+
+                    try
+                    {
+                        var doc = XDocument.Load(nfoPath);
+                        var root = doc.Root;
+                        if (root != null)
+                        {
+                            item.Name = root.Element("title")?.Value ?? item.Name;
+                            item.Overview = root.Element("plot")?.Value ?? item.Overview;
+
+                            if (DateTime.TryParse(root.Element("premiered")?.Value ?? root.Element("releasedate")?.Value, out var date))
+                            {
+                                item.PremiereDate = date;
+                                item.ProductionYear = date.Year;
+                            }
+
+                            if (float.TryParse(root.Element("rating")?.Value, out var rating))
+                                item.CommunityRating = rating;
+
+                            if (float.TryParse(root.Element("criticrating")?.Value, out var criticRating))
+                                item.CriticRating = criticRating;
+
+                            item.OfficialRating = root.Element("esrb")?.Value ?? root.Element("mpaa")?.Value ?? item.OfficialRating;
+                            item.SeriesName = root.Element("set")?.Value ?? root.Element("series")?.Value ?? item.SeriesName;
+
+                            foreach (var genre in root.Elements("genre"))
+                                if (!string.IsNullOrWhiteSpace(genre.Value)) item.AddGenre(genre.Value);
+
+                            foreach (var dev in root.Elements("developer"))
+                                if (!string.IsNullOrWhiteSpace(dev.Value)) item.AddStudio(dev.Value);
+
+                            foreach (var pub in root.Elements("publisher"))
+                                if (!string.IsNullOrWhiteSpace(pub.Value)) item.AddStudio(pub.Value);
+
+                            Action<XElement, string> parsePerson = (node, defaultRole) =>
+                            {
+                                var name = node.Element("name")?.Value ?? node.Value;
+                                if (string.IsNullOrWhiteSpace(name)) return;
+
+                                var role = node.Element("role")?.Value ?? defaultRole;
+                                var p = new PersonInfo { Name = name.Trim(), Type = PersonKind.Author, Role = role };
+                                var dict = new Dictionary<string, string>();
+
+                                if (dict.Count > 0) p.ProviderIds = dict;
+
+                                var thumb = node.Element("thumb")?.Value;
+                                if (!string.IsNullOrWhiteSpace(thumb)) p.ImageUrl = thumb;
+
+                                result.AddPerson(p);
+                            };
+
+                            foreach (var actor in root.Elements("actor")) parsePerson(actor, "Actor");
+                            foreach (var director in root.Elements("director")) parsePerson(director, "Director");
+                            foreach (var credits in root.Elements("credits")) parsePerson(credits, "Writer/Credits");
+                        }
+                    }
+                    catch
+                    {
+                        item.Overview = "Failed to parse .nfo XML. Check logs.";
+                    }
+
+                    result.Item = item;
+                    result.HasMetadata = true;
                 }
             }
 
@@ -199,6 +256,7 @@ namespace JellyEmu
         {
             var cleanName = RomExtensions.CleanName(name);
             if (string.IsNullOrEmpty(cleanName)) return null;
+            
             try
             {
                 var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
@@ -208,7 +266,8 @@ namespace JellyEmu
                 {
                     var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                     using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.GetArrayLength() > 0) return doc.RootElement[0].GetProperty("id").GetInt32().ToString();
+                    if (doc.RootElement.GetArrayLength() > 0) 
+                        return doc.RootElement[0].GetProperty("id").GetInt32().ToString();
                 }
             }
             catch { }
@@ -222,57 +281,6 @@ namespace JellyEmu
                 return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
             }
             return HttpClientFactory.CreateClient().GetAsync(url, cancellationToken);
-        }
-    }
-
-    public abstract class BaseRawgProvider
-    {
-        protected readonly IHttpClientFactory HttpClientFactory;
-        protected readonly ILogger Logger;
-
-        protected static string ApiKey => Plugin.Instance?.Configuration.RawgApiKey ?? string.Empty;
-
-        protected BaseRawgProvider(IHttpClientFactory httpClientFactory, ILogger logger)
-        {
-            HttpClientFactory = httpClientFactory;
-            Logger = logger;
-        }
-
-        protected HttpClient GetHttpClient()
-        {
-            var client = HttpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
-            return client;
-        }
-
-        protected async Task<string?> ResolveGameIdAsync(string name, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(ApiKey)) return null;
-            var cleanName = RomExtensions.CleanName(name);
-            if (string.IsNullOrEmpty(cleanName)) return null;
-            try
-            {
-                var url = $"https://api.rawg.io/api/games?search={Uri.EscapeDataString(cleanName)}&key={ApiKey}&page_size=1";
-                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
-                if (response.IsSuccessStatusCode)
-                {
-                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("results", out var arr) && arr.GetArrayLength() > 0)
-                        return arr[0].GetProperty("id").GetInt32().ToString();
-                }
-            }
-            catch { }
-            return null;
-        }
-
-        public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
-            {
-                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
-            }
-            return GetHttpClient().GetAsync(url, cancellationToken);
         }
     }
 
@@ -337,7 +345,7 @@ namespace JellyEmu
             try
             {
                 var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
-                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,total_rating,total_rating_count;", Encoding.UTF8, "text/plain");
+                var content = new StringContent($"where id = {gameId}; fields name,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,total_rating,total_rating_count,collection.name,franchises.name;", Encoding.UTF8, "text/plain");
                 var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
@@ -385,7 +393,6 @@ namespace JellyEmu
                                 }
                             }
 
-                        // IGDB total_rating is 0–100 (weighted avg of critic + user scores)
                         if (root.TryGetProperty("total_rating", out var totalRating) &&
                             totalRating.ValueKind == JsonValueKind.Number &&
                             root.TryGetProperty("total_rating_count", out var ratingCount) &&
@@ -393,6 +400,18 @@ namespace JellyEmu
                             ratingCount.GetInt32() > 0)
                         {
                             item.CommunityRating = (float)Math.Round(totalRating.GetDouble() / 10.0, 1);
+                        }
+
+                        if (root.TryGetProperty("collection", out var collection) && collection.ValueKind == JsonValueKind.Object && collection.TryGetProperty("name", out var collectionName))
+                        {
+                            item.SeriesName = collectionName.GetString();
+                        }
+                        else if (root.TryGetProperty("franchises", out var franchises) && franchises.ValueKind == JsonValueKind.Array && franchises.GetArrayLength() > 0)
+                        {
+                            if (franchises[0].TryGetProperty("name", out var franchiseName))
+                            {
+                                item.SeriesName = franchiseName.GetString();
+                            }
                         }
 
                         item.SetProviderId("IGDB", gameId);
@@ -462,6 +481,57 @@ namespace JellyEmu
             }
             catch { }
             return list;
+        }
+    }
+
+    public abstract class BaseRawgProvider
+    {
+        protected readonly IHttpClientFactory HttpClientFactory;
+        protected readonly ILogger Logger;
+
+        protected static string ApiKey => Plugin.Instance?.Configuration.RawgApiKey ?? string.Empty;
+
+        protected BaseRawgProvider(IHttpClientFactory httpClientFactory, ILogger logger)
+        {
+            HttpClientFactory = httpClientFactory;
+            Logger = logger;
+        }
+
+        protected HttpClient GetHttpClient()
+        {
+            var client = HttpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+            return client;
+        }
+
+        protected async Task<string?> ResolveGameIdAsync(string name, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(ApiKey)) return null;
+            var cleanName = RomExtensions.CleanName(name);
+            if (string.IsNullOrEmpty(cleanName)) return null;
+            try
+            {
+                var url = $"https://api.rawg.io/api/games?search={Uri.EscapeDataString(cleanName)}&key={ApiKey}&page_size=1";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("results", out var arr) && arr.GetArrayLength() > 0)
+                        return arr[0].GetProperty("id").GetInt32().ToString();
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
+            }
+            return GetHttpClient().GetAsync(url, cancellationToken);
         }
     }
 
@@ -543,6 +613,15 @@ namespace JellyEmu
                         Tags = tags.ToArray()
                     };
 
+                    if (root.TryGetProperty("metacritic", out var metacritic) && metacritic.ValueKind == JsonValueKind.Number)
+                        item.CriticRating = metacritic.GetSingle();
+
+                    if (root.TryGetProperty("rating", out var rawgRating) && rawgRating.ValueKind == JsonValueKind.Number)
+                        item.CommunityRating = (float)Math.Round(rawgRating.GetDouble() * 2, 1);
+
+                    if (root.TryGetProperty("esrb_rating", out var esrb) && esrb.ValueKind == JsonValueKind.Object && esrb.TryGetProperty("name", out var esrbName))
+                        item.OfficialRating = esrbName.GetString();
+
                     if (root.TryGetProperty("genres", out var genresArray) && genresArray.ValueKind == JsonValueKind.Array)
                         foreach (var genre in genresArray.EnumerateArray())
                             if (genre.TryGetProperty("name", out var genreName)) item.AddGenre(genreName.GetString());
@@ -560,6 +639,45 @@ namespace JellyEmu
                     item.SetProviderId("RAWG", gameId);
                     result.HasMetadata = true;
                     result.Item = item;
+
+                    try
+                    {
+                        var teamResponse = await GetHttpClient().GetAsync($"https://api.rawg.io/api/games/{gameId}/development-team?key={ApiKey}", cancellationToken).ConfigureAwait(false);
+                        if (teamResponse.IsSuccessStatusCode)
+                        {
+                            using var teamDoc = JsonDocument.Parse(await teamResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                            if (teamDoc.RootElement.TryGetProperty("results", out var teamArray) && teamArray.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var member in teamArray.EnumerateArray())
+                                {
+                                    if (member.TryGetProperty("name", out var memberName) && !string.IsNullOrWhiteSpace(memberName.GetString()))
+                                    {
+                                        string role = "Developer";
+                                        if (member.TryGetProperty("positions", out var positions) && positions.ValueKind == JsonValueKind.Array && positions.GetArrayLength() > 0)
+                                        {
+                                            role = positions[0].TryGetProperty("name", out var posName) ? (posName.GetString() ?? "Developer") : "Developer";
+                                        }
+
+                                        var pInfo = new PersonInfo
+                                        {
+                                            Name = memberName.GetString(),
+                                            Type = PersonKind.Author,
+                                            Role = role
+                                        };
+
+                                        if (member.TryGetProperty("image", out var imgEl) && imgEl.ValueKind == JsonValueKind.String)
+                                        {
+                                            var url = imgEl.GetString();
+                                            if (!string.IsNullOrWhiteSpace(url)) pInfo.ImageUrl = url;
+                                        }
+
+                                        result.AddPerson(pInfo);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
                 }
             }
             catch { }
@@ -838,10 +956,6 @@ namespace JellyEmu
             return client;
         }
 
-        /// <summary>
-        /// Searches the Romm API for a ROM by name and returns the first matching ROM object,
-        /// or null if nothing is found.
-        /// </summary>
         protected async Task<JsonElement?> ResolveRomAsync(string name, CancellationToken cancellationToken)
         {
             if (!IsEnabled || string.IsNullOrEmpty(InstanceUrl)) return null;
@@ -992,13 +1106,47 @@ namespace JellyEmu
                     item.PremiereDate = new DateTime(yrEl.GetInt32(), 1, 1);
                 }
 
-                // Genres
                 if (rom.Value.TryGetProperty("genres", out var genresEl) && genresEl.ValueKind == JsonValueKind.Array)
                     foreach (var g in genresEl.EnumerateArray())
                     {
                         var gName = g.TryGetProperty("name", out var gn) ? gn.GetString() : g.GetString();
                         if (!string.IsNullOrWhiteSpace(gName)) item.AddGenre(gName);
                     }
+
+                if (rom.Value.TryGetProperty("developers", out var devsEl) && devsEl.ValueKind == JsonValueKind.Array)
+                    foreach (var d in devsEl.EnumerateArray())
+                    {
+                        var dName = d.TryGetProperty("name", out var dn) ? dn.GetString() : d.GetString();
+                        if (!string.IsNullOrWhiteSpace(dName)) item.AddStudio(dName);
+                    }
+
+                if (rom.Value.TryGetProperty("publishers", out var pubsEl) && pubsEl.ValueKind == JsonValueKind.Array)
+                    foreach (var p in pubsEl.EnumerateArray())
+                    {
+                        var pName = p.TryGetProperty("name", out var pn) ? pn.GetString() : p.GetString();
+                        if (!string.IsNullOrWhiteSpace(pName)) item.AddStudio(pName);
+                    }
+
+                if (rom.Value.TryGetProperty("creators", out var creatorsEl) && creatorsEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var creator in creatorsEl.EnumerateArray())
+                    {
+                        var creatorName = creator.TryGetProperty("name", out var cName) ? cName.GetString() : creator.GetString();
+                        if (!string.IsNullOrWhiteSpace(creatorName))
+                        {
+                            var pInfo = new PersonInfo { Name = creatorName, Type = PersonKind.Author, Role = "Creator" };
+                            if (creator.ValueKind == JsonValueKind.Object && creator.TryGetProperty("id", out var cId))
+                            {
+                                var rommIdStr = cId.ToString();
+                                pInfo.ProviderIds = new Dictionary<string, string> 
+                                { 
+                                    { "Romm", rommIdStr }
+                                };
+                            }
+                            result.AddPerson(pInfo);
+                        }
+                    }
+                }
 
                 if (rom.Value.TryGetProperty("platform_name", out var platformEl))
                 {
@@ -1099,6 +1247,221 @@ namespace JellyEmu
             }
             catch { }
             return list;
+        }
+    }
+
+    public class RawgPersonMetadataProvider : BaseRawgProvider, IRemoteMetadataProvider<Person, PersonLookupInfo>, IHasOrder
+    {
+        public string Name => "RAWG Creators";
+        public int Order => 1;
+
+        public RawgPersonMetadataProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonMetadataProvider> logger) 
+            : base(httpClientFactory, logger) { }
+
+        public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(PersonLookupInfo searchInfo, CancellationToken cancellationToken)
+        {
+            var results = new List<RemoteSearchResult>();
+            if (string.IsNullOrEmpty(ApiKey) || string.IsNullOrEmpty(searchInfo.Name)) return results;
+            
+            searchInfo.ProviderIds.TryGetValue("RAWG", out var rawgId);
+
+            if (!string.IsNullOrEmpty(rawgId))
+            {
+                results.Add(new RemoteSearchResult
+                {
+                    Name = searchInfo.Name,
+                    ProviderIds = new Dictionary<string, string> { { "RAWG", rawgId } },
+                    SearchProviderName = Name
+                });
+                return results;
+            }
+
+            try
+            {
+                var url = $"https://api.rawg.io/api/creators?search={Uri.EscapeDataString(searchInfo.Name)}&key={ApiKey}";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("results", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var creator in arr.EnumerateArray().Take(5))
+                        {
+                            if (creator.TryGetProperty("id", out var idEl) && creator.TryGetProperty("name", out var nameEl))
+                            {
+                                var res = new RemoteSearchResult
+                                {
+                                    Name = nameEl.GetString() ?? string.Empty,
+                                    ProviderIds = new Dictionary<string, string> { { "RAWG", idEl.GetInt32().ToString() } },
+                                    SearchProviderName = Name
+                                };
+                                
+                                if (creator.TryGetProperty("image", out var imgEl) && imgEl.ValueKind == JsonValueKind.String)
+                                {
+                                    var imgUrl = imgEl.GetString();
+                                    if (!string.IsNullOrWhiteSpace(imgUrl)) res.ImageUrl = imgUrl;
+                                }
+                                
+                                results.Add(res);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            
+            return results;
+        }
+
+        public async Task<MetadataResult<Person>> GetMetadata(PersonLookupInfo info, CancellationToken cancellationToken)
+        {
+            var result = new MetadataResult<Person> { HasMetadata = false };
+            if (string.IsNullOrEmpty(ApiKey)) return result;
+
+            info.ProviderIds.TryGetValue("RAWG", out var rawgId);
+            
+            if (string.IsNullOrEmpty(rawgId))
+            {
+                var searchResults = await GetSearchResults(info, cancellationToken).ConfigureAwait(false);
+                rawgId = searchResults.FirstOrDefault()?.ProviderIds["RAWG"];
+            }
+
+            if (string.IsNullOrEmpty(rawgId)) return result;
+
+            try
+            {
+                var url = $"https://api.rawg.io/api/creators/{rawgId}?key={ApiKey}";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    var person = new Person
+                    {
+                        Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? info.Name : info.Name,
+                        Overview = root.TryGetProperty("description", out var d) ? (d.GetString() ?? string.Empty).Replace("<p>", "").Replace("</p>", "").Replace("<br />", "\n").Replace("&#39;", "'") : string.Empty
+                    };
+
+                    person.SetProviderId("RAWG", rawgId);
+
+                    result.Item = person;
+                    result.HasMetadata = true;
+                }
+            }
+            catch { }
+            return result;
+        }
+    }
+
+    public class RawgPersonImageProvider : BaseRawgProvider, IRemoteImageProvider, IHasOrder
+    {
+        public string Name => "RAWG Creators";
+        public int Order => 1;
+
+        public RawgPersonImageProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonImageProvider> logger) 
+            : base(httpClientFactory, logger) { }
+
+        public bool Supports(BaseItem item) => item is Person;
+
+        public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary };
+
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
+        {
+            var list = new List<RemoteImageInfo>();
+            if (string.IsNullOrEmpty(ApiKey)) return list;
+
+            var rawgId = item.GetProviderId("RAWG");
+            if (string.IsNullOrEmpty(rawgId)) return list;
+
+            try
+            {
+                var url = $"https://api.rawg.io/api/creators/{rawgId}?key={ApiKey}";
+                var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null)
+                    {
+                        var imgUrl = img.GetString();
+                        if (!string.IsNullOrWhiteSpace(imgUrl))
+                        {
+                            list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = imgUrl });
+                        }
+                    }
+                }
+            }
+            catch { }
+            return list;
+        }
+    }
+
+    public class RawgPersonExternalId : IExternalId
+    {
+        public string ProviderName => "RAWG Database";
+        public string Key => "RAWG";
+        public ExternalIdMediaType? Type => ExternalIdMediaType.Person;
+        public string UrlFormatString => "https://rawg.io/creators/{0}";
+        public bool Supports(IHasProviderIds item) => item is Person;
+    }
+
+    public class RawgGameExternalId : IExternalId
+    {
+        public string ProviderName => "RAWG Database";
+        public string Key => "RAWG";
+        public ExternalIdMediaType? Type => null;
+        public string UrlFormatString => "https://rawg.io/games/{0}";
+        public bool Supports(IHasProviderIds item) => item is Book;
+    }
+
+    public class WikipediaGameExternalId : IExternalId
+    {
+        public string ProviderName => "Wikipedia";
+        public string Key => "Wikipedia";
+        public ExternalIdMediaType? Type => null;
+        public string UrlFormatString => "https://en.wikipedia.org/?curid={0}";
+        public bool Supports(IHasProviderIds item) => item is Book;
+    }
+
+    public class IgdbGameExternalId : IExternalId
+    {
+        public string ProviderName => "IGDB";
+        public string Key => "IGDB";
+        public ExternalIdMediaType? Type => null;
+        public string UrlFormatString => "https://www.igdb.com/games/{0}";
+        public bool Supports(IHasProviderIds item) => item is Book;
+    }
+
+    public class RawgExternalUrlProvider : IExternalUrlProvider
+    {
+        public string Name => "RAWG";
+
+        public IEnumerable<string> GetExternalUrls(BaseItem item)
+        {
+            if (item is Person && item.TryGetProviderId("RAWG", out var personId))
+            {
+                yield return $"https://rawg.io/creators/{personId}";
+            }
+            else if (item is Book && item.TryGetProviderId("RAWG", out var gameId))
+            {
+                yield return $"https://rawg.io/games/{gameId}";
+            }
+        }
+    }
+
+    public class WikipediaExternalUrlProvider : IExternalUrlProvider
+    {
+        public string Name => "Wikipedia";
+
+        public IEnumerable<string> GetExternalUrls(BaseItem item)
+        {
+            if (item is Book && item.TryGetProviderId("Wikipedia", out var wikiId))
+            {
+                yield return $"https://en.wikipedia.org/?curid={wikiId}";
+            }
         }
     }
 
