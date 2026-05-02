@@ -23,7 +23,6 @@ namespace JellyEmu.Services
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<JellyEmuSessionService> _logger;
 
-        // Key: "{userId}:{itemId}"  Value: session id issued by Jellyfin
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ActiveGameSession> _activeSessions = new();
 
         public JellyEmuSessionService(
@@ -69,8 +68,6 @@ namespace JellyEmu.Services
 
             try
             {
-                // Ensure there is a Jellyfin session for this client/device combination.
-                // GetOrCreateSessionInfo returns an existing session or creates one.
                 var session = await _sessionManager.LogSessionActivity(
                     clientName,
                     "1.0",

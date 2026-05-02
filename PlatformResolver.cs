@@ -100,9 +100,7 @@ namespace JellyEmu
         private static string? NormaliseDiscLabel(string raw)
         {
             if (string.IsNullOrEmpty(raw)) return null;
-            // Arabic digit — straightforward
             if (int.TryParse(raw, out var n)) return $"Disc {n}";
-            // Simple Roman numeral map (I–VIII covers virtually all multi-disc games)
             return raw.ToUpperInvariant() switch
             {
                 "I" => "Disc 1",
@@ -128,7 +126,6 @@ namespace JellyEmu
             var fileName = Path.GetFileNameWithoutExtension(path) ?? string.Empty;
             var m = DiscTokenRegex.Match(fileName);
             if (!m.Success) return null;
-            // Group 1 = bracketed form, Group 2 = bare form
             var raw = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
             return NormaliseDiscLabel(raw.Trim());
         }
@@ -383,7 +380,6 @@ namespace JellyEmu
                 return extTag;
             }
 
-            // Check library-only extensions (e.g. .3ds, .gcm, .wbfs) before giving up
             if (!string.IsNullOrEmpty(ext) && LibraryOnlyExtensions.TryGetValue(ext, out var libTag))
             {
                 _logger.LogDebug("[JellyEmu] Library-only platform from extension '{Ext}': {Tag}", ext, libTag);
@@ -420,19 +416,16 @@ namespace JellyEmu
                 if (Aliases.ContainsKey(inner))
                     return "";
 
-                // Strip region tokens (including comma-separated ones like "USA, Europe")
                 var allParts = inner.Split(',', StringSplitOptions.TrimEntries);
                 if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p)))
                     return "";
 
-                // Strip bracketed disc tokens e.g. (Disc 1), [Disk 2]
                 if (DiscTokenRegex.IsMatch("(" + inner + ")"))
                     return "";
 
                 return m.Value;
             });
 
-            // Also strip bare disc tokens not wrapped in brackets e.g. "Game Disc1.iso"
             result = DiscTokenRegex.Replace(result, "");
 
             return Regex.Replace(result, @"\s+", " ").Trim();
@@ -448,7 +441,6 @@ namespace JellyEmu
                     inner.StartsWith("rawg-", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                // Skip pure region tokens so they don't pollute platform resolution
                 var allParts = inner.Split(',', StringSplitOptions.TrimEntries);
                 if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p)))
                     continue;

@@ -81,7 +81,6 @@ namespace JellyEmu.Services
         {
             if (!Directory.Exists(EjsRoot)) return false;
             if (!File.Exists(StampFile)) return false;
-            // Invalidate caches built against the old beta ("latest") channel
             var stamp = File.ReadAllText(StampFile).Trim();
             if (stamp != "cdn-stable") return false;
             if (!File.Exists(Path.Combine(EjsRoot, "loader.js"))) return false;

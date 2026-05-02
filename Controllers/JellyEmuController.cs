@@ -5,11 +5,11 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Collections;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace JellyEmu.Controllers
 {
@@ -2134,9 +2134,18 @@ namespace JellyEmu.Controllers
         [Authorize]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public IActionResult DeleteSave(string itemId, string userId, [FromQuery] int? slot)
         {
+            var authenticatedUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            
+            if (!string.Equals(authenticatedUserId, userId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("[JellyEmu] Unauthorized delete attempt. User {AuthUser} tried to delete save for User {TargetUser}", authenticatedUserId, userId);
+                return Forbid();
+            }
+
             var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slotNum);
 
