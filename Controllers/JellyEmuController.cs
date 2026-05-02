@@ -368,6 +368,9 @@ namespace JellyEmu.Controllers
         .je-dockbtn {{ background: none; border: none; color: #fff; cursor: pointer; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .1s; position: relative; }}
         .je-dockbtn:hover {{ background: rgba(255,255,255,.12); }}
         .je-dockbtn:active {{ transform: scale(.88); }}
+        .je-dockbtn:disabled {{ opacity: 0.4; cursor: not-allowed; }}
+        .je-dockbtn:disabled:hover {{ background: none; }}
+        .je-dockbtn:disabled:active {{ transform: none; }}
         .je-dockbtn svg {{ width: 22px; height: 22px; fill: currentColor; }}
         .je-dockbtn.je-active {{ background: rgba(255,255,255,.2); }}
         .je-dock-sep {{ width: 1px; height: 24px; background: rgba(255,255,255,.15); margin: 0 2px; flex-shrink: 0; }}
@@ -469,7 +472,7 @@ namespace JellyEmu.Controllers
     </style>
 </head>
 <body>
-    <!-- ═══ Loading Screen ═══ -->
+    <!-- Loading Screen -->
     <div id=""je-loader"">
         <div class=""je-loader-anim"">
             <div class=""je-pulse-ring""></div>
@@ -482,7 +485,7 @@ namespace JellyEmu.Controllers
         <div id=""je-loader-status"">Loading ROM…</div>
     </div>
 
-    <!-- ═══ Top Bar ═══ -->
+    <!-- Top Bar -->
     <div id=""je-topbar"" class=""je-bar"">
         <span id=""je-topbar-title"">{gameName}</span>
         <button class=""je-topbtn"" id=""je-exit-btn"" title=""Exit"">
@@ -491,7 +494,7 @@ namespace JellyEmu.Controllers
         </button>
     </div>
 
-    <!-- ═══ Bottom Dock ═══ -->
+    <!-- Bottom Dock -->
     <div id=""je-dock"" class=""je-bar"">
         <button class=""je-dockbtn"" id=""je-btn-pause"" title=""Pause""><svg viewBox=""0 0 24 24""><path d=""M6 19h4V5H6v14zm8-14v14h4V5h-4z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-play"" title=""Play"" style=""display:none""><svg viewBox=""0 0 24 24""><path d=""M8 5v14l11-7z""/></svg></button>
@@ -504,17 +507,18 @@ namespace JellyEmu.Controllers
         <button class=""je-dockbtn"" id=""je-btn-vol"" title=""Volume""><svg viewBox=""0 0 24 24""><path d=""M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-3.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-cheats"" title=""Cheats""><svg viewBox=""0 0 24 24""><path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-inputmap"" title=""Input Mapping""><svg viewBox=""0 0 24 24""><path d=""M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-netplay"" title=""Netplay"" disabled><svg viewBox=""0 0 24 24""><path d=""M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z""/></svg></button>
         <div class=""je-dock-sep""></div>
         <button class=""je-dockbtn"" id=""je-btn-screenshot"" title=""Screenshot""><svg viewBox=""0 0 24 24""><path d=""M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-settings"" title=""Settings""><svg viewBox=""0 0 24 24""><path d=""M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z""/></svg></button>
     </div>
 
-    <!-- ═══ Dock Minimize FAB ═══ -->
+    <!-- Dock Minimize FAB -->
     <button id=""je-dock-min"" title=""Expand Controls"">
         <svg viewBox=""0 0 24 24""><path d=""M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z""/></svg>
     </button>
 
-    <!-- ═══ Popup: Save States ═══ -->
+    <!-- Popup: Save States -->
     <div class=""je-overlay"" id=""je-pop-saves"">
         <div class=""je-popup"">
             <div class=""je-popup-hdr""><h3>Save States</h3><button class=""je-closebtn"" data-close=""je-pop-saves"">&times;</button></div>
@@ -522,7 +526,7 @@ namespace JellyEmu.Controllers
         </div>
     </div>
 
-    <!-- ═══ Popup: Volume ═══ -->
+    <!-- Popup: Volume -->
     <div class=""je-overlay"" id=""je-pop-vol"">
         <div class=""je-popup"" style=""max-width:340px"">
             <div class=""je-popup-hdr""><h3>Volume</h3><button class=""je-closebtn"" data-close=""je-pop-vol"">&times;</button></div>
@@ -536,7 +540,7 @@ namespace JellyEmu.Controllers
         </div>
     </div>
 
-    <!-- ═══ Popup: Cheats ═══ -->
+    <!-- Popup: Cheats -->
     <div class=""je-overlay"" id=""je-pop-cheats"">
         <div class=""je-popup"">
             <div class=""je-popup-hdr""><h3>Cheats</h3><button class=""je-closebtn"" data-close=""je-pop-cheats"">&times;</button></div>
@@ -552,7 +556,7 @@ namespace JellyEmu.Controllers
         </div>
     </div>
 
-    <!-- ═══ Popup: Input Mapping ═══ -->
+    <!-- Popup: Input Mapping -->
     <div class=""je-overlay"" id=""je-pop-inputmap"">
         <div class=""je-popup je-popup-lg"">
             <div class=""je-popup-hdr""><h3>Input Mapping</h3><button class=""je-closebtn"" data-close=""je-pop-inputmap"">&times;</button></div>
@@ -582,7 +586,7 @@ namespace JellyEmu.Controllers
         </div>
     </div>
 
-    <!-- ═══ Popup: Settings ═══ -->
+    <!-- Popup: Settings -->
     <div class=""je-overlay"" id=""je-pop-settings"">
         <div class=""je-popup"">
             <div class=""je-popup-hdr""><h3>Settings</h3><button class=""je-closebtn"" data-close=""je-pop-settings"">&times;</button></div>
@@ -623,7 +627,7 @@ namespace JellyEmu.Controllers
                 vb:'Virtual Boy',segaMD:'Sega Genesis',segaGG:'Game Gear',segaMS:'Master System',segaCD:'Sega CD',
                 sega32x:'Sega 32X',psx:'PlayStation',psp:'PSP',a2600:'Atari 2600',a7800:'Atari 7800',lynx:'Atari Lynx',
                 pce:'TurboGrafx-16',coleco:'ColecoVision',ngp:'Neo Geo Pocket',arcade:'Arcade',dos:'DOS',
-                '3do':'3DO',jaguar:'Atari Jaguar',mame2003:'MAME',ws:'WonderSwan'}};
+                '3do':'3DO',jaguar:'Atari Jaguar',mame2003:'MAME',ws:'WonderSwan', ss: 'Sega Saturn'}};
             var sysEl = document.getElementById('je-loader-system');
             if (sysEl) {{ var cn = coreNames[window.EJS_core] || window.EJS_core || ''; sysEl.textContent = cn; }}
 
@@ -1370,8 +1374,7 @@ namespace JellyEmu.Controllers
         
         // Inject default options for save states, shader and video rotation
         window.EJS_defaultOptions = {{
-            'save-state-slot': {activeSlot},
-            'save-state-location': 'browser'{(string.IsNullOrEmpty(activeShader) ? "" : $",\n            'shader': '{activeShader}'")}
+            {(string.IsNullOrEmpty(activeShader) ? "" : $",\n            'shader': '{activeShader}'")}
         }};
         {(videoRotation != 0 ? $"window.EJS_videoRotation = {videoRotation};" : "// EJS_videoRotation: 0 (default, no rotation)")}
         {(core is "dos" or "psp" ? "window.EJS_threads = true;" : "// EJS_threads not required for this core")}
