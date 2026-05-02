@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/jellyemu.svg" alt="JellyEmu Logo" width="120" />
   <h1>JellyEmu</h1>
-  <p>A plugin for jellyfin 10.11+ to import, play and share your roms with users.</p>
+  <p>A plugin for jellyfin 10.11+ to import, manage, play and share your roms with users.</p>
   <p><sub>Now with romm integration.</sub></p>
 </div>
 
