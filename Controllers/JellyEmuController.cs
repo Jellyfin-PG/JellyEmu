@@ -180,7 +180,7 @@ namespace JellyEmu.Controllers
         [Obsolete("Use ReadUserPrefs(userId) instead to fetch all slot-level preference settings.")]
         private int ReadActiveSlot(string userId) => ReadUserPrefs(userId).Slot;
 
-        // ── Full user preferences (emulator + controls + save behaviour) ──────────
+        // Full user preferences (emulator + controls + save behaviour)
         // Stored separately from the slot file so slot reads stay cheap.
         // File: {DataPath}/jellyemu-saves/{userId}/prefs.json
 
@@ -267,7 +267,7 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId,
+        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
             var item = _libraryManager.GetItemById(itemId);
@@ -283,7 +283,7 @@ namespace JellyEmu.Controllers
             var hasSaves = !string.IsNullOrEmpty(userId);
             var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
             var fullPrefs = hasSaves ? ReadFullPrefs(userId!) : DefaultFullPrefs;
-            var activeSlot = userPrefs.Slot;
+            var activeSlot = (slot.HasValue && slot.Value > 0) ? slot.Value : userPrefs.Slot;
             var activeShader = userPrefs.Shader;
             var videoRotation = userPrefs.VideoRotation;
             var savedControls = fullPrefs.Controls;           // keyboard bindings JSON
@@ -305,6 +305,17 @@ namespace JellyEmu.Controllers
             // Fetch cheats server-side so they're inlined before loader.js runs.
             // GetCheatsJson handles disk cache — this is a fast local read on repeat plays.
             var cheatsJson = await GetCheatsJsonAsync(item, httpClientFactory);
+
+            // Handle direct loading of a save state
+            var directLoadScript = (slot.HasValue && slot.Value > 0 && hasSaves) ? $@"
+                setTimeout(function() {{
+                    fetch('/jellyemu/save/{itemId}/{userId}?slot={slot.Value}')
+                        .then(function(r) {{ if (r.ok) return r.arrayBuffer(); throw new Error('No save data'); }})
+                        .then(function(buf) {{
+                            var g = gm(); if (g) g.loadState(new Uint8Array(buf));
+                            console.log('[JellyEmu] Pipeline STAGE 4 (Client Direct Receive): Downloaded bytes ->', buf.byteLength);
+                        }}).catch(function(e) {{ console.warn('[JellyEmu] Direct load failed:', e); }});
+                }}, 500);" : "";
 
             var html = $@"<!DOCTYPE html>
 <html>
@@ -606,7 +617,7 @@ namespace JellyEmu.Controllers
     </script>
     <script>
         (function() {{
-            // ── Core name map for loading screen badge ──
+            // Core name map for loading screen badge
             var coreNames = {{nes:'NES',snes:'SNES',n64:'N64',gb:'Game Boy',gba:'Game Boy Advance',nds:'Nintendo DS',
                 vb:'Virtual Boy',segaMD:'Sega Genesis',segaGG:'Game Gear',segaMS:'Master System',segaCD:'Sega CD',
                 sega32x:'Sega 32X',psx:'PlayStation',psp:'PSP',a2600:'Atari 2600',a7800:'Atari 7800',lynx:'Atari Lynx',
@@ -615,7 +626,7 @@ namespace JellyEmu.Controllers
             var sysEl = document.getElementById('je-loader-system');
             if (sysEl) {{ var cn = coreNames[window.EJS_core] || window.EJS_core || ''; sysEl.textContent = cn; }}
 
-            // ── Loading screen lifecycle ──
+            // Loading screen lifecycle
             var loader = document.getElementById('je-loader');
             var topbar = document.getElementById('je-topbar');
             var dock   = document.getElementById('je-dock');
@@ -635,6 +646,7 @@ namespace JellyEmu.Controllers
             window.EJS_onGameStart = function() {{
                 dismissLoader();
                 setTimeout(refocusGame, 500);
+{directLoadScript}
                 // CRITICAL: EJS checks settingsMenu.style.display !== 'none' in keyChange()
                 // to decide whether to block keyboard input. Our CSS class-based hiding
                 // doesn't set inline style, so EJS thinks settings menu is open and blocks
@@ -648,7 +660,7 @@ namespace JellyEmu.Controllers
                 }}, 200);
             }};
 
-            // ── Auto-hide docks ──
+            // Auto-hide docks
             var hideTimer = null;
             var HIDE_MS = 3000;
             var popupOpen = false;
@@ -676,7 +688,7 @@ namespace JellyEmu.Controllers
                 showDocks();
             }}
 
-            // ── Refocus game on any click on the game area or after dock button press ──
+            // Refocus game on any click on the game area or after dock button press
             document.getElementById('game').addEventListener('mousedown', function() {{
                 setTimeout(refocusGame, 50);
             }});
@@ -686,7 +698,7 @@ namespace JellyEmu.Controllers
                 if (btn && !popupOpen) {{ setTimeout(refocusGame, 50); }}
             }}, true);
 
-            // ── Popup management ──
+            // Popup management
             function openPopup(id) {{
                 closeAllPopups();
                 var el = document.getElementById(id);
@@ -713,7 +725,7 @@ namespace JellyEmu.Controllers
                 ov.addEventListener('click', function(e) {{ if (e.target === ov) {{ closeAllPopups(); showDocks(); refocusGame(); }} }});
             }});
 
-            // ── Tab switching ──
+            // Tab switching
             document.querySelectorAll('.je-tab').forEach(function(tab) {{
                 tab.addEventListener('click', function() {{
                     var tabs = tab.parentElement.querySelectorAll('.je-tab');
@@ -726,11 +738,27 @@ namespace JellyEmu.Controllers
                 }});
             }});
 
-            // ── Helper: get emulator ──
+            // Helper: get emulator
             function emu() {{ return window.EJS_emulator; }}
             function gm()  {{ var e = emu(); return e ? e.gameManager : null; }}
 
-            // ── Focus management: EJS listens for keyboard on ejs_parent, not document ──
+            function _jeEnsureBinary(data) {{
+                if (!data) return null;
+                if (data instanceof Blob) return data;
+                if (data instanceof Uint8Array) return new Blob([data], {{ type: 'application/octet-stream' }});
+                if (data instanceof ArrayBuffer) return new Blob([new Uint8Array(data)], {{ type: 'application/octet-stream' }});
+                if (typeof data === 'string') {{
+                    try {{
+                        var binary = window.atob(data);
+                        var bytes = new Uint8Array(binary.length);
+                        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                        return new Blob([bytes], {{ type: 'application/octet-stream' }});
+                    }} catch(ex) {{ return new Blob([new TextEncoder().encode(data)], {{ type: 'application/octet-stream' }}); }}
+                }}
+                return new Blob([new TextEncoder().encode(JSON.stringify(data))], {{ type: 'application/octet-stream' }});
+            }}
+
+            // Focus management: EJS listens for keyboard on ejs_parent, not document
             function refocusGame() {{
                 var e = emu();
                 if (e && e.elements && e.elements.parent) {{
@@ -741,7 +769,7 @@ namespace JellyEmu.Controllers
                 }}
             }}
 
-            // ── Server sync for controls & settings ──
+            // Server sync for controls & settings
             var _syncTimer = null;
             function syncControlsToServer() {{
                 clearTimeout(_syncTimer);
@@ -777,14 +805,14 @@ namespace JellyEmu.Controllers
                 }}, 800);
             }}
 
-            // ── Exit button ──
+            // Exit button
             document.getElementById('je-exit-btn').addEventListener('click', function() {{
                 if (window.EJS_onExit) {{ EJS_onExit(); }}
                 else if (window.opener) {{ window.close(); }}
                 else {{ window.parent.postMessage('close-jellyemu','*'); }}
             }});
 
-            // ── Pause / Play ──
+            // Pause / Play
             var btnPause = document.getElementById('je-btn-pause');
             var btnPlay  = document.getElementById('je-btn-play');
             btnPause.addEventListener('click', function() {{
@@ -798,12 +826,12 @@ namespace JellyEmu.Controllers
                 btnPlay.style.display = 'none'; btnPause.style.display = '';
             }});
 
-            // ── Restart ──
+            // Restart
             document.getElementById('je-btn-restart').addEventListener('click', function() {{
                 var g = gm(); if (g) g.restart();
             }});
 
-            // ── Fast Forward ──
+            // Fast Forward
             var ffActive = false;
             document.getElementById('je-btn-ff').addEventListener('click', function() {{
                 var g = gm(); if (!g) return;
@@ -812,7 +840,7 @@ namespace JellyEmu.Controllers
                 this.classList.toggle('je-active', ffActive);
             }});
 
-            // ── Slow Motion ──
+            // Slow Motion
             var slowActive = false;
             document.getElementById('je-btn-slow').addEventListener('click', function() {{
                 var g = gm(); if (!g) return;
@@ -821,7 +849,7 @@ namespace JellyEmu.Controllers
                 this.classList.toggle('je-active', slowActive);
             }});
 
-            // ── Save States popup ──
+            // Save States popup
             document.getElementById('je-btn-saves').addEventListener('click', function() {{
                 buildSaveSlots();
                 openPopup('je-pop-saves');
@@ -856,29 +884,37 @@ namespace JellyEmu.Controllers
                     btn.addEventListener('click', function() {{
                         var s = parseInt(btn.getAttribute('data-save'));
                         var g = gm(); if (!g) return;
-                        var state = g.getState();
-                        if (!state) return;
-                        // Upload save state to server
-                        fetch('/jellyemu/save/{itemId}/{userId}?slot=' + s, {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/octet-stream' }},
-                            body: state
-                        }}).then(function() {{
-                            var el = document.getElementById('je-slot-status-' + s);
-                            if (el) el.textContent = 'Saved!';
-                            // Capture and upload screenshot for this slot
-                            var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('canvas');
-                            if (canvas) {{
-                                try {{
-                                    var dataUrl = canvas.toDataURL('image/png');
-                                    fetch('/jellyemu/save-screenshot/{itemId}/{userId}/' + s, {{
-                                        method: 'POST',
-                                        headers: {{ 'Content-Type': 'application/json' }},
-                                        body: JSON.stringify({{ dataUrl: dataUrl }})
-                                    }}).catch(function(err) {{ console.warn('[JellyEmu] Screenshot upload failed:', err); }});
-                                }} catch(ex) {{ console.warn('[JellyEmu] Screenshot capture failed:', ex); }}
-                            }}
-                        }}).catch(function() {{}});
+                        Promise.resolve(g.getState()).then(function(rawState) {{
+                            var state = _jeEnsureBinary(rawState);
+                            if (!state) return;
+                            console.log('[JellyEmu] Pipeline STAGE 1 (Client Gen): Payload size ->', state.size || state.byteLength, 'bytes');
+                            // Upload save state to server
+                            fetch('/jellyemu/save/{itemId}/{userId}?slot=' + s, {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/octet-stream' }},
+                                body: state
+                            }}).then(function(r) {{
+                                if (!r.ok) throw new Error('Save rejected by server');
+                                var el = document.getElementById('je-slot-status-' + s);
+                                if (el) el.textContent = 'Saved!';
+                                // Capture and upload screenshot for this slot
+                                var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('canvas');
+                                if (canvas) {{
+                                    try {{
+                                        var dataUrl = canvas.toDataURL('image/png');
+                                        fetch('/jellyemu/save-screenshot/{itemId}/{userId}/' + s, {{
+                                            method: 'POST',
+                                            headers: {{ 'Content-Type': 'application/json' }},
+                                            body: JSON.stringify({{ dataUrl: dataUrl }})
+                                        }}).catch(function(err) {{ console.warn('[JellyEmu] Screenshot upload failed:', err); }});
+                                    }} catch(ex) {{ console.warn('[JellyEmu] Screenshot capture failed:', ex); }}
+                                }}
+                            }}).catch(function(err) {{
+                                console.error('[JellyEmu] Save failed:', err);
+                                var el = document.getElementById('je-slot-status-' + s);
+                                if (el) el.textContent = 'Save Failed';
+                            }});
+                        }});
                     }});
                 }});
                 body.querySelectorAll('[data-load]').forEach(function(btn) {{
@@ -890,6 +926,7 @@ namespace JellyEmu.Controllers
                                 return r.arrayBuffer();
                             }}).then(function(buf) {{
                                 var g = gm(); if (!g) return;
+                                console.log('[JellyEmu] Pipeline STAGE 4 (Client Receive): Downloaded bytes ->', buf.byteLength);
                                 g.loadState(new Uint8Array(buf));
                                 closePopup('je-pop-saves');
                             }}).catch(function() {{
@@ -900,7 +937,7 @@ namespace JellyEmu.Controllers
                 }});
             }}
 
-            // ── Volume popup ──
+            // Volume popup
             document.getElementById('je-btn-vol').addEventListener('click', function() {{
                 var e = emu();
                 if (e) {{
@@ -924,7 +961,7 @@ namespace JellyEmu.Controllers
                 document.getElementById('je-vol-pct').textContent = e.muted ? '0%' : Math.round(e.volume * 100) + '%';
             }});
 
-            // ── Cheats popup ──
+            // Cheats popup
             document.getElementById('je-btn-cheats').addEventListener('click', function() {{
                 buildCheats();
                 openPopup('je-pop-cheats');
@@ -1163,7 +1200,7 @@ namespace JellyEmu.Controllers
                 buildGamepadBinds();
             }});
 
-            // ── Screenshot ──
+            // Screenshot
             document.getElementById('je-btn-screenshot').addEventListener('click', function() {{
                 var g = gm(); if (!g) return;
                 g.screenshot().then(function(pngBytes) {{
@@ -1182,7 +1219,7 @@ namespace JellyEmu.Controllers
                 }}).catch(function(err) {{ console.warn('[JellyEmu] Screenshot failed:', err); }});
             }});
 
-            // ── Settings popup ──
+            // Settings popup
             document.getElementById('je-btn-settings').addEventListener('click', function() {{
                 syncSettingsUI();
                 openPopup('je-pop-settings');
@@ -1226,7 +1263,7 @@ namespace JellyEmu.Controllers
                 syncControlsToServer();
             }});
 
-            // ── Screen Size ──
+            // Screen Size
             document.getElementById('je-set-screensize').addEventListener('change', function() {{
                 var val = this.value;
                 var e = emu(); if (!e) return;
@@ -1253,7 +1290,7 @@ namespace JellyEmu.Controllers
                 }}
             }});
 
-            // ── FPS Counter ──
+            // FPS Counter
             var fpsEl = document.getElementById('je-fps');
             var fpsOn = false;
             var fpsFrames = 0;
@@ -1281,7 +1318,7 @@ namespace JellyEmu.Controllers
                 }}
             }});
 
-            // ── Dock minimize / expand ──
+            // Dock minimize / expand
             var dockMinimized = false;
             var dockMinBtn = document.getElementById('je-dock-min');
             // Add minimize button to end of dock
@@ -1311,7 +1348,7 @@ namespace JellyEmu.Controllers
                 }}
             }};
 
-            // ── Dock popup buttons ──
+            // Dock popup buttons
             document.getElementById('je-btn-inputmap').addEventListener('click', function() {{
                 buildKeyboardBinds();
                 buildGamepadBinds();
@@ -1457,13 +1494,16 @@ namespace JellyEmu.Controllers
 
         window.EJS_onSaveState = function(e) {{
             if (!e || !e.state) return;
+            var state = _jeEnsureBinary(e.state);
+            console.log('[JellyEmu] Pipeline STAGE 1 (Client AutoGen): Payload size ->', state.size || state.byteLength, 'bytes');
             // Capture canvas NOW — synchronously, before the fetch, so we get the
             // current game frame rather than whatever is on screen after the round-trip
             var savePromise = fetch('{savePostUrl}', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/octet-stream' }},
-                body: e.state
+                body: state
             }}).then(function(r) {{
+                if (!r.ok) throw new Error('Server rejected save');
                 console.log('[JellyEmu] Save uploaded, status:', r.status);
                 try {{ window.parent.postMessage({{ type: 'jellyemu-save-written', itemId: '{itemId}' }}, '*'); }} catch(_) {{}}
             }}).catch(function(err) {{
@@ -1474,11 +1514,14 @@ namespace JellyEmu.Controllers
         // EJS_onSaveUpdate fires on battery/SRAM saves detected by hash comparison.
         window.EJS_onSaveUpdate = function(e) {{
             if (!e || !e.save) return;
+            var save = _jeEnsureBinary(e.save);
+            console.log('[JellyEmu] Pipeline STAGE 1 (Client SRAM Gen): Payload size ->', save.size || save.byteLength, 'bytes');
             var savePromise = fetch('{savePostUrl}', {{
                 method: 'POST',
                 headers: {{ 'Content-Type': 'application/octet-stream' }},
-                body: e.save
-            }}).then(function() {{
+                body: save
+            }}).then(function(r) {{
+                if (!r.ok) throw new Error('Server rejected save');
                 try {{ window.parent.postMessage({{ type: 'jellyemu-save-written', itemId: '{itemId}' }}, '*'); }} catch(_) {{}}
             }}).catch(function(err) {{
                 console.error('[JellyEmu] Save update upload failed:', err);
@@ -1523,36 +1566,53 @@ namespace JellyEmu.Controllers
                 }}
             }}
 
+            function _fallbackClose() {{
+                Promise.all([sessionStop, playtimeFlush]).finally(function() {{
+                    try {{ window.parent.postMessage({{ type: 'jellyemu-session-end', itemId: '{itemId}', seconds: sessionSeconds }}, '*'); }} catch(_) {{}}
+                    closeIframe();
+                }});
+            }}
+
             if (!autoSave) {{
-                Promise.all([sessionStop, playtimeFlush]).finally(function() {{
-                    try {{ window.parent.postMessage({{ type: 'jellyemu-session-end', itemId: '{itemId}', seconds: sessionSeconds }}, '*'); }} catch(_) {{}}
-                    closeIframe();
-                }});
+                _fallbackClose();
                 return;
             }}
-            EJS_emulator.gameManager.saveSaveFiles();
-            var stateData = EJS_emulator.gameManager.getSaveFile();
-            if (!stateData) {{
-                Promise.all([sessionStop, playtimeFlush]).finally(function() {{
-                    try {{ window.parent.postMessage({{ type: 'jellyemu-session-end', itemId: '{itemId}', seconds: sessionSeconds }}, '*'); }} catch(_) {{}}
-                    closeIframe();
+            
+            try {{
+                if (!window.EJS_emulator || !window.EJS_emulator.gameManager) throw new Error('EJS_emulator not fully initialized');
+                
+                EJS_emulator.gameManager.saveSaveFiles();
+                Promise.resolve(EJS_emulator.gameManager.getSaveFile()).then(function(rawState) {{
+                    var stateData = _jeEnsureBinary(rawState);
+                    if (!stateData) {{
+                        _fallbackClose();
+                        return;
+                    }}
+                    // Capture before the fetch so rAF fires on the current frame
+                    var saveFlush = fetch('{savePostUrl}', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/octet-stream' }},
+                        body: stateData
+                    }}).then(function(r) {{
+                        if (!r.ok) throw new Error('Server rejected save');
+                        try {{ window.parent.postMessage({{ type: 'jellyemu-save-written', itemId: '{itemId}' }}, '*'); }} catch(_) {{}}
+                    }}).catch(function(err) {{
+                        console.error('[JellyEmu] Auto-save on exit failed:', err);
+                    }});
+                    _jePostCanvasScreenshot(saveFlush);
+                    Promise.all([sessionStop, playtimeFlush, saveFlush]).finally(function() {{
+                        // Notify parent of session end for Romm playtime reporting
+                        try {{ window.parent.postMessage({{ type: 'jellyemu-session-end', itemId: '{itemId}', seconds: sessionSeconds }}, '*'); }} catch(_) {{}}
+                        closeIframe();
+                    }});
+                }}).catch(function(err) {{
+                    console.warn('[JellyEmu] Promise.resolve(getSaveFile) failed', err);
+                    _fallbackClose();
                 }});
-                return;
+            }} catch (ex) {{
+                console.warn('[JellyEmu] Auto-save sequence crashed, triggering fallback exit:', ex);
+                _fallbackClose();
             }}
-            // Capture before the fetch so rAF fires on the current frame
-            var saveFlush = fetch('{savePostUrl}', {{
-                method: 'POST',
-                headers: {{ 'Content-Type': 'application/octet-stream' }},
-                body: stateData
-            }}).then(function() {{
-                try {{ window.parent.postMessage({{ type: 'jellyemu-save-written', itemId: '{itemId}' }}, '*'); }} catch(_) {{}}
-            }}).catch(function() {{}});
-            _jePostCanvasScreenshot(saveFlush);
-            Promise.all([sessionStop, playtimeFlush, saveFlush]).finally(function() {{
-                // Notify parent of session end for Romm playtime reporting
-                try {{ window.parent.postMessage({{ type: 'jellyemu-session-end', itemId: '{itemId}', seconds: sessionSeconds }}, '*'); }} catch(_) {{}}
-                closeIframe();
-            }});
         }};
 
         // Hook EmulatorJS screenshot button to push to Romm via parent
@@ -2053,9 +2113,45 @@ namespace JellyEmu.Controllers
                 return NotFound();
             }
 
-            _logger.LogInformation("[JellyEmu] Serving save for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+            var fileInfo = new System.IO.FileInfo(path);
+            _logger.LogInformation("[JellyEmu] Pipeline STAGE 3 (Server Send): Serving save for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)", itemId, userId, slotNum, fileInfo.Length);
             var stream = System.IO.File.OpenRead(path);
             return File(stream, "application/octet-stream", $"{itemId}.state");
+        }
+
+        /// <summary>
+        /// Diagnostic endpoint to verify what bytes were actually written to disk for a save state.
+        /// Path: GET /jellyemu/debug-save/{itemId}/{userId}
+        /// </summary>
+        [HttpGet("/jellyemu/debug-save/{itemId}/{userId}")]
+        [Produces(MediaTypeNames.Application.Json)]
+        public IActionResult DebugSave(string itemId, string userId, [FromQuery] int? slot)
+        {
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSavePath(userId, itemId, slotNum);
+            
+            if (!System.IO.File.Exists(path))
+            {
+                return Ok(new { exists = false, message = "File does not exist on server." });
+            }
+
+            var fileInfo = new System.IO.FileInfo(path);
+            var headerBytes = new byte[Math.Min(16, fileInfo.Length)];
+            
+            using (var fs = System.IO.File.OpenRead(path))
+            {
+                fs.Read(headerBytes, 0, headerBytes.Length);
+            }
+
+            var hex = BitConverter.ToString(headerBytes).Replace("-", " ");
+            
+            return Ok(new {
+                exists = true,
+                path = path,
+                sizeBytes = fileInfo.Length,
+                first16BytesHex = hex,
+                isRetroArch = hex.StartsWith("52 41 53 54 41 54 45") // RASTATE
+            });
         }
 
         /// <summary>
@@ -2070,21 +2166,32 @@ namespace JellyEmu.Controllers
         /// Returns Example: `200 OK`
         /// </summary>
         [HttpPost("/jellyemu/save/{itemId}/{userId}")]
+        [DisableRequestSizeLimit]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            if (Request.ContentLength == 0 || Request.ContentLength == null)
+            if (Request.ContentLength == 0)
                 return BadRequest("Empty save body.");
 
             var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slotNum);
 
-            using var fs = System.IO.File.Create(path);
-            await Request.Body.CopyToAsync(fs);
+            using (var fs = System.IO.File.Create(path))
+            {
+                await Request.Body.CopyToAsync(fs);
+            }
 
-            _logger.LogInformation("[JellyEmu] Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                itemId, userId, slotNum, fs.Length);
+            var writtenFile = new System.IO.FileInfo(path);
+            if (writtenFile.Length < 50)
+            {
+                _logger.LogWarning("[JellyEmu] Save state for item {ItemId} user {UserId} slot {Slot} was suspiciously small ({Bytes} bytes). Deleting it.", itemId, userId, slotNum, writtenFile.Length);
+                System.IO.File.Delete(path);
+                return BadRequest("Save state was empty or corrupt.");
+            }
+
+            _logger.LogInformation("[JellyEmu] Pipeline STAGE 2 (Server Receive): Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                itemId, userId, slotNum, writtenFile.Length);
 
             return Ok();
         }

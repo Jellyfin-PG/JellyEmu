@@ -161,10 +161,13 @@ namespace JellyEmu.Services
                         setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 420); }, durationMs);
                     }
 
-                    function launchEmulator(itemId) {
+                    function launchEmulator(itemId, slot) {
                         console.log('[JellyEmu] Launching emulator for item:', itemId);
                         var userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
                         var playUrl = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
+                        if (slot) {
+                            playUrl += (playUrl.indexOf('?') !== -1 ? '&' : '?') + 'slot=' + slot;
+                        }
 
                         // Romm sync-on-launch: pull if Romm has a newer save
                         if (userId) {
@@ -1337,7 +1340,7 @@ namespace JellyEmu.Services
                                     </div>`;
 
                                 body.querySelector('.je-save-btn-play').addEventListener('click', () => {
-                                    launchEmulator(s.itemId);
+                                    launchEmulator(s.itemId, s.slot);
                                 });
 
                                 // Romm sync status + push/pull buttons
