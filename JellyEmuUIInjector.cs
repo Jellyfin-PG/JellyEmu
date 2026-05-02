@@ -204,6 +204,46 @@ namespace JellyEmu.Services
                             });
                     }
 
+                    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+                    async function deleteSave(itemId, slot) {
+                        try {
+                            const userId = ApiClient.getCurrentUserId();
+                            const token = ApiClient.accessToken();
+
+                            const url = `/jellyemu/save/${itemId}/${userId}?slot=${slot}`;
+
+                            const response = await fetch(url, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `MediaBrowser Token="${token}"`, 
+                                    'Accept': 'application/json'
+                                }
+                            });
+
+                            if (response.status === 204) {
+                                console.log(`[JellyEmu] Successfully deleted save slot ${slot} for item ${itemId}.`);
+                                return true;
+                            } 
+                            else if (response.status === 404) {
+                                console.warn(`[JellyEmu] Save slot ${slot} not found.`);
+                                return false;
+                            } 
+                            else if (response.status === 403) {
+                                console.error(`[JellyEmu] Forbidden: You do not have permission to delete this save.`);
+                                return false;
+                            } 
+                            else {
+                                console.error(`[JellyEmu] Unexpected error. Server returned status: ${response.status}`);
+                                return false;
+                            }
+
+                        } catch (error) {
+                            console.error(`[JellyEmu] Network error while trying to delete save:`, error);
+                            return false;
+                        }
+                    }
+
                     function dismissActionSheet(sheetRoot) {
                         var dialog = sheetRoot.closest('.dialog') || sheetRoot.closest('[data-history]') || sheetRoot.parentElement;
                         if (dialog) dialog.remove();
@@ -1151,6 +1191,14 @@ namespace JellyEmu.Services
                                     color: #fff;
                                 }
                                 .je-save-btn-play:hover { background: rgba(0,164,220,1); }
+                                .je-save-btn-delete {
+                                    background: rgba(220, 53, 69, 0.85);
+                                    color: #fff;
+                                }
+
+                                .je-save-btn-delete:hover { 
+                                    background: rgba(220, 53, 69, 1); 
+                                }
                                 .je-save-btn-dl {
                                     background: rgba(255,255,255,0.08);
                                     color: rgba(255,255,255,0.75);
@@ -1328,6 +1376,9 @@ namespace JellyEmu.Services
                                         <button class="je-save-btn je-save-btn-play">
                                             <span class="material-icons">sports_esports</span>Play
                                         </button>
+                                        <button class="je-save-btn je-save-btn-delete">
+                                            <span class="material-icons">delete</span>
+                                        </button>
                                         <a class="je-save-btn je-save-btn-dl" href="${s.downloadUrl}" download="${s.gameName.replace(/[^a-zA-Z0-9 _-]/g,'_')}_slot${s.slot}.state">
                                             <span class="material-icons">download</span>
                                         </a>
@@ -1341,6 +1392,14 @@ namespace JellyEmu.Services
 
                                 body.querySelector('.je-save-btn-play').addEventListener('click', () => {
                                     launchEmulator(s.itemId, s.slot);
+                                });
+
+                                body.querySelector('.je-save-btn-delete').addEventListener('click', async () => {
+                                    if (confirm(`Are you sure you want to delete save slot ${s.slot}?`)) {
+                                        deleteSave(s.itemId, s.slot);
+                                        await delay(100);
+                                        reloadGrid();
+                                    }
                                 });
 
                                 // Romm sync status + push/pull buttons
@@ -1401,7 +1460,8 @@ namespace JellyEmu.Services
                             renderGrid(filtered);
                         }
 
-                        fetch('/jellyemu/saves/' + userId)
+                        function reloadGrid() {
+                            fetch('/jellyemu/saves/' + userId)
                             .then(r => r.ok ? r.json() : [])
                             .then(saves => {
                                 allSaves = saves;
@@ -1424,6 +1484,9 @@ namespace JellyEmu.Services
                                 activePage.querySelector('#je-saves-grid').innerHTML =
                                     '<div class="je-saves-empty"><span class="material-icons">error_outline</span>Failed to load save states.</div>';
                             });
+                        }
+
+                        reloadGrid();
                     }
 
                 })();

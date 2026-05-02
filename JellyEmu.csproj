@@ -5,16 +5,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Plugin Metadata -->
+    <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
     <RootNamespace>JellyEmu</RootNamespace>
-    <Version>0.3.0.0</Version>
-    <AssemblyVersion>0.3.0.0</AssemblyVersion>
-    <FileVersion>0.3.0.0</FileVersion>
+    <Version>0.4.0.0</Version>
+    <AssemblyVersion>0.4.0.0</AssemblyVersion>
+    <FileVersion>0.4.0.0</FileVersion>
     <Authors>Jellyfin-PG</Authors>
     <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Description>JellyEmu — A retro ROM scanner and EmulatorJS wrapper for Jellyfin.</Description>
+    <!-- Plugin Metadata End -->
   </PropertyGroup>
 
   <ItemGroup>

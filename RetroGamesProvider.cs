@@ -15,11 +15,8 @@ namespace JellyEmu
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
-            // Regular file path
             var ext = Path.GetExtension(path);
             if (!string.IsNullOrEmpty(ext)) return PlatformResolver.AllRomExtensions.Contains(ext);
-            // Directory path — valid only if it contains exactly one .cue that references
-            // at least one existing .bin (i.e. it's a CUE+BIN game folder, not a platform folder).
             if (Directory.Exists(path))
             {
                 try
@@ -389,7 +386,6 @@ namespace JellyEmu
                             }
 
                         // IGDB total_rating is 0–100 (weighted avg of critic + user scores)
-                        // Jellyfin CommunityRating is 0–10, so divide by 10
                         if (root.TryGetProperty("total_rating", out var totalRating) &&
                             totalRating.ValueKind == JsonValueKind.Number &&
                             root.TryGetProperty("total_rating_count", out var ratingCount) &&
@@ -824,8 +820,6 @@ namespace JellyEmu
         protected static string Username => Plugin.Instance?.Configuration.RommUsername ?? string.Empty;
         protected static string Password => Plugin.Instance?.Configuration.RommPassword ?? string.Empty;
 
-        // Simple in-process token cache — keyed by InstanceUrl+Username so it auto-invalidates on credential changes.
-
         protected BaseRommProvider(IHttpClientFactory httpClientFactory, ILogger logger)
         {
             HttpClientFactory = httpClientFactory;
@@ -863,7 +857,6 @@ namespace JellyEmu
                 {
                     var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                     using var doc = JsonDocument.Parse(json);
-                    // Romm returns { "items": [...], "total": N }
                     if (doc.RootElement.TryGetProperty("items", out var items) && items.GetArrayLength() > 0)
                         return items[0].Clone();
                 }
@@ -944,7 +937,6 @@ namespace JellyEmu
             if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
             if (string.IsNullOrEmpty(InstanceUrl)) return result;
 
-            // Try to get cached ROM id first, otherwise search
             info.ProviderIds.TryGetValue("Romm", out var romId);
             JsonElement? rom = null;
 
@@ -988,7 +980,6 @@ namespace JellyEmu
                     Tags = tags.ToArray()
                 };
 
-                // Release year from first_release_date (unix timestamp) or year_released (int)
                 if (rom.Value.TryGetProperty("first_release_date", out var frdEl) && frdEl.ValueKind == JsonValueKind.Number)
                 {
                     var releaseDate = DateTimeOffset.FromUnixTimeSeconds(frdEl.GetInt64()).UtcDateTime;
@@ -1009,7 +1000,6 @@ namespace JellyEmu
                         if (!string.IsNullOrWhiteSpace(gName)) item.AddGenre(gName);
                     }
 
-                // Platforms / studios from the rom's platform name
                 if (rom.Value.TryGetProperty("platform_name", out var platformEl))
                 {
                     var pName = platformEl.GetString();
@@ -1019,8 +1009,6 @@ namespace JellyEmu
                 if (!string.IsNullOrEmpty(resolvedId))
                     item.SetProviderId("Romm", resolvedId);
 
-                // RoMM proxies IGDB metadata — pull rating from igdb_metadata.total_rating if available
-                // igdb_metadata.total_rating is 0–100; Jellyfin CommunityRating is 0–10
                 if (rom.Value.TryGetProperty("igdb_metadata", out var igdbMeta) &&
                     igdbMeta.ValueKind == JsonValueKind.Object)
                 {
@@ -1086,20 +1074,17 @@ namespace JellyEmu
 
             try
             {
-                // cover_url is the primary artwork Romm exposes
                 if (rom.Value.TryGetProperty("url_cover", out var coverEl) && coverEl.ValueKind != JsonValueKind.Null)
                 {
                     var coverUrl = coverEl.GetString();
                     if (!string.IsNullOrWhiteSpace(coverUrl))
                     {
-                        // Romm may return a relative path
                         if (!Uri.IsWellFormedUriString(coverUrl, UriKind.Absolute))
                             coverUrl = $"{InstanceUrl}{(coverUrl.StartsWith("/") ? "" : "/")}{coverUrl}";
                         list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = coverUrl });
                     }
                 }
 
-                // screenshots as backdrop images
                 if (rom.Value.TryGetProperty("url_screenshots", out var screenshotsEl) && screenshotsEl.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var shot in screenshotsEl.EnumerateArray())

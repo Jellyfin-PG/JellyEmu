@@ -5,10 +5,11 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Collections;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace JellyEmu.Controllers
 {
@@ -2120,38 +2121,55 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Diagnostic endpoint to verify what bytes were actually written to disk for a save state.
-        /// Path: GET /jellyemu/debug-save/{itemId}/{userId}
+        /// Deletes the save state for a given user and item.
+        /// 
+        /// Path: DELETE /jellyemu/save/{itemId}/{userId}
+        /// Parameters:
+        ///   - itemId (string, path): The game ID.
+        ///   - userId (string, path): The user ID.
+        ///   - slot (int, query, optional): Specific slot to delete.
+        /// Returns Example: `204 No Content` (if deleted) or `404 Not Found` (if it didn't exist)
         /// </summary>
-        [HttpGet("/jellyemu/debug-save/{itemId}/{userId}")]
-        [Produces(MediaTypeNames.Application.Json)]
-        public IActionResult DebugSave(string itemId, string userId, [FromQuery] int? slot)
+        [HttpDelete("/jellyemu/save/{itemId}/{userId}")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public IActionResult DeleteSave(string itemId, string userId, [FromQuery] int? slot)
         {
+            var authenticatedUserId = User.FindFirstValue("Jellyfin-UserId") 
+                                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            bool isValidAuthGuid = Guid.TryParse(authenticatedUserId, out Guid authUserGuid);
+            bool isValidTargetGuid = Guid.TryParse(userId, out Guid targetUserGuid);
+
+            if (string.IsNullOrEmpty(authenticatedUserId) || !isValidAuthGuid || !isValidTargetGuid || authUserGuid != targetUserGuid)
+            {
+                _logger.LogWarning("[JellyEmu] Unauthorized delete attempt.");
+                return Forbid(); 
+            }
+
             var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slotNum);
-            
+
             if (!System.IO.File.Exists(path))
             {
-                return Ok(new { exists = false, message = "File does not exist on server." });
+                _logger.LogInformation("[JellyEmu] Cannot delete: No save found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return NotFound();
             }
 
-            var fileInfo = new System.IO.FileInfo(path);
-            var headerBytes = new byte[Math.Min(16, fileInfo.Length)];
-            
-            using (var fs = System.IO.File.OpenRead(path))
+            try
             {
-                fs.Read(headerBytes, 0, headerBytes.Length);
+                System.IO.File.Delete(path);
+                _logger.LogInformation("[JellyEmu] Successfully deleted save for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return NoContent();
             }
-
-            var hex = BitConverter.ToString(headerBytes).Replace("-", " ");
-            
-            return Ok(new {
-                exists = true,
-                path = path,
-                sizeBytes = fileInfo.Length,
-                first16BytesHex = hex,
-                isRetroArch = hex.StartsWith("52 41 53 54 41 54 45") // RASTATE
-            });
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "[JellyEmu] Failed to delete save file for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         /// <summary>
