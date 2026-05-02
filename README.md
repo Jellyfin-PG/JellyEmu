@@ -191,6 +191,7 @@ The plugin determines a ROM's platform using a strict 3-step priority list. If s
 | **Sega Master System** | `sms`, `master system`, `sega master system` |
 | **Sega Genesis / Mega Drive** | `genesis`, `sega genesis`, `mega drive`, `sega mega drive`, `md` |
 | **Sega Game Gear** | `gg`, `game gear`, `sega game gear` |
+| **Sega Saturn** | `ss`, `sega saturn` |
 | **Sega CD** | `sega cd`, `segacd`, `mega cd`, `sega-cd` |
 | **Sega 32X** | `32x`, `sega 32x` |
 | **PlayStation 1** | `psx`, `ps1`, `playstation`, `playstation 1`, `ps one` |
