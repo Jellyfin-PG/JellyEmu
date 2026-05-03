@@ -31,6 +31,7 @@ namespace JellyEmu.Controllers
                 { "SNES",             "snes"        },
                 { "N64",              "n64"         },
                 { "Game Boy",         "gb"          },  // gambatte handles both GB and GBC
+                { "Game Boy Color",   "gba"         },
                 { "Game Boy Advance", "gba"         },
                 { "Nintendo DS",      "nds"         },
                 { "Virtual Boy",      "vb"          },
@@ -279,7 +280,8 @@ namespace JellyEmu.Controllers
             }
 
             var core = ResolveCore(item);
-            var romUrl = $"/jellyemu/rom/{itemId}";
+            var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".zip";
+            var romUrl = $"/jellyemu/rom/{itemId}/{itemId}{ext}";
 
             var hasSaves = !string.IsNullOrEmpty(userId);
             var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
@@ -330,6 +332,15 @@ namespace JellyEmu.Controllers
         #game {{ width: 100%; height: 100%; }}
 
         /* ── Hide native EJS UI (specific selectors only — preserve ejs_parent for keyboard focus) ── */
+        /* Keep the elements in the DOM but hide them from view */
+        .ejs_menu_bar, 
+        .ejs_parent > div:not(.ejs_canvas_parent),
+        #je-loader + .ejs_parent .ejs_menu_bar {{
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }}
         .ejs_bottom_bar_area, .ejs_loading_text, .ejs_start_button,
         .ejs_settings_parent, .ejs_cheat_parent, .ejs_menu_bar_area,
         .ejs_control_bar, .ejs_menu_bar, .ejs_menu_button, .ejs_bar_top {{ display: none !important; }}
@@ -623,7 +634,7 @@ namespace JellyEmu.Controllers
     <script>
         (function() {{
             // Core name map for loading screen badge
-            var coreNames = {{nes:'NES',snes:'SNES',n64:'N64',gb:'Game Boy',gba:'Game Boy Advance',nds:'Nintendo DS',
+            var coreNames = {{nes:'NES',snes:'SNES',n64:'N64',gba:'Game Boy',gbc:'Game Boy Color',gba:'Game Boy Advance',nds:'Nintendo DS',
                 vb:'Virtual Boy',segaMD:'Sega Genesis',segaGG:'Game Gear',segaMS:'Master System',segaCD:'Sega CD',
                 sega32x:'Sega 32X',psx:'PlayStation',psp:'PSP',a2600:'Atari 2600',a7800:'Atari 7800',lynx:'Atari Lynx',
                 pce:'TurboGrafx-16',coleco:'ColecoVision',ngp:'Neo Geo Pocket',arcade:'Arcade',dos:'DOS',
@@ -646,6 +657,10 @@ namespace JellyEmu.Controllers
             }}
             // Fallback: auto-dismiss after 30s
             setTimeout(dismissLoader, 30000);
+
+            window.EJS_onLoad = function() {{
+                dismissLoader();
+            }};
 
             // Hook into EJS start event
             window.EJS_onGameStart = function() {{
@@ -1362,6 +1377,34 @@ namespace JellyEmu.Controllers
             }});
         }})();
     </script>
+    {/*<script>
+        (function() {{
+            var statusEl = document.getElementById('je-loader-status');
+            if (statusEl) statusEl.textContent = 'Downloading ROM...';
+
+            // Standard GET request, completely bypassing HEAD
+            fetch('{romUrl}')
+                .then(function(response) {{
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.blob();
+                }})
+                .then(function(blob) {{
+                    if (statusEl) statusEl.textContent = 'Initializing Emulator...';
+                    
+                    // Extract the filename from your URL so EJS knows if it's a .zip, .gbc, etc.
+                    var fileName = ""{romUrl}"".split('/').pop() || ""rom.zip"";
+                    if (fileName.indexOf('?') > -1) fileName = fileName.split('?')[0];
+                    
+                    // Create the native File object in memory
+                    console.log(decodeURIComponent(fileName));
+                    window.EJS_gameUrl = new File([blob], decodeURIComponent(fileName));
+                }})
+                .catch(function(err) {{
+                    console.error('[JellyEmu] Direct Fetch Failed:', err);
+                    if (statusEl) statusEl.textContent = 'ROM Download Failed';
+                }});
+        }})();
+    </script>*/""}
     <script>
         window.EJS_player        = '#game';
         window.EJS_core          = '{core}';
@@ -1371,6 +1414,11 @@ namespace JellyEmu.Controllers
         window.EJS_startOnLoaded = true;
         window.EJS_askBeforeExit = true;
         window.EJS_color         = '#00a4dc';
+
+        window.EJS_DEBUG_XX = window.debug;
+        if (window.language !== ""auto"") {{
+            window.EJS_language = window.language;
+        }}
         
         // Inject default options for save states, shader and video rotation
         window.EJS_defaultOptions = {{
@@ -1674,7 +1722,6 @@ namespace JellyEmu.Controllers
         {
             var cacheDir = Path.Combine(_appPaths.DataPath, "jellyemu-cheats", "index");
             Directory.CreateDirectory(cacheDir);
-            // Safe filename from folder name
             var safeName = string.Concat(dbFolder.Select(c => char.IsLetterOrDigit(c) ? c : '_'));
             var cacheFile = Path.Combine(cacheDir, safeName + ".json");
 
@@ -1791,7 +1838,6 @@ namespace JellyEmu.Controllers
 
             try
             {
-                // Step 1: get the directory listing for this system (cached 30 days)
                 var candidates = await GetSystemCheatListAsync(dbFolder, httpClientFactory);
                 if (candidates == null || candidates.Count == 0)
                 {
@@ -1799,7 +1845,6 @@ namespace JellyEmu.Controllers
                     return null;
                 }
 
-                // Step 2: fuzzy-match the ROM name against the listing
                 var matched = FuzzyMatchCht(romName, candidates);
                 if (matched == null)
                 {
@@ -1810,7 +1855,6 @@ namespace JellyEmu.Controllers
 
                 _logger.LogInformation("[JellyEmu] Matched '{Rom}' → '{Matched}'", romName, matched);
 
-                // Step 3: fetch the matched .cht file
                 var encodedFolder = Uri.EscapeDataString(dbFolder);
                 var encodedFile = Uri.EscapeDataString(matched);
                 var url = $"https://raw.githubusercontent.com/libretro/libretro-database/master/cht/{encodedFolder}/{encodedFile}";
@@ -1967,20 +2011,11 @@ namespace JellyEmu.Controllers
             return new JsonResult(result);
         }
 
-        /// <summary>
-        /// Streams the raw ROM file for the given item directly from disk.
-        /// No authentication required. HEAD is supported so EmulatorJS can read Content-Length before downloading.
-        /// 
-        /// Path: GET /jellyemu/rom/{itemId} (or HEAD)
-        /// Parameters:
-        ///   - itemId (string, path): The unique ID of the ROM file item.
-        /// Returns Example: Binary File Stream (e.g., application/zip)
-        /// </summary>
-        [HttpGet("/jellyemu/rom/{itemId}")]
-        [HttpHead("/jellyemu/rom/{itemId}")]
+        [HttpGet("/jellyemu/rom/{itemId}/{filename?}")]
+        [HttpHead("/jellyemu/rom/{itemId}/{filename?}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Rom(string itemId)
+        public IActionResult Rom(string itemId, string? filename = null)
         {
             var item = _libraryManager.GetItemById(itemId);
             if (item == null || string.IsNullOrEmpty(item.Path) || !System.IO.File.Exists(item.Path))
@@ -1989,65 +2024,12 @@ namespace JellyEmu.Controllers
                 return NotFound();
             }
 
-            // For .cue files, EmulatorJS needs the actual binary track data.
-            // Parse the .cue sheet and serve the first FILE entry's .bin instead.
-            var servePath = item.Path;
-            if (string.Equals(Path.GetExtension(item.Path), ".cue", StringComparison.OrdinalIgnoreCase))
-            {
-                var binPath = CueParser.GetFirstBinPath(item.Path);
-                if (binPath != null)
-                {
-                    _logger.LogInformation("[JellyEmu] CUE sheet resolved to BIN: {Path}", binPath);
-                    servePath = binPath;
-                }
-                else
-                {
-                    _logger.LogWarning("[JellyEmu] CUE sheet has no resolvable BIN track: {Path}", item.Path);
-                }
-            }
+            _logger.LogInformation("[JellyEmu] Serving ROM: {Path}", item.Path);
 
-            _logger.LogInformation("[JellyEmu] Serving ROM: {Path}", servePath);
-
-            var ext = Path.GetExtension(servePath).TrimStart('.').ToLowerInvariant();
-            var mimeType = ext switch
-            {
-                "zip" => "application/zip",
-                "7z" => "application/x-7z-compressed",
-                "iso" => "application/x-iso9660-image",
-                "cso" => "application/x-compressed",
-                _ => "application/octet-stream"
-            };
-
-            var fileInfo = new System.IO.FileInfo(servePath);
-            var lastModified = fileInfo.LastWriteTimeUtc;
-            // ETag: size + last-modified ticks — unique per file version, no hashing required
-            var etag = $"\"{fileInfo.Length}-{lastModified.Ticks}\"";
-
-            Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
-            Response.Headers["Content-Length"] = fileInfo.Length.ToString();
-            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Path.GetFileName(servePath)}\"";
-            Response.Headers["ETag"] = etag;
-            Response.Headers["Last-Modified"] = lastModified.ToString("R"); // RFC1123
-            // ROMs are immutable in practice — allow EJS to cache for 7 days before re-validating
-            Response.Headers["Cache-Control"] = "public, max-age=604800, must-revalidate";
-
-            // Conditional GET/HEAD — return 304 if EJS already has a fresh cached copy
-            var ifNoneMatch = Request.Headers["If-None-Match"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(ifNoneMatch) && ifNoneMatch == etag)
-                return StatusCode(304);
-
-            if (DateTimeOffset.TryParseExact(
-                    Request.Headers["If-Modified-Since"].FirstOrDefault() ?? "",
-                    "R", System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out var ifModifiedSince)
-                && lastModified <= ifModifiedSince.UtcDateTime)
-                return StatusCode(304);
-
-            if (HttpMethods.IsHead(Request.Method))
-                return new FileContentResult(Array.Empty<byte>(), mimeType);
-
-            var stream = System.IO.File.OpenRead(servePath);
-            return File(stream, mimeType, enableRangeProcessing: true);
+            var stream = System.IO.File.OpenRead(item.Path);
+            var fileName = Path.GetFileName(item.Path);
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+            return File(stream, "application/octet-stream", enableRangeProcessing: true);
         }
 
         /// <summary>
@@ -2556,55 +2538,6 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Serves a Cross-Origin Isolation service worker that adds COOP/COEP headers.
-        /// Required for threaded cores (DOS, PSP).
-        /// 
-        /// Path: GET /jellyemu/coi-sw.js
-        /// Returns Example: Raw JavaScript document.
-        /// </summary>
-        [HttpGet("/jellyemu/coi-sw.js")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public IActionResult CoiServiceWorker()
-        {
-            const string js = """
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-
-function addHeaders(headers) {
-    const newHeaders = new Headers(headers);
-    newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
-    newHeaders.set('Cross-Origin-Embedder-Policy', 'credentialless');
-    newHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    return newHeaders;
-}
-
-self.addEventListener('fetch', function(e) {
-    // Only handle http/https requests
-    if (!e.request.url.startsWith('http')) return;
-
-    e.respondWith(
-        fetch(e.request)
-            .then(function(res) {
-                // Don't modify opaque responses
-                if (res.type === 'opaque' || res.type === 'opaqueredirect') return res;
-                return new Response(res.body, {
-                    status: res.status,
-                    statusText: res.statusText,
-                    headers: addHeaders(res.headers)
-                });
-            })
-            .catch(function() {
-                return fetch(e.request);
-            })
-    );
-});
-""";
-            Response.Headers["Service-Worker-Allowed"] = "/";
-            Response.Headers["Cache-Control"] = "no-cache";
-            return Content(js, "application/javascript");
-        }
-
-        /// <summary>
         /// Proxies the EJS assets. Uses local cache if available, otherwise proxies to CDN.
         /// 
         /// Path: GET /jellyemu/ejs/{*path}
@@ -2627,16 +2560,26 @@ self.addEventListener('fetch', function(e) {
 
             var contentType = path switch
             {
+                var p when p.EndsWith(".mjs", StringComparison.OrdinalIgnoreCase) => "application/javascript",
+                var p when p.EndsWith(".cjs", StringComparison.OrdinalIgnoreCase) => "application/javascript",
+                var p when p.EndsWith(".jsx", StringComparison.OrdinalIgnoreCase) => "text/javascript",
                 var p when p.EndsWith(".js", StringComparison.OrdinalIgnoreCase) => "application/javascript",
                 var p when p.EndsWith(".wasm", StringComparison.OrdinalIgnoreCase) => "application/wasm",
                 var p when p.EndsWith(".css", StringComparison.OrdinalIgnoreCase) => "text/css",
                 var p when p.EndsWith(".json", StringComparison.OrdinalIgnoreCase) => "application/json",
                 var p when p.EndsWith(".png", StringComparison.OrdinalIgnoreCase) => "image/png",
                 var p when p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) => "image/svg+xml",
+                var p when p.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) => "text/plain",
+                var p when p.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) => "text/csv",
+                var p when p.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) => "application/xml",
+                var p when p.EndsWith(".dat", StringComparison.OrdinalIgnoreCase) => "application/octet-stream",
+                var p when p.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) => "application/octet-stream",
+                var p when p.EndsWith(".data", StringComparison.OrdinalIgnoreCase) => "application/octet-stream",
+                var p when p.EndsWith(".mem", StringComparison.OrdinalIgnoreCase) => "application/octet-stream",
                 _ => "application/octet-stream"
             };
 
-            Response.Headers["Cache-Control"] = "public, max-age=86400";
+            //Response.Headers["Cache-Control"] = "public, max-age=86400";
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
             // Local cache
@@ -3473,7 +3416,7 @@ self.addEventListener('fetch', function(e) {
                     // N64
                     { "z64",  "n64"        }, { "n64",  "n64"        }, { "v64", "n64"        },
                     // Game Boy / GBC — gambatte handles both
-                    { "gb",   "gb"         }, { "gbc",  "gb"         },
+                    { "gb",   "gb"         }, { "gbc",  "gbc"         },
                     // GBA
                     { "gba",  "gba"        },
                     // NDS

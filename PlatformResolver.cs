@@ -143,7 +143,7 @@ namespace JellyEmu
                 { "n64", "N64" }, { "nintendo 64", "N64" },
                 // Game Boy / GBC — same core
                 { "gb", "Game Boy" }, { "game boy", "Game Boy" }, { "gameboy", "Game Boy" },
-                { "gbc", "Game Boy" }, { "game boy color", "Game Boy" }, { "gameboy color", "Game Boy" },
+                { "gbc", "Game Boy Color" }, { "game boy color", "Game Boy Color" }, { "gameboy color", "Game Boy Color" },
                 // GBA
                 { "gba", "Game Boy Advance" }, { "game boy advance", "Game Boy Advance" },
                 { "gameboy advance", "Game Boy Advance" },
@@ -230,7 +230,7 @@ namespace JellyEmu
                 // N64
                 { ".z64", "N64" }, { ".n64", "N64" }, { ".v64", "N64" },
                 // Game Boy / GBC
-                { ".gb",  "Game Boy" }, { ".gbc", "Game Boy" },
+                { ".gb",  "Game Boy" }, { ".gbc", "Game Boy Color" },
                 // GBA
                 { ".gba", "Game Boy Advance" },
                 // NDS
@@ -492,7 +492,7 @@ namespace JellyEmu
                 // PSP compressed ISO — unambiguous PSP format
                 ".cso",
                 // DOS / Arcade / multi-file platforms — zip is the delivery format
-                ".zip",
+                ".zip", ".7z",
                 // Commodore 64 disk/tape/cart formats
                 ".d64", ".t64", ".crt", ".tap", ".prg",
                 // Amiga floppy formats
