@@ -291,6 +291,11 @@ namespace JellyEmu.Controllers
         <div class=""je-dock-sep""></div>
         <button class=""je-dockbtn"" id=""je-btn-screenshot"" title=""Screenshot""><svg viewBox=""0 0 24 24""><path d=""M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-settings"" title=""Settings""><svg viewBox=""0 0 24 24""><path d=""M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z""/></svg></button>
+        <div class=""je-dock-sep""></div>
+        <button class=""je-dockbtn"" id=""je-btn-fullscreen"" title=""Fullscreen"">
+            <svg id=""je-fs-enter"" viewBox=""0 0 24 24""><path d=""M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z""/></svg>
+            <svg id=""je-fs-exit"" viewBox=""0 0 24 24"" style=""display:none""><path d=""M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z""/></svg>
+        </button>
     </div>
 
     <!-- Dock Minimize FAB -->
@@ -313,7 +318,7 @@ namespace JellyEmu.Controllers
             <div class=""je-popup-body"">
                 <div class=""je-vol-wrap"">
                     <div id=""je-vol-pct"" class=""je-vol-pct"">50%</div>
-                    <input type=""range"" min=""0"" max=""1"" step=""0.01"" value=""0.5"" class=""je-vol-slider"" id=""je-vol-slider"">
+                    <input type=""range"" min=""0"" max=""1"" step=""0.01"" value=""1.0"" class=""je-vol-slider"" id=""je-vol-slider"">
                     <button class=""je-btn"" id=""je-vol-mute"">Mute</button>
                 </div>
             </div>
@@ -599,6 +604,11 @@ namespace JellyEmu.Controllers
                 if (window.EJS_onExit) {{ EJS_onExit(); }}
                 else if (window.opener) {{ window.close(); }}
                 else {{ window.parent.postMessage('close-jellyemu','*'); }}
+            }});
+
+            // Fullscreen
+            document.getElementById('je-btn-fullscreen').addEventListener('click', function() {{
+                document.body.requestFullscreen();
             }});
 
             // Pause / Play
