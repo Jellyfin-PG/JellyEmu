@@ -35,6 +35,7 @@ namespace JellyEmu
                     if (cueFiles.Length == 1 && CueParser.HasResolvedBin(cueFiles[0]))
                     {
                         var cuePath     = cueFiles[0];
+                        var binPath     = CueParser.GetFirstBinPath(cueFiles[0]);
                         var consoleTag  = _platformResolver.Resolve(cuePath);
                         var regionTag   = PlatformResolver.ResolveRegion(cuePath);
                         // Use the folder name as the display name — it's usually cleaner
@@ -54,7 +55,7 @@ namespace JellyEmu
                         return new Book
                         {
                             Name            = RomExtensions.CleanName(displayName),
-                            Path            = cuePath,   // metadata + playback both use the .cue
+                            Path            = binPath,   // metadata + playback both use the .cue
                             IsInMixedFolder = false,
                             SeriesName      = seriesName,
                             Tags            = tags.ToArray()
