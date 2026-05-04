@@ -249,6 +249,7 @@ You can force JellyEmu to link the ROM to a specific database entry by adding a 
 
 * **For IGDB:** Use `[igdb-ID]` 
 * **For RAWG:** Use `[rawg-SLUG]`
+* **For Lexaloffle:** Use `[loid-ID]`
 
 **Examples:**
 * `Doom [igdb-1039].iso` ➔ Forces the IGDB entry for the 1993 original, rather than the 2016 reboot.
