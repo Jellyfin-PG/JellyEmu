@@ -22,6 +22,8 @@ namespace JellyEmu.Controllers
         protected readonly JellyEmuSessionService SessionService;
         protected readonly IHttpClientFactory HttpClientFactory;
 
+        protected record CoreInfo(string Core, bool NeedsThreads, string Launcher);
+
         protected JellyEmuBaseController(
             ILibraryManager libraryManager,
             IApplicationPaths appPaths,
@@ -97,6 +99,7 @@ namespace JellyEmu.Controllers
                 { "Arcade",           "arcade"      },
                 { "MAME 2003",        "mame2003"    },
                 { "DOS",              "dos"         },
+                { "PICO-8",           "pico8"       },
             };
 
         /// <summary>
@@ -290,6 +293,9 @@ namespace JellyEmu.Controllers
 
             if (!string.IsNullOrEmpty(item.Path))
             {
+                if (item.Path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
+                    return "pico8";
+
                 var ext = Path.GetExtension(item.Path).TrimStart('.').ToLowerInvariant();
                 var extMap = new Dictionary<string, string>
                 {
@@ -334,13 +340,26 @@ namespace JellyEmu.Controllers
                     { "tap", "c64" }, { "prg", "c64" },
                     // Amiga
                     { "adf", "amiga" }, { "dms", "amiga" }, { "ipf", "amiga" }, { "adz", "amiga" },
-                    // .zip intentionally omitted — needs a tag to disambiguate
+                    // PICO-8
+                    { "p8", "pico8" },
                 };
                 if (extMap.TryGetValue(ext, out var extCore))
                     return extCore;
             }
 
-            return "nes"; // last-resort fallback
+            return "nes";
+        }
+
+        protected static CoreInfo ResolveCoreInfo(MediaBrowser.Controller.Entities.BaseItem item)
+        {
+            var core = ResolveCore(item);
+            return core switch
+            {
+                "pico8" => new CoreInfo(core, false, "pico8"),
+                "dos"   => new CoreInfo(core, true,  "ejs"),
+                "psp"   => new CoreInfo(core, true,  "ejs"),
+                _       => new CoreInfo(core, false, "ejs"),
+            };
         }
 
         protected static string RommInstanceUrl =>

@@ -125,6 +125,8 @@ namespace JellyEmu
                 { "c64", "Commodore 64" }, { "commodore 64", "Commodore 64" },
                 // PC-FX
                 { "pc-fx", "PC-FX" }, { "pcfx", "PC-FX" }, { "nec pc-fx", "PC-FX" },
+                // Pico 8
+                { "pico-8", "PICO-8" }, { "pico8", "PICO-8" }, { "pico 8", "PICO-8" }, { "pico", "PICO-8" },
             };
 
         private static readonly Dictionary<string, string> UnambiguousExtensions =
@@ -139,7 +141,7 @@ namespace JellyEmu
                 { ".32x", "Sega 32X" }, { ".a26", "Atari 2600" }, { ".a78", "Atari 7800" }, { ".lnx", "Atari Lynx" },
                 { ".jag", "Atari Jaguar" }, { ".j64", "Atari Jaguar" }, { ".ws",  "WonderSwan" }, { ".wsc", "WonderSwan" },
                 { ".pce", "TurboGrafx-16" }, { ".col", "ColecoVision" }, { ".cv", "ColecoVision" },
-                { ".ngp", "NeoGeo Pocket" }, { ".ngc", "NeoGeo Pocket" }, { ".cso", "PSP" },
+                { ".ngp", "NeoGeo Pocket" }, { ".ngc", "NeoGeo Pocket" }, { ".cso", "PSP" }, { ".p8", "PICO-8" },
             };
 
         public static readonly Dictionary<string, string> LibraryOnlyAliases =
@@ -267,21 +269,51 @@ namespace JellyEmu
         {
             if (string.IsNullOrEmpty(dirPath)) return null;
             var dir = new DirectoryInfo(dirPath);
-            // Search up to 3 levels deep (e.g. Games / Nintendo / Game Boy Color / Game.gbc)
+
             for (int depth = 0; depth < 3 && dir != null; depth++, dir = dir.Parent)
             {
                 var folderName = dir.Name;
-                
-                // 1. Direct Alias Check (Case-insensitive via Dictionary)
+
                 if (Aliases.TryGetValue(folderName, out var tag)) return tag;
                 if (LibraryOnlyAliases.TryGetValue(folderName, out var libTag)) return libTag;
 
-                // 2. Keyword/Pronunciation Check
-                // This checks if the platform name exists anywhere in the folder name (e.g. "Roms - Super Nintendo")
-                foreach (var aliasKvp in Aliases)
+                var folderCollapsed = Regex.Replace(folderName, @"\s+", "", RegexOptions.None);
+
+                static string CollapseSpaces(string s) => Regex.Replace(s, @"\s+", "");
+
+                bool KeywordMatch(string folder, string folderCol, string aliasKey)
                 {
-                    if (aliasKvp.Key.Length > 2 && Regex.IsMatch(folderName, $@"\b{Regex.Escape(aliasKvp.Key)}\b", RegexOptions.IgnoreCase))
-                        return aliasKvp.Value;
+                    var idx = folder.IndexOf(aliasKey, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        var before = idx > 0 ? folder[idx - 1] : ' ';
+                        var after  = idx + aliasKey.Length < folder.Length ? folder[idx + aliasKey.Length] : ' ';
+                        if (!char.IsLetterOrDigit(before) && !char.IsLetterOrDigit(after)) return true;
+                    }
+
+                    var aliasCol = CollapseSpaces(aliasKey);
+                    if (aliasCol.Length <= 2) return false;
+                    var idxCol = folderCol.IndexOf(aliasCol, StringComparison.OrdinalIgnoreCase);
+                    if (idxCol >= 0)
+                    {
+                        var before = idxCol > 0 ? folderCol[idxCol - 1] : ' ';
+                        var after  = idxCol + aliasCol.Length < folderCol.Length ? folderCol[idxCol + aliasCol.Length] : ' ';
+                        if (!char.IsLetterOrDigit(before) && !char.IsLetterOrDigit(after)) return true;
+                    }
+
+                    return false;
+                }
+
+                foreach (var kvp in Aliases.OrderByDescending(k => k.Key.Length))
+                {
+                    if (kvp.Key.Length <= 2) continue;
+                    if (KeywordMatch(folderName, folderCollapsed, kvp.Key)) return kvp.Value;
+                }
+
+                foreach (var kvp in LibraryOnlyAliases.OrderByDescending(k => k.Key.Length))
+                {
+                    if (kvp.Key.Length <= 2) continue;
+                    if (KeywordMatch(folderName, folderCollapsed, kvp.Key)) return kvp.Value;
                 }
             }
             return null;
@@ -296,7 +328,7 @@ namespace JellyEmu
                 ".col", ".cv", ".ngp", ".ngc", ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
-                ".xex", ".xiso", ".vpk",
+                ".xex", ".xiso", ".vpk", ".p8", ".p8.png",
             };
     }
 

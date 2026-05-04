@@ -25,6 +25,483 @@ namespace JellyEmu.Controllers
             IHttpClientFactory httpClientFactory)
             : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory) { }
 
+        [HttpGet("/jellyemu/play/{itemId}")]
+        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
+            [FromServices] IHttpClientFactory httpClientFactory)
+        {
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null) return NotFound();
+
+            var core = ResolveCore(item);
+
+            return core switch
+            {
+                "pico8" => PlayPico8(itemId),
+                _       => await PlayEjs(itemId, userId, slot, httpClientFactory)
+            };
+        }
+
+        /// <summary>
+        /// Returns a standalone PICO-8 HTML play page for the given item.
+        /// The page replicates the Lexaloffle BBS shell JS and loads the
+        /// PICO-8 runtime from /jellyemu/pico8/runtime.js, passing the cart
+        /// via Module.arguments exactly as the BBS does.
+        ///
+        /// Supports .p8 and .p8.png cart files.
+        /// No save-state support — PICO-8 manages its own internal storage.
+        ///
+        /// Path: GET /jellyemu/pico8/play/{itemId}
+        /// </summary>
+        [HttpGet("/jellyemu/pico8/play/{itemId}")]
+        [Produces(MediaTypeNames.Text.Html)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlayPico8(string itemId)
+        {
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null)
+            {
+                Logger.LogWarning("[JellyEmu] Pico8Play: item {ItemId} not found", itemId);
+                return NotFound();
+            }
+
+            var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".p8.png";
+
+            // .p8.png needs special handling — GetExtension returns ".png"
+            if (!string.IsNullOrEmpty(item.Path) &&
+                item.Path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
+                ext = ".p8.png";
+
+            var cartUrl = $"/jellyemu/rom/{itemId}/{itemId}{ext}";
+            var gameName = HtmlEncoder.Default.Encode(item.Name);
+
+            Logger.LogInformation("[JellyEmu] PICO-8 play: {Name} ({ItemId}) cart={CartUrl}",
+                item.Name, itemId, cartUrl);
+
+            var html = $@"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>{gameName}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        html, body {{ width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }}
+
+        /* ── Loading Screen ── */
+        #je-loader {{ position: fixed; inset: 0; z-index: 99999; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; transition: opacity .4s ease; }}
+        #je-loader.je-dismiss {{ opacity: 0; pointer-events: none; }}
+        #je-loader-title {{ font-size: 28px; font-weight: 700; text-align: center; padding: 0 20px; }}
+        #je-loader-system {{ display: inline-block; padding: 4px 16px; border-radius: 20px; background: rgba(255,255,255,.12); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }}
+        .je-spinner {{ width: 56px; height: 56px; border: 3px solid rgba(255,255,255,.15); border-top-color: #fff; border-radius: 50%; animation: je-spin 1s linear infinite; }}
+        @keyframes je-spin {{ to {{ transform: rotate(360deg); }} }}
+        .je-loader-anim {{ position: relative; display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; }}
+
+        /* ── PICO-8 layout ── */
+        #p8_frame_0 {{ display: table; width: 100%; height: 100%; background-color: #111; }}
+        #p8_frame {{ display: flex; width: 100%; height: 100%; margin: auto; }}
+        #p8_container {{ margin: auto; display: flex; }}
+        #p8_playarea {{ display: none; margin: auto; user-select: none; -webkit-user-select: none; }}
+        #p8_playarea_flex {{ display: flex; position: relative; }}
+
+        canvas.emscripten {{
+            image-rendering: optimizeSpeed;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: optimize-contrast;
+            image-rendering: pixelated;
+            -ms-interpolation-mode: nearest-neighbor;
+            border: 0px;
+            cursor: none;
+        }}
+
+        /* ── Shared Dock Styles ── */
+        .je-bar {{ position: fixed; z-index: 90000; transition: opacity .3s ease, transform .3s ease; }}
+        .je-bar.je-hidden {{ opacity: 0; pointer-events: none; }}
+
+        /* ── Bottom Dock ── */
+        #je-dock {{ width: max-content; bottom: 16px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 28px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1); }}
+        #je-dock.je-active {{ display: flex; }}
+        #je-dock.je-hidden {{ transform: translateX(-50%) translateY(20px); }}
+        .je-dockbtn {{ background: none; border: none; color: #fff; cursor: pointer; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .1s; position: relative; }}
+        .je-dockbtn:hover {{ background: rgba(255,255,255,.12); }}
+        .je-dockbtn:active {{ transform: scale(.88); }}
+        .je-dockbtn svg {{ width: 22px; height: 22px; fill: currentColor; }}
+        .je-dockbtn.je-active {{ background: rgba(255,255,255,.2); }}
+        .je-dock-sep {{ width: 1px; height: 24px; background: rgba(255,255,255,.15); margin: 0 2px; flex-shrink: 0; }}
+
+        /* ── Touch controls ── */
+        #touch_controls_gfx, #touch_keyboard_gfx {{ pointer-events: none; display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }}
+        #touch_controls_background {{ pointer-events: none; display: none; background: #000; opacity: 0.5; position: fixed; top: 0; left: 0; width: 100vw; height: 200vh; }}
+
+        /* ── Top Bar ── */
+        .je-bar {{ position: fixed; left: 0; right: 0; z-index: 90000; display: flex; align-items: center; transition: opacity .3s; }}
+        #je-topbar {{ top: 0; height: 48px; justify-content: space-between; padding: 0 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); opacity: 0; pointer-events: none; }}
+        body:hover #je-topbar {{ opacity: 1; pointer-events: auto; }}
+        #je-topbar-title {{ font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }}
+        .je-topbtn {{ background: none; border: none; color: #fff; cursor: pointer; padding: 8px; border-radius: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: background .15s; }}
+        .je-topbtn:hover {{ background: rgba(255,255,255,.1); }}
+        .je-topbtn:active {{ transform: scale(.93); }}
+        .je-topbtn svg {{ width: 20px; height: 20px; fill: currentColor; }}
+    </style>
+</head>
+<body>
+
+    <!-- Loading screen -->
+    <div id=""je-loader"">
+        <div class=""je-loader-anim""><div class=""je-spinner""></div></div>
+        <div id=""je-loader-title"">{gameName}</div>
+        <div id=""je-loader-system"">PICO-8</div>
+    </div>
+
+    <!-- Top Bar -->
+    <div id=""je-topbar"" class=""je-bar"">
+        <span id=""je-topbar-title"">{gameName}</span>
+        <button class=""je-topbtn"" id=""je-exit-btn"" title=""Exit"" onclick=""jeExit()"">
+            <svg viewBox=""0 0 24 24""><path d=""M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z""/></svg>
+            Exit
+        </button>
+    </div>
+
+    <!-- PICO-8 frame (mirrors Lexaloffle BBS structure exactly) -->
+    <div id=""p8_frame_0"">
+        <div id=""p8_frame"">
+            <textarea id=""codo_textarea"" class=""emscripten"" style=""display:none; position:absolute; left:-9999px; height:0; overflow:hidden""></textarea>
+
+            <div id=""p8_menu_buttons_touch"" style=""position:absolute; width:100%; z-index:10; left:0; top:0;"">
+                <div class=""p8_menu_button"" id=""p8b_full""  style=""float:left; margin-left:10px""  onclick=""p8_give_focus(); p8_request_fullscreen();""></div>
+                <div class=""p8_menu_button"" id=""p8b_sound"" style=""float:left; margin-left:10px""  onclick=""p8_give_focus(); p8_create_audio_context(); Module.pico8ToggleSound();""></div>
+            </div>
+
+            <div id=""p8_container"" onclick="""">
+                <div id=""p8_playarea"">
+                    <div id=""touch_controls_background"">&nbsp;</div>
+                    <div id=""p8_playarea_flex"">
+                        <canvas class=""emscripten"" id=""canvas"" oncontextmenu=""event.preventDefault();"" width=""128"" height=""128""></canvas>
+                    </div>
+                    <div id=""touch_controls_gfx"">
+                        <img src=""#"" id=""controls_right_panel"" style=""position:absolute; opacity:0.5;"">
+                        <img src=""#"" id=""controls_left_panel""  style=""position:absolute; opacity:0.5;"">
+                    </div>
+                    <div id=""touch_keyboard_gfx"">
+                        <img src=""#"" id=""controls_keyboard_panel"" style=""position:absolute; opacity:0.5;"">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Bottom Dock -->
+    <div id=""je-dock"" class=""je-bar"">
+        <!-- Controls -->
+        <button class=""je-dockbtn"" id=""je-btn-controls"" title=""Controls"" onclick=""p8_give_focus(); Module.pico8ToggleControlMenu();"">
+            <svg viewBox=""0 0 24 24""><path d=""M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z""/></svg>
+        </button>
+        <!-- Pause -->
+        <button class=""je-dockbtn"" id=""je-btn-pause"" title=""Pause"" onclick=""p8_give_focus(); Module.pico8TogglePaused(); p8_update_layout_hash=-22;"">
+            <svg viewBox=""0 0 24 24""><path d=""M6 19h4V5H6v14zm8-14v14h4V5h-4z""/></svg>
+        </button>
+        <!-- Sound -->
+        <button class=""je-dockbtn"" id=""je-btn-sound"" title=""Sound"" onclick=""p8_give_focus(); p8_create_audio_context(); Module.pico8ToggleSound();"">
+            <svg viewBox=""0 0 24 24""><path d=""M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z""/></svg>
+        </button>
+        <!-- Fullscreen -->
+        <button class=""je-dockbtn"" id=""je-btn-full"" title=""Fullscreen"" onclick=""p8_give_focus(); p8_request_fullscreen();"">
+            <svg viewBox=""0 0 24 24""><path d=""M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z""/></svg>
+        </button>
+    </div>
+
+    <script>
+    // ── JellyEmu exit ────────────────────────────────────────────────────────
+    function jeExit() {{
+        if (window.parent === window) {{
+            try {{ var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); }} catch(e) {{}}
+            window.close();
+        }} else {{
+            window.parent.postMessage('close-jellyemu', '*');
+        }}
+    }}
+
+    // ── PICO-8 BBS shell globals (from lexaloffle.com BBS source) ────────────
+    var p8_is_running = false;
+    var p8_script = null;
+    var Module = null;
+    var codo_textarea = document.getElementById('codo_textarea');
+    var is_voxatron = false;
+    var is_picotron = false;
+    var p8_autoplay = true;
+    var pico8_state = [];
+    var codo_key_buffer = [];
+    var p8_keyboard_state = 0;
+    var pico8_buttons = [0,0,0,0,0,0,0,0];
+    var picotron_buttons = [];
+    var pico8_mouse = [];
+    var pico8_gamepads = {{ count: 0 }};
+    var pico8_gpio = new Array(128);
+    var pico8_audio_context;
+    var p8_touch_detected = false;
+    var p8_update_layout_hash = -1;
+    var last_windowed_container_height = 512;
+    var last_windowed_container_width = 512;
+    var p8_aspect = 1.0;
+    var p8_buttons_hash = -1;
+    var p8_dropped_cart = null;
+    var p8_dropped_cart_name = '';
+
+    // Button icon assets (inline base64 from BBS)
+    var p8_gfx_dat = {{
+        'p8b_pause1':    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAOUlEQVRIx2NgGPbg/8cX/0F46FtAM4vobgHVLRowC6hm0YBbQLFFoxaM4FQ0dHPy0C1Nh26NNugBAAnizNiMfvbGAAAAAElFTkSuQmCC',
+        'p8b_pause0':    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAKUlEQVRIx2NgGHbg/8cX/7FhctWNWjBqwagFoxaMWjBqwagF5Fkw5AAAPaGZvsIUtXUAAAAASUVORK5CYII=',
+        'p8b_controls':  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAQ0lEQVRIx2NgGAXEgP8fX/ynBaap4XBLhqcF1IyfYWQBrZLz0LEAlzqqxQFVLcAmT3MLqJqTaW7B4CqLaF4fjIIBBwBL/B2vqtPVIwAAAABJRU5ErkJggg==',
+        'p8b_full':      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAN0lEQVRIx2NgGPLg/8cX/2mJ6WcBrUJm4CwgOSgGrQVEB8WoBaMWDGMLhm5OHnql6dCt0YY8AAA9oZm+9Z9xQAAAAABJRU5ErkJggg==',
+        'p8b_sound0':    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAANklEQVRIx2NgGDHg/8cX/5Hx0LEA3cChYwEugwavBcRG4qgFoxYMZwuGfk4efqXp8KnRBj0AAMz7cLDnG4FeAAAAAElFTkSuQmCC',
+        'p8b_sound1':    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAPUlEQVRIx2NgGDHg/8cX/5Hx0LEA3cChYwEugwhZQLQDqG4BsZFIKMhGLRi1YChbMPRz8vArTYdPjTboAQCSVgpXUWQAMAAAAABJRU5ErkJggg==',
+        'p8b_close':     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAU0lEQVRIx2NkoDFgpJsF/z+++I8iwS9BkuW49A+cBcRaREgf/Swg1SJi1dHfAkIG4EyOOIJy4Cwg1iJCiWDUAvItGLqpaOjm5KFfmg79Gm3ItioAl+mAGVYIZUUAAAAASUVORK5CYII=',
+        'p8b_cart':      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAZ0lEQVR4Ae2dsQrAMAhEa+ie1f//uq79Ajs1OKRyiGDTeuAQAr4cp5lpU5LzEH32ijqPvi2ioaUpgDqTp2BApHbrEs3k6fV5GRSgAD8DmJtsbegaDpb4iz6eAao7q5njHAfo9Lxiii5mqxbMNtaN0wAAABB0RVh0TG9kZVBORwAyMDExMDIyMeNZtsEAAAAASUVORK5CYII=',
+        'controls_left_panel':     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AAAEI0lEQVR42u3dMU7DQBCG0Tjam9DTcP8jpEmfswS5iHBhAsLxev/hvQY6pGXyZRTQ+nQCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHqbHEEtl+vt7hS+fLy/mXHBQqxEi/6aI/AiFW9SnB2BWDkDBAtAsADBAhAsAMECBAtAsAAECxAsAMECECxAsAAEC0CwONJ8tYvrXRAsImK19j0IFsPGSrQQLCJiNV+et7xAT7QQLIaN1dr3ooVgMWysRAvBIipWooVgERUr0UKwiIqVaCFYRMVKtBAsomIlWggWUbESLQSLqFiJFoJFVKxEC8EiKlaihWARFSvRQrDYJSSVfhaCBSBYAIIFCBbAHpoj4Bl/scOGBWDD4lX8iwE2LADBAgQLQLAABAsQLADBAhAsQLAABAtAsADBAhAsAMECBAtAsAAECxAsAMECECxAsMh1ud7uTsHZVDcZyFo8Yt5sVJ6NyUAaSNEyIymaXwZepIKd4mwoQbAFC0CwAMECECwAwQIEC0CwAAQLECwAwQIQLECwAAQLQLAAwQI4UHME2/10QZq7usyBObBhRQwpmBUb1nADuPbuaUD/p2ezMH+1admwhosVfBcxb2SCJVaIlmAhVoiWYIkVoiVagiVWiJZgiZVYIVqCJVaIlmgJllghWoIlViBagiVWiJZoCZZYIVqCJVYgWoIlViBaggUIlnc0sPELlmghVmIlWKKFWAmWaIFYCZZoIVYIlmghVoIlWiBWgiVaiJVgIVqIlWCJFoiVYIkWYiVYiBZiJViihViJ1XbNEWyL1mMQRYvfvIGJlQ1rmE0LzIoNyyBiDrBhAYIFIFiAYAEIFoBgAYIFIFgAggUIFoBgAQgWIFgAggUgWIBgDc+Nn1D/tdH8YupwgZy5qG4ykKIlVmZDsDjshSlazqQqH7p793Q2CBaAYAGCBSBYAIIFCBaAYAEIFiBYAIIFIFiAYAEIFoBgAYIFIFgAggUIFoBgAQgWIFgAggUgWIBgAQgWwENzBKxZPub9CJ7WjA0LsGFRV+9N5+jNDhsWgGABggUgWACCxW56fgjuA3cEiz9Z/nWwR0iWP8P/YCFYDBstsUKwiIiWWCFYRERLrBAsIqIlVggWEdESKwSLiGiJFYJFRLTECsEiIlpihWARES2xQrCIiJZYIVhEREusECwioiVWCBYx0RIrBIuoaIkVr+YhFHTZtMCGBQgWgGABCBYgWACCBSBYgGABCBaAYAGCBSBYAIIFCBbj2uOR8s6AEbhexgsWYri3SKhKczcXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMA2n+e0UMDzh3yTAAAAAElFTkSuQmCC',
+        'controls_right_panel':    'data:image/png;base64,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',
+    }};
+
+    document.addEventListener('touchstart', {{}}, {{passive:true}});
+    document.addEventListener('touchmove',  {{}}, {{passive:true}});
+    document.addEventListener('touchend',   {{}}, {{passive:true}});
+
+    // ── Dock / topbar show-on-hover ──────────────────────────────────────────
+    var _jeIdleTimer = null;
+    function _jeShowUI() {{
+        document.getElementById('je-topbar').classList.add('je-active');
+        var dock = document.getElementById('je-dock');
+        dock.classList.add('je-active');
+        dock.classList.remove('je-hidden');
+        clearTimeout(_jeIdleTimer);
+        _jeIdleTimer = setTimeout(_jeHideUI, 3000);
+    }}
+    function _jeHideUI() {{
+        document.getElementById('je-topbar').classList.remove('je-active');
+        var dock = document.getElementById('je-dock');
+        dock.classList.add('je-hidden');
+        setTimeout(function() {{
+            if (dock.classList.contains('je-hidden')) dock.classList.remove('je-active');
+        }}, 300);
+    }}
+    document.addEventListener('mousemove', _jeShowUI);
+    document.addEventListener('touchstart', _jeShowUI, {{ passive: true }});
+
+    addEventListener('touchstart', function(e) {{
+        p8_touch_detected = true;
+        if (codo_textarea && codo_textarea.style.display != 'none')
+            codo_textarea.style.display = 'none';
+    }}, {{passive:true}});
+
+    function p8_give_focus() {{
+        var el = codo_textarea || document.getElementById('codo_textarea');
+        if (el) {{ el.focus(); el.select(); }}
+    }}
+
+    function p8_create_audio_context() {{
+        if (pico8_audio_context) {{
+            try {{ pico8_audio_context.resume(); }} catch(e) {{}}
+            return;
+        }}
+        var API = window.AudioContext || window.webkitAudioContext;
+        if (API) {{
+            pico8_audio_context = new API();
+            try {{
+                var src = pico8_audio_context.createBufferSource();
+                src.buffer = pico8_audio_context.createBuffer(1,1,22050);
+                src.connect(pico8_audio_context.destination);
+                src.start(1, 0.25);
+            }} catch(e) {{}}
+        }}
+    }}
+
+    function p8_request_fullscreen() {{
+        if (!document.fullscreenElement) {{
+            document.body.requestFullscreen().catch(function(err) {{
+                console.warn('[JellyEmu] Fullscreen failed:', err);
+            }});
+        }} else {{
+            if (document.exitFullscreen) {{
+                document.exitFullscreen();
+            }}
+        }}
+    }}
+
+    var p8_buttons_hash = -1;
+    function p8_update_button_icons() {{
+        var w = 24;
+        if (!p8_is_running) {{ requestAnimationFrame(p8_update_button_icons); return; }}
+        var is_fs = document.fullscreenElement || document.webkitIsFullScreen;
+        var hash = (pico8_state.sound_volume || 0);
+        if (pico8_state.is_paused) hash += 0x100;
+        if (p8_touch_detected)    hash += 0x200;
+        if (is_fs)                hash += 0x400;
+        if (p8_buttons_hash === hash) {{ requestAnimationFrame(p8_update_button_icons); return; }}
+        p8_buttons_hash = hash;
+        var els = document.getElementsByClassName('p8_menu_button');
+        for (var i = 0; i < els.length; i++) {{
+            var el = els[i];
+            var idx = el.id;
+            if (idx === 'p8b_sound') idx += (pico8_state.sound_volume === 0 ? '0' : '1');
+            if (idx === 'p8b_pause') idx += (pico8_state.is_paused > 0 ? '1' : '0');
+            if (!p8_gfx_dat[idx]) {{ requestAnimationFrame(p8_update_button_icons); continue; }}
+            var ns = '<img width='+w+' height='+w+' style=""display:table;pointer-events:none;"" src=""'+p8_gfx_dat[idx]+'""/>';
+            if (el.innerHTML !== ns) el.innerHTML = ns;
+            var vis = p8_is_running;
+            if (!p8_touch_detected && el.parentElement.id === 'p8_menu_buttons_touch') vis = false;
+            if (p8_touch_detected  && el.parentElement.id === 'p8_menu_buttons')       vis = false;
+            if (is_fs) vis = false;
+            el.style.display = vis ? '' : 'none';
+        }}
+        requestAnimationFrame(p8_update_button_icons);
+    }}
+
+    var p8_update_layout_hash = -1;
+    function p8_update_layout() {{
+        var canvas     = document.getElementById('canvas');
+        var playarea   = document.getElementById('p8_playarea');
+        var container  = document.getElementById('p8_container');
+        var frame      = document.getElementById('p8_frame');
+        if (!canvas || !playarea || !container || !frame) {{ requestAnimationFrame(p8_update_layout); return; }}
+        var is_fs = document.fullscreenElement || document.webkitIsFullScreen;
+        var fw = is_fs ? window.innerWidth  : Math.min(frame.offsetWidth,  window.innerWidth);
+        var fh = is_fs ? window.innerHeight : Math.min(frame.offsetHeight, window.innerHeight);
+        var csize = Math.min(fw, fh);
+        if (p8_touch_detected && p8_is_running) csize = Math.min(csize, Math.max(window.innerWidth, window.innerHeight) * 2/3);
+        if (fw >= 512 && fh >= 512) csize = (csize+1) & ~0x7f;
+        if (!is_fs) {{ csize = Math.min(csize, last_windowed_container_height, last_windowed_container_width / p8_aspect); }}
+        var ml = is_fs ? (fw - csize * p8_aspect) / 2 : 0;
+        var mt = is_fs ? (fh - csize) / 2 : 0;
+        var hash = csize + mt*1000.3 + ml*0.001 + fw*333.33 + fh*772.15;
+        if (is_fs) hash += 0.1237;
+        if (!is_fs && !p8_touch_detected && p8_update_layout_hash === hash) {{ requestAnimationFrame(p8_update_layout); return; }}
+        p8_update_layout_hash = hash;
+        if (!is_fs) {{
+            last_windowed_container_height = (frame.parentNode && frame.parentNode.parentNode) ? frame.parentNode.parentNode.offsetHeight : fh;
+            last_windowed_container_width  = (frame.parentNode && frame.parentNode.parentNode) ? frame.parentNode.parentNode.offsetWidth  : fw;
+        }}
+        canvas.style.width  = (csize * p8_aspect) + 'px';
+        canvas.style.height = csize + 'px';
+        canvas.style.marginLeft = ml + 'px';
+        canvas.style.marginTop  = mt + 'px';
+        var dock = document.getElementById('je-dock');
+        if (dock) {{
+            var canvasW = csize * p8_aspect;
+            dock.style.maxWidth = canvasW + 'px';
+        }}
+        container.style.width  = (csize * p8_aspect) + 'px';
+        container.style.height = csize + 'px';
+        document.getElementById('touch_controls_gfx').style.display    = (p8_touch_detected && p8_is_running) ? 'table' : 'none';
+        document.getElementById('touch_keyboard_gfx').style.display    = 'none';
+        if (!p8_is_running) playarea.style.display = 'none';
+        requestAnimationFrame(p8_update_layout);
+    }}
+
+    // Gamepad support (condensed from BBS)
+    var P8_BUTTON_O = {{action:'button',code:0x10}}, P8_BUTTON_X = {{action:'button',code:0x20}};
+    var P8_DPAD_LEFT={{action:'button',code:0x1}}, P8_DPAD_RIGHT={{action:'button',code:0x2}};
+    var P8_DPAD_UP={{action:'button',code:0x4}},   P8_DPAD_DOWN={{action:'button',code:0x8}};
+    var P8_MENU={{action:'menu'}}, P8_NO_ACTION={{action:'none'}};
+    var P8_BUTTON_MAPPING=[P8_BUTTON_O,P8_BUTTON_X,P8_BUTTON_X,P8_BUTTON_O,P8_NO_ACTION,P8_NO_ACTION,P8_NO_ACTION,P8_NO_ACTION,P8_MENU,P8_MENU,P8_NO_ACTION,P8_NO_ACTION,P8_DPAD_UP,P8_DPAD_DOWN,P8_DPAD_LEFT,P8_DPAD_RIGHT];
+    var pico8_gamepads_mapping=[];
+    function p8_update_gamepads(){{
+        var gps=Array.from(navigator.getGamepads()||navigator.webkitGetGamepads()||[]);
+        pico8_gamepads.count=gps.length;
+        gps.forEach(function(gp,i){{
+            if(!gp||!gp.connected){{if(pico8_gamepads_mapping[i]!=null){{pico8_buttons[pico8_gamepads_mapping[i]]=0;pico8_gamepads_mapping[i]=null;}}return;}}
+            var bs=0,menu=false,any=false;
+            if(gp.axes[0]<-0.3)bs|=1;if(gp.axes[0]>0.3)bs|=2;if(gp.axes[1]<-0.3)bs|=4;if(gp.axes[1]>0.3)bs|=8;
+            gp.buttons.forEach(function(b,j){{if(!(b.value>0.5||b.pressed))return;var m=P8_BUTTON_MAPPING[j]||P8_NO_ACTION;if(m.action==='button')bs|=m.code;if(m.action==='menu')menu=true;any=true;}});
+            any|=bs;
+            if(any&&pico8_gamepads_mapping[i]==null){{var fp=0;while(pico8_gamepads_mapping.indexOf(fp)>-1)fp++;pico8_gamepads_mapping[i]=fp;}}
+            if(pico8_gamepads_mapping[i]!=null)pico8_buttons[pico8_gamepads_mapping[i]]=bs;
+            if(menu)pico8_buttons[0]|=0x40;
+        }});
+        requestAnimationFrame(p8_update_gamepads);
+    }}
+    requestAnimationFrame(p8_update_gamepads);
+
+    document.addEventListener('keydown', function(e){{
+        if(!p8_is_running)return;
+        if(pico8_state.has_focus==1)
+            if([17,88,67,86].indexOf(e.keyCode)<0)
+                if(e.preventDefault)e.preventDefault();
+    }},{{passive:false}});
+
+    // Touch button events (condensed)
+    function pico8_buttons_event(e,step){{
+        if(!p8_is_running)return;
+        pico8_buttons[0]=0;
+        var num=e.touches?e.touches.length:0;
+        for(var i=0;i<num;i++){{
+            var t=e.touches[i],x=t.clientX,y=t.clientY,w=window.innerWidth,h=window.innerHeight;
+            var r=Math.min(w,h)/12;if(r>40)r=40;
+            var b=0;
+            if(y>h-r*8){{
+                e.preventDefault();
+                if(x<w/2&&x<r*6){{
+                    var cx=r*3,cy=h-r*3,dx=x-cx,dy=y-cy,dz=r/3;
+                    if(Math.abs(dx)>Math.abs(dy)*0.6){{if(dx<-dz)b|=1;if(dx>dz)b|=2;}}
+                    if(Math.abs(dy)>Math.abs(dx)*0.6){{if(dy<-dz)b|=4;if(dy>dz)b|=8;}}
+                }}else if(x>w-r*6){{
+                    if((h-y)>(w-x)*0.8)b|=0x10;
+                    if((w-x)>(h-y)*0.8)b|=0x20;
+                }}
+            }}
+            pico8_buttons[0]|=b;
+        }}
+    }}
+    addEventListener('touchstart',function(e){{pico8_buttons_event(e,0);}},{{passive:false}});
+    addEventListener('touchmove', function(e){{pico8_buttons_event(e,1);}},{{passive:false}});
+    addEventListener('touchend',  function(e){{pico8_buttons_event(e,2);}},{{passive:false}});
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    p8_update_layout();
+    p8_update_button_icons();
+
+    var canvas = document.getElementById('canvas');
+    Module = {{}};
+    Module.canvas = canvas;
+    Module.arguments = ['{cartUrl}'];
+
+    Module.onRuntimeInitialized = function() {{
+        // Show canvas, dismiss loader
+        var playarea = document.getElementById('p8_playarea');
+        if (playarea) playarea.style.display = 'table';
+        p8_is_running = true;
+        p8_update_layout_hash = -77;
+        p8_buttons_hash = -1;
+        var loader = document.getElementById('je-loader');
+        if (loader) loader.classList.add('je-dismiss');
+        p8_create_audio_context();
+    }};
+
+    canvas.addEventListener('click', function() {{
+        if (!p8_touch_detected && pico8_state.request_pointer_lock)
+            canvas.requestPointerLock();
+    }});
+
+    // Load the runtime
+    (function() {{
+        var s = document.createElement('script');
+        s.type = 'application/javascript';
+        s.src = '/jellyemu/pico8/runtime.js';
+        s.onerror = function() {{
+            document.getElementById('je-loader-system').textContent = 'Runtime failed to load';
+        }};
+        document.body.appendChild(s);
+    }})();
+    </script>
+</body>
+</html>";
+
+            Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+            Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+
+            return Content(html, MediaTypeNames.Text.Html);
+        }
+
         /// <summary>
         /// Returns a standalone EmulatorJS HTML page for the given item.
         /// No authentication required — the ROM is fetched via /jellyemu/rom/{itemId}.
@@ -35,11 +512,11 @@ namespace JellyEmu.Controllers
         ///   - userId (string, query, optional): Allows wire up of per-user save states.
         /// Returns Example: `200 OK` (Content-Type: text/html)
         /// </summary>
-        [HttpGet("/jellyemu/play/{itemId}")]
+        [HttpGet("/jellyemu/ejs/play/{itemId}")]
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
+        public async Task<IActionResult> PlayEjs(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
             var item = LibraryManager.GetItemById(itemId);
@@ -2090,53 +2567,5 @@ namespace JellyEmu.Controllers
 
             return Content(html, MediaTypeNames.Text.Html);
         }
-
-
-        [HttpGet("/jellyemu/rom/{itemId}/{filename?}")]
-        [HttpHead("/jellyemu/rom/{itemId}/{filename?}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Rom(string itemId, string? filename = null)
-        {
-            var item = LibraryManager.GetItemById(itemId);
-            if (item == null || string.IsNullOrEmpty(item.Path) || !System.IO.File.Exists(item.Path))
-            {
-                Logger.LogWarning("[JellyEmu] Rom: item {ItemId} not found or path missing", itemId);
-                return NotFound();
-            }
-
-            Logger.LogInformation("[JellyEmu] Serving ROM: {Path}", item.Path);
-
-            var stream = System.IO.File.OpenRead(item.Path);
-            var fileName = Path.GetFileName(item.Path);
-            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
-            return File(stream, "application/octet-stream", enableRangeProcessing: true);
-        }
-
-        /// <summary>
-        /// Returns the resolved core name and whether it requires threads (SharedArrayBuffer)
-        /// for the given item. Used by the UI to decide iframe vs new tab launch.
-        /// 
-        /// Path: GET /jellyemu/core/{itemId}
-        /// Parameters:
-        ///   - itemId (string, path): The unique ID of the item.
-        /// Returns Example: { "core": "gba", "needsThreads": false }
-        /// </summary>
-        [HttpGet("/jellyemu/core/{itemId}")]
-        [Produces(MediaTypeNames.Application.Json)]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult GetCore(string itemId)
-        {
-            var item = LibraryManager.GetItemById(itemId);
-            if (item == null)
-                return NotFound();
-
-            var core = ResolveCore(item);
-            var needsThreads = core is "dos" or "psp";
-            return Ok(new { core, needsThreads });
-        }
-
-
     }
 }

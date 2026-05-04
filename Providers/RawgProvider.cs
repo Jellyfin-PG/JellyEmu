@@ -6,7 +6,7 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
 using Microsoft.Extensions.Logging;
 
-namespace JellyEmu
+namespace JellyEmu.Providers
 {
     public abstract class BaseRawgProvider
     {

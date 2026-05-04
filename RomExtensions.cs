@@ -7,6 +7,7 @@ namespace JellyEmu
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+            if (path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase)) return true;
             var ext = Path.GetExtension(path);
             if (!string.IsNullOrEmpty(ext)) return PlatformResolver.AllRomExtensions.Contains(ext);
             if (Directory.Exists(path))

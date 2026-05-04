@@ -9,6 +9,7 @@ namespace JellyEmu.Services
     {
         private readonly ILogger<JellyEmuInjectorService> _logger;
         private readonly JellyEmuEjsManager _ejsManager;
+        private readonly JellyEmuPico8Manager _pico8Manager;
 
         private static readonly Guid RegistrationId = Guid.Parse("9bab105e-9af0-4e25-a87d-876713b60962");
 
@@ -20,10 +21,12 @@ namespace JellyEmu.Services
 
         public JellyEmuInjectorService(
             ILogger<JellyEmuInjectorService> logger,
-            JellyEmuEjsManager ejsManager)
+            JellyEmuEjsManager ejsManager,
+            JellyEmuPico8Manager pico8Manager)
         {
             _logger = logger;
             _ejsManager = ejsManager;
+            _pico8Manager = pico8Manager;
         }
 
         /// <summary>
@@ -71,6 +74,8 @@ namespace JellyEmu.Services
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _ejsManager.EnsureAssetsAsync();
+
+            _pico8Manager.EnsureRuntimeAsync();
 
             _logger.LogInformation("[JellyEmu] Registering UI injection with file transform plugin...");
 
