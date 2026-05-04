@@ -119,6 +119,7 @@ Ensure your files are placed in the library folder using the supported extension
 | **Neo Geo Pocket** | .ngp, .ngc |
 | **WonderSwan** | .ws, .wsc |
 | **DOS** | .exe, .com, .conf, .zip |
+| **Pico-8** | .p8, .p8.png, .zip |
 
 ---
 
@@ -204,6 +205,7 @@ The plugin determines a ROM's platform using a strict 3-step priority list. If s
 | **TurboGrafx-16 / PC Engine** | `pce`, `turbografx`, `turbografx-16`, `turbografx 16`, `pc engine` |
 | **ColecoVision** | `coleco`, `colecovision` |
 | **NeoGeo Pocket / Color** | `ngp`, `neogeo pocket`, `neo geo pocket`, `ngpc` |
+| **Pico-8** | `pico-8`, `pico`, `pico8` |
 
 ---
 
