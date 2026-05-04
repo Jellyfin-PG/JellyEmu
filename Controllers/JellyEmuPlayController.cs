@@ -577,10 +577,9 @@ namespace JellyEmu.Controllers
         html, body {{ width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }}
         #game {{ width: 100%; height: 100%; }}
 
-        /* ── Hide native EJS UI (specific selectors only — preserve ejs_parent for keyboard focus) ── */
         /* Keep the elements in the DOM but hide them from view */
         .ejs_menu_bar, 
-        .ejs_parent > div:not(.ejs_canvas_parent),
+        .ejs_parent > div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),
         #je-loader + .ejs_parent .ejs_menu_bar {{
             display: none !important;
             visibility: hidden !important;
