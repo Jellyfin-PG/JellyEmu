@@ -2,7 +2,7 @@
   <img src="assets/jellyemu.svg" alt="JellyEmu Logo" width="120" />
   <h1>JellyEmu</h1>
   <p>A plugin for jellyfin 10.11+ to import, manage, play and share your roms and pico-8 games with users.</p>
-  <p><sub>Now with romm integration.</sub></p>
+  <p><sub>Now with romm integration. and pico8 support.</sub></p>
 </div>
 
 <p align="center">
