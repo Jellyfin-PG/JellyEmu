@@ -1,8 +1,6 @@
 using JellyEmu.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JellyEmu
@@ -18,9 +16,18 @@ namespace JellyEmu
                 client.Timeout = TimeSpan.FromMinutes(10);
             });
 
+            serviceCollection.AddHttpClient("JellyEmuPico8", client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "Mozilla/5.0 (compatible; JellyEmu/1.0)");
+                client.Timeout = TimeSpan.FromMinutes(5);
+            });
+
             serviceCollection.AddSingleton<PlatformResolver>();
 
             serviceCollection.AddSingleton<JellyEmuEjsManager>();
+
+            serviceCollection.AddSingleton<JellyEmuPico8Manager>();
 
             serviceCollection.AddSingleton<JellyEmuSessionService>();
 
