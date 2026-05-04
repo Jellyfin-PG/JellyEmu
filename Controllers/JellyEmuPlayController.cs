@@ -288,6 +288,7 @@ namespace JellyEmu.Controllers
         <button class=""je-dockbtn"" id=""je-btn-slow"" title=""Slow Motion""><svg viewBox=""0 0 24 24""><path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2V8h-2v8zm-3 0h2V8H8v8z""/></svg></button>
         <div class=""je-dock-sep""></div>
         <button class=""je-dockbtn"" id=""je-btn-saves"" title=""Save States""><svg viewBox=""0 0 24 24""><path d=""M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-io"" title=""Import / Export""><svg viewBox=""0 0 24 24""><path d=""M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-vol"" title=""Volume""><svg viewBox=""0 0 24 24""><path d=""M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-3.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-cheats"" title=""Cheats""><svg viewBox=""0 0 24 24""><path d=""M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-inputmap"" title=""Input Mapping""><svg viewBox=""0 0 24 24""><path d=""M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z""/></svg></button>
@@ -322,6 +323,28 @@ namespace JellyEmu.Controllers
         <div class=""je-popup"">
             <div class=""je-popup-hdr""><h3>Save States</h3><button class=""je-closebtn"" data-close=""je-pop-saves"">&times;</button></div>
             <div class=""je-popup-body"" id=""je-saves-body""></div>
+        </div>
+    </div>
+
+    <!-- Popup: Import/Export -->
+    <div class=""je-overlay"" id=""je-pop-io"">
+        <div class=""je-popup"">
+            <div class=""je-popup-hdr""><h3>Import / Export</h3><button class=""je-closebtn"" data-close=""je-pop-io"">&times;</button></div>
+            <div class=""je-popup-body"">
+                <div class=""je-section-title"">Export to Device</div>
+                <div style=""display:flex;gap:10px;margin-bottom:20px"">
+                    <button class=""je-btn je-btn-primary"" id=""je-io-exp-state"" style=""flex:1"">Export State (.state)</button>
+                    <button class=""je-btn"" id=""je-io-exp-sram"" style=""flex:1"">Export SRAM (.sav)</button>
+                </div>
+                
+                <div class=""je-section-title"">Import from Device</div>
+                <div id=""je-io-dropzone"" style=""border:2px dashed rgba(255,255,255,.2);border-radius:12px;padding:30px 20px;text-align:center;transition:background .2s, border-color .2s;cursor:pointer;"">
+                    <svg viewBox=""0 0 24 24"" style=""width:32px;height:32px;fill:currentColor;opacity:.5;margin-bottom:10px""><path d=""M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z""/></svg>
+                    <div style=""font-size:14px;font-weight:600;margin-bottom:4px"">Click or Drop File Here</div>
+                    <div style=""font-size:12px;opacity:.5"">Supports .state and .sav files</div>
+                    <input type=""file"" id=""je-io-file"" style=""display:none"">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -653,6 +676,119 @@ namespace JellyEmu.Controllers
                 buildCoreOptions();
                 openPopup('je-pop-coreopts');
             }});
+
+            // Import / Export Popup
+            document.getElementById('je-btn-io').addEventListener('click', function() {{
+                openPopup('je-pop-io');
+            }});
+
+            // Export Save State (.state)
+            document.getElementById('je-io-exp-state').addEventListener('click', function() {{
+                var g = gm(); if (!g) return;
+                Promise.resolve(g.getState()).then(function(rawState) {{
+                    var stateBlob = _jeEnsureBinary(rawState);
+                    if (!stateBlob || stateBlob.size === 0) return alert('No state data available.');
+                    
+                    var url = URL.createObjectURL(stateBlob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = (window.EJS_gameName || 'game').replace(/[^a-z0-9]/gi, '_') + '.state';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }});
+            }});
+
+            // Export SRAM In-Game Save (.sav)
+            document.getElementById('je-io-exp-sram').addEventListener('click', function() {{
+                var g = gm(); if (!g) return;
+                
+                // getSaveFile() automatically calls saveSaveFiles() internally in gamemanager.js
+                var rawSave = g.getSaveFile();
+                if (!rawSave) return alert('No in-game SRAM data available. Make sure you saved in-game first!');
+                
+                var saveBlob = _jeEnsureBinary(rawSave);
+                var url = URL.createObjectURL(saveBlob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = (window.EJS_gameName || 'game').replace(/[^a-z0-9]/gi, '_') + '.sav';
+                a.click();
+                URL.revokeObjectURL(url);
+            }});
+
+            // Import Drag/Drop & File Select Engine
+            var ioDrop = document.getElementById('je-io-dropzone');
+            var ioFile = document.getElementById('je-io-file');
+
+            ioDrop.addEventListener('click', function() {{ ioFile.click(); }});
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(evt) {{
+                ioDrop.addEventListener(evt, function(e) {{ e.preventDefault(); e.stopPropagation(); }}, false);
+            }});
+            
+            ['dragenter', 'dragover'].forEach(function(evt) {{
+                ioDrop.addEventListener(evt, function() {{
+                    ioDrop.style.borderColor = 'rgba(100,200,255,.8)';
+                    ioDrop.style.background = 'rgba(100,200,255,.1)';
+                }}, false);
+            }});
+            
+            ['dragleave', 'drop'].forEach(function(evt) {{
+                ioDrop.addEventListener(evt, function() {{
+                    ioDrop.style.borderColor = 'rgba(255,255,255,.2)';
+                    ioDrop.style.background = 'transparent';
+                }}, false);
+            }});
+            
+            ioDrop.addEventListener('drop', function(e) {{
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {{
+                    _jeHandleImport(e.dataTransfer.files[0]);
+                }}
+            }}, false);
+            
+            ioFile.addEventListener('change', function(e) {{
+                if (e.target.files && e.target.files.length > 0) {{
+                    _jeHandleImport(e.target.files[0]);
+                    e.target.value = ''; // reset
+                }}
+            }});
+
+            function _jeHandleImport(file) {{
+                var g = gm(); if (!g) return;
+                var isSram = file.name.toLowerCase().endsWith('.sav') || file.name.toLowerCase().endsWith('.srm');
+                
+                var reader = new FileReader();
+                reader.onload = function(e) {{
+                    try {{
+                        var uint8 = new Uint8Array(e.target.result);
+                        
+                        if (isSram) {{
+                            // Get the exact virtual path where this specific core expects SRAM
+                            var sramPath = g.getSaveFilePath();
+                            if (!sramPath) {{
+                                alert('Could not determine the SRAM path for this emulator core.');
+                                return;
+                            }}
+                            
+                            // Delete the old file if it exists, write the new one, and refresh
+                            try {{ g.FS.unlink(sramPath); }} catch(err) {{}}
+                            g.FS.writeFile(sramPath, uint8);
+                            g.loadSaveFiles();
+                            
+                            alert('SRAM imported successfully! The emulator will now restart to load the battery data.');
+                            g.restart();
+                            closePopup('je-pop-io');
+                        }} else {{
+                            // Save States can be injected into live memory instantly
+                            g.loadState(uint8);
+                            closePopup('je-pop-io');
+                        }}
+                    }} catch(err) {{
+                        console.error('[JellyEmu] Import error:', err);
+                        alert('Failed to import file. The data may be corrupt or incompatible with this emulator core.');
+                    }}
+                }};
+                reader.readAsArrayBuffer(file);
+            }}
 
             function buildCoreOptions() {{
                 var body = document.getElementById('je-coreopts-body');
