@@ -291,6 +291,7 @@ namespace JellyEmu.Controllers
         <div class=""je-dock-sep""></div>
         <button class=""je-dockbtn"" id=""je-btn-screenshot"" title=""Screenshot""><svg viewBox=""0 0 24 24""><path d=""M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z""/></svg></button>
         <button class=""je-dockbtn"" id=""je-btn-settings"" title=""Settings""><svg viewBox=""0 0 24 24""><path d=""M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z""/></svg></button>
+        <button class=""je-dockbtn"" id=""je-btn-coreopts"" title=""Core Options""><svg viewBox=""0 0 24 24""><path d=""M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z""/></svg></button>
         <div class=""je-dock-sep""></div>
         <button class=""je-dockbtn"" id=""je-btn-fullscreen"" title=""Fullscreen"">
             <svg id=""je-fs-enter"" viewBox=""0 0 24 24""><path d=""M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z""/></svg>
@@ -302,6 +303,15 @@ namespace JellyEmu.Controllers
     <button id=""je-dock-min"" title=""Expand Controls"">
         <svg viewBox=""0 0 24 24""><path d=""M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z""/></svg>
     </button>
+
+    <!-- Popup: Core Options -->
+    <div class=""je-overlay"" id=""je-pop-coreopts"">
+        <div class=""je-popup"">
+            <div class=""je-popup-hdr""><h3>Core Options</h3><button class=""je-closebtn"" data-close=""je-pop-coreopts"">&times;</button></div>
+            <div class=""je-popup-body"" id=""je-coreopts-body"">
+                </div>
+        </div>
+    </div>
 
     <!-- Popup: Save States -->
     <div class=""je-overlay"" id=""je-pop-saves"">
@@ -438,6 +448,10 @@ namespace JellyEmu.Controllers
 
             // Hook into EJS start event
             window.EJS_onGameStart = function() {{
+                // Load percentage observer
+                if (_jeEjsObserver) _jeEjsObserver.disconnect();
+                clearInterval(_jeFindLoader);
+                // Dismiss loading screen
                 dismissLoader();
                 setTimeout(refocusGame, 500);
 {directLoadScript}
@@ -453,6 +467,30 @@ namespace JellyEmu.Controllers
                     }}
                 }}, 200);
             }};
+
+            // Loading Status Observer
+            var myStatusEl = document.getElementById('je-loader-status');
+            var _jeEjsObserver = null;
+
+            var _jeFindLoader = setInterval(function() {{
+                var ejsTextEl = document.querySelector('.ejs_loading_text');
+                if (ejsTextEl) {{
+                    clearInterval(_jeFindLoader);
+
+                    _jeEjsObserver = new MutationObserver(function() {{
+                        var text = ejsTextEl.textContent || ejsTextEl.innerText;
+                        if (text && text.trim() !== '') {{
+                            myStatusEl.textContent = text;
+                        }}
+                    }});
+
+                    _jeEjsObserver.observe(ejsTextEl, {{ 
+                        childList: true, 
+                        characterData: true, 
+                        subtree: true 
+                    }});
+                }}
+            }}, 200);
 
             // Auto-hide docks
             var hideTimer = null;
@@ -606,6 +644,79 @@ namespace JellyEmu.Controllers
                 else {{ window.parent.postMessage('close-jellyemu','*'); }}
             }});
 
+            // Core Options Popup
+            document.getElementById('je-btn-coreopts').addEventListener('click', function() {{
+                buildCoreOptions();
+                openPopup('je-pop-coreopts');
+            }});
+
+            function buildCoreOptions() {{
+                var body = document.getElementById('je-coreopts-body');
+                var g = gm();
+                
+                if (!g || typeof g.getCoreOptions !== 'function') {{
+                    body.innerHTML = '<div style=""opacity:.4;font-size:13px;text-align:center;padding:20px;"">Core options not available yet.</div>';
+                    return;
+                }}
+
+                var optsRaw = g.getCoreOptions();
+                if (!optsRaw || typeof optsRaw !== 'string') {{
+                    body.innerHTML = '<div style=""opacity:.4;font-size:13px;text-align:center;padding:20px;"">No options available for this core.</div>';
+                    return;
+                }}
+
+                var lines = optsRaw.split('\n');
+                body.innerHTML = '';
+                var hasOpts = false;
+
+                lines.forEach(function(line) {{
+                    if (!line.trim()) return;
+                    hasOpts = true;
+                    
+                    // Splits ""key|currentValue; val1|val2|val3""
+                    var parts = line.split(/;\s*/);
+                    if (parts.length < 2) return;
+
+                    var keyVal = parts[0].split('|');
+                    var key = keyVal[0];
+                    var currentVal = keyVal[1];
+                    var options = parts[1].split('|');
+
+                    // Make the label pretty (e.g., 'yabause_frameskip' -> 'Frameskip')
+                    var displayKey = key.replace(/^[^_]+_/, '').replace(/_/g, ' ');
+                    displayKey = displayKey.charAt(0).toUpperCase() + displayKey.slice(1);
+
+                    var row = document.createElement('div');
+                    row.className = 'je-setting';
+                    
+                    var label = document.createElement('span');
+                    label.className = 'je-setting-label';
+                    label.textContent = displayKey;
+                    
+                    var select = document.createElement('select');
+                    options.forEach(function(opt) {{
+                        var option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        if (opt === currentVal) option.selected = true;
+                        select.appendChild(option);
+                    }});
+
+                    // Trigger the core change instantly on dropdown change
+                    select.addEventListener('change', function() {{
+                        g.setVariable(key, this.value);
+                    }});
+
+                    row.appendChild(label);
+                    row.appendChild(select);
+                    body.appendChild(row);
+                }});
+
+                if (!hasOpts) {{
+                    body.innerHTML = '<div style=""opacity:.4;font-size:13px;text-align:center;padding:20px;"">No options available for this core.</div>';
+                }}
+            }}
+
             // Fullscreen
             document.getElementById('je-btn-fullscreen').addEventListener('click', function() {{
                 document.body.requestFullscreen();
@@ -737,27 +848,75 @@ namespace JellyEmu.Controllers
             }}
 
             // Volume popup
+            var _jeCurrentVol = 1.0; // Single source of truth for the session
+            var _jeLastVol = 1.0;    // Memory for the mute toggle
+
             document.getElementById('je-btn-vol').addEventListener('click', function() {{
                 var e = emu();
                 if (e) {{
                     var slider = document.getElementById('je-vol-slider');
-                    slider.value = e.volume;
-                    document.getElementById('je-vol-pct').textContent = Math.round(e.volume * 100) + '%';
+                    var isMuted = (_jeCurrentVol === 0);
+                    
+                    // Sync the UI to our session tracker, ignoring EJS's reported value
+                    slider.value = _jeCurrentVol;
+                    document.getElementById('je-vol-pct').textContent = Math.round(_jeCurrentVol * 100) + '%';
+                    document.getElementById('je-vol-mute').textContent = isMuted ? 'Unmute' : 'Mute';
+                    
+                    // Force the emulator to match our tracked volume, just to be safe
+                    e.setVolume(_jeCurrentVol);
+                    e.volume = _jeCurrentVol;
                 }}
                 openPopup('je-pop-vol');
             }});
+
             document.getElementById('je-vol-slider').addEventListener('input', function() {{
                 var v = parseFloat(this.value);
+                _jeCurrentVol = v; // Update our session tracker
+                
                 document.getElementById('je-vol-pct').textContent = Math.round(v * 100) + '%';
+                
                 var e = emu();
-                if (e) {{ e.volume = v; e.muted = false; e.setVolume(v); }}
+                if (e) {{ 
+                    e.setVolume(v); 
+                    e.volume = v; // Keep EJS property in sync
+                    
+                    if (v > 0) {{
+                        document.getElementById('je-vol-mute').textContent = 'Mute';
+                    }} else {{
+                        document.getElementById('je-vol-mute').textContent = 'Unmute';
+                    }}
+                }}
             }});
+
             document.getElementById('je-vol-mute').addEventListener('click', function() {{
-                var e = emu(); if (!e) return;
-                e.muted = !e.muted;
-                e.setVolume(e.muted ? 0 : e.volume);
-                this.textContent = e.muted ? 'Unmute' : 'Mute';
-                document.getElementById('je-vol-pct').textContent = e.muted ? '0%' : Math.round(e.volume * 100) + '%';
+                var e = emu(); 
+                if (!e) return;
+                
+                var slider = document.getElementById('je-vol-slider');
+                
+                if (_jeCurrentVol > 0) {{
+                    // Action: Mute
+                    _jeLastVol = _jeCurrentVol; // Save current volume
+                    _jeCurrentVol = 0;          // Update session tracker
+                    
+                    e.setVolume(0);
+                    e.volume = 0;
+                    
+                    slider.value = 0;
+                    document.getElementById('je-vol-pct').textContent = '0%';
+                    this.textContent = 'Unmute';
+                }} else {{
+                    // Action: Unmute
+                    var restoreVol = _jeLastVol > 0 ? _jeLastVol : 1.0; 
+                    _jeCurrentVol = restoreVol; // Restore session tracker
+                    
+                    e.setVolume(restoreVol);
+                    e.volume = restoreVol;
+                    
+                    slider.value = restoreVol;
+                    document.getElementById('je-vol-pct').textContent = Math.round(restoreVol * 100) + '%';
+                    this.textContent = 'Mute';
+                }}
             }});
 
             // Cheats popup — cheats are loaded lazily on first open, never injected at startup.
