@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ game_name }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }
@@ -150,6 +151,12 @@
         #je-dock-min svg { width: 22px; height: 22px; fill: currentColor; }
         #je-dock.je-minimized { display: none !important; }
 
+        /* ── VR/AR Button ── */
+        #je-vr-btn { display: none; }
+        #je-vr-btn.je-vr-available { display: flex; }
+        #je-vr-btn.je-vr-active { color: #7df; background: rgba(100,200,255,.18); }
+        #je-vr-btn.je-vr-active:hover { background: rgba(100,200,255,.28); }
+
         /* ── Mobile ── */
         @media (max-width: 768px) {
             #je-dock { gap: 2px; padding: 5px 8px; bottom: 8px; max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
@@ -181,10 +188,17 @@
     <!-- Top Bar -->
     <div id="je-topbar" class="je-bar">
         <span id="je-topbar-title">{{ game_name }}</span>
-        <button class="je-topbtn" id="je-exit-btn" title="Exit">
-            <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-            Exit
-        </button>
+        
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="je-topbtn" id="je-vr-btn" title="Enter VR">
+                <svg viewBox="0 0 24 24"><path d="M20.5 6H3.5C2.12 6 1 7.12 1 8.5v7C1 16.88 2.12 18 3.5 18h4.1l1.33-1.5h6.14L16.4 18h4.1c1.38 0 2.5-1.12 2.5-2.5v-7C23 7.12 21.88 6 20.5 6zM8 13.5C6.62 13.5 5.5 12.38 5.5 11S6.62 8.5 8 8.5 10.5 9.62 10.5 11 9.38 13.5 8 13.5zm8 0c-1.38 0-2.5-1.12-2.5-2.5S14.62 8.5 16 8.5 18.5 9.62 18.5 11 17.38 13.5 16 13.5z"/></svg>
+                <span id="je-vr-label">VR</span>
+            </button>
+            <button class="je-topbtn" id="je-exit-btn" title="Exit">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                Exit
+            </button>
+        </div>
     </div>
 
     <!-- Bottom Dock -->
@@ -605,6 +619,337 @@
                 if (window.EJS_onExit) { EJS_onExit(); }
                 else if (window.opener) { window.close(); }
                 else { window.parent.postMessage('close-jellyemu','*'); }
+            });
+
+            // ── VR / AR Toggle ──
+            var vrBtn = document.getElementById('je-vr-btn');
+            var vrLabel = document.getElementById('je-vr-label');
+            var _xrSession = null;
+            var _xrMode = null; // 'immersive-ar' or 'immersive-vr'
+
+            if (!navigator.xr) return;
+
+            navigator.xr.isSessionSupported('immersive-ar').then(function(arOk) {
+                console.log(JSON.stringify(arOk));
+                if (arOk) {
+                    _xrMode = 'immersive-ar';
+                    vrLabel.textContent = 'AR';
+                    vrBtn.title = 'Enter AR';
+                    vrBtn.classList.add('je-vr-available');
+                    return;
+                }
+                return navigator.xr.isSessionSupported('immersive-vr').then(function(vrOk) {
+                    console.log(JSON.stringify(vrOk));
+                    if (vrOk) {
+                        _xrMode = 'immersive-vr';
+                        vrLabel.textContent = 'VR';
+                        vrBtn.title = 'Enter VR';
+                        vrBtn.classList.add('je-vr-available');
+                    }
+                });
+            }).catch(function() {});
+
+            function _enterXR() {
+                if (!_xrMode) return;
+                
+                var gameCanvas = document.querySelector('#game canvas') || document.querySelector('canvas');
+                if (!gameCanvas) return;
+
+                if (typeof THREE === 'undefined') {
+                    console.error('[JellyEmu] Three.js is missing! Ensure you added the script tag.');
+                    return;
+                }
+
+                navigator.xr.requestSession(_xrMode, { optionalFeatures: ['local-floor', 'bounded-floor'] })
+                    .then(function(session) {
+                        _xrSession = session;
+
+                        var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+                        renderer.xr.enabled = true;
+                        renderer.xr.setReferenceSpaceType('local-floor');
+                        renderer.xr.setSession(session);
+
+                        var scene = new THREE.Scene();
+                        var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+                        scene.background = new THREE.Color(0x0a0a1a);
+                        var gridHelper = new THREE.GridHelper(20, 40, 0x00ffff, 0x111133);
+                        scene.add(gridHelper);
+
+                        var ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                        scene.add(ambientLight);
+                        var directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                        directionalLight.position.set(5, 10, 2);
+                        scene.add(directionalLight);
+
+                        var texture = new THREE.CanvasTexture(gameCanvas);
+                        texture.minFilter = THREE.NearestFilter;
+                        texture.magFilter = THREE.NearestFilter;
+
+                        var screenRadius = 3.5; 
+                        var screenHeight = 2.4; 
+                        var screenMesh = null; 
+
+                        function setAspectRatio(ratio) {
+                            if (screenMesh) {
+                                scene.remove(screenMesh);
+                                screenMesh.geometry.dispose(); 
+                            }
+
+                            var screenWidth = screenHeight * ratio; 
+                            var geometry = new THREE.CylinderGeometry(
+                                screenRadius, screenRadius, screenHeight, 32, 1, true, 
+                                -screenWidth / (2 * screenRadius), screenWidth / screenRadius
+                            );
+                            geometry.scale(-1, 1, 1);
+
+                            var material = new THREE.MeshBasicMaterial({ 
+                                map: texture, 
+                                blending: THREE.NoBlending
+                            });
+
+                            screenMesh = new THREE.Mesh(geometry, material);
+                            screenMesh.position.set(0, 1.5, 0);
+                            screenMesh.rotation.y = Math.PI;
+                            scene.add(screenMesh);
+                        }
+
+                        var currentRatioIndex = 0;
+                        var ratios = [4/3, 16/9, 1/1]; 
+                        setAspectRatio(ratios[currentRatioIndex]);
+
+                        var dockGroup = new THREE.Group();
+                        dockGroup.position.set(0, 0.4, -2.5);
+                        dockGroup.rotation.x = -Math.PI / 8;
+                        scene.add(dockGroup);
+
+                        var interactables = [];
+
+                        function updateButtonTexture(mesh, label, isMuted, isFlashing, drawIcon) {
+                            var canvas = document.createElement('canvas');
+                            canvas.width = 256; canvas.height = 256;
+                            var ctx = canvas.getContext('2d');
+
+                            ctx.fillStyle = isFlashing ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.7)';
+                            ctx.beginPath();
+                            ctx.roundRect(10, 10, 236, 236, 40);
+                            ctx.fill();
+                            
+                            ctx.lineWidth = 4;
+                            ctx.strokeStyle = isFlashing ? '#ffffff' : 'rgba(255,255,255,0.2)';
+                            ctx.stroke();
+
+                            ctx.save();
+                            ctx.translate(128, 100);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.strokeStyle = '#ffffff';
+                            drawIcon(ctx, isMuted);
+                            ctx.restore();
+
+                            ctx.fillStyle = '#ffffff';
+                            ctx.font = 'bold 24px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(label, 128, 200);
+
+                            if (mesh.material.map) mesh.material.map.dispose();
+                            mesh.material.map = new THREE.CanvasTexture(canvas);
+                            mesh.material.map.minFilter = THREE.LinearFilter;
+                            mesh.material.needsUpdate = true;
+                        }
+
+                        function createDockButton(action, xOffset, label, drawIcon) {
+                            var geo = new THREE.PlaneGeometry(0.4, 0.4); // 40cm x 40cm
+                            var mat = new THREE.MeshBasicMaterial({ transparent: true });
+                            var mesh = new THREE.Mesh(geo, mat);
+                            
+                            mesh.position.set(xOffset, 0, 0);
+                            
+                            mesh.userData = { action: action, label: label, drawIcon: drawIcon, isMuted: false };
+                            updateButtonTexture(mesh, label, false, false, drawIcon);
+                            
+                            dockGroup.add(mesh);
+                            interactables.push(mesh);
+                            return mesh;
+                        }
+
+                        function drawRatioIcon(ctx) {
+                            ctx.lineWidth = 8;
+                            ctx.strokeRect(-40, -30, 80, 60);
+                        }
+
+                        function drawMuteIcon(ctx, isMuted) {
+                            ctx.beginPath();
+                            ctx.moveTo(-20, -15); ctx.lineTo(-20, 15); ctx.lineTo(0, 15);
+                            ctx.lineTo(25, 35); ctx.lineTo(25, -35); ctx.closePath();
+                            ctx.fill();
+                            
+                            if (isMuted) {
+                                ctx.lineWidth = 6; ctx.strokeStyle = '#ff4444';
+                                ctx.beginPath(); ctx.moveTo(35, -15); ctx.lineTo(65, 15); ctx.stroke();
+                                ctx.beginPath(); ctx.moveTo(65, -15); ctx.lineTo(35, 15); ctx.stroke();
+                            } else {
+                                ctx.lineWidth = 6; // Sound waves
+                                ctx.beginPath(); ctx.arc(25, 0, 20, -Math.PI/4, Math.PI/4); ctx.stroke();
+                                ctx.beginPath(); ctx.arc(25, 0, 35, -Math.PI/4, Math.PI/4); ctx.stroke();
+                            }
+                        }
+
+                        function drawExitIcon(ctx) {
+                            ctx.lineWidth = 10; ctx.lineCap = 'round';
+                            ctx.beginPath(); ctx.moveTo(-30, -30); ctx.lineTo(30, 30); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(30, -30); ctx.lineTo(-30, 30); ctx.stroke();
+                        }
+
+                        var btnRatio = createDockButton('ratio', -0.5, 'Ratio', drawRatioIcon);
+                        var btnMute  = createDockButton('mute', 0, 'Mute', drawMuteIcon);
+                        var btnExit  = createDockButton('exit', 0.5, 'Exit VR', drawExitIcon);
+
+
+                        var raycaster = new THREE.Raycaster();
+                        var tempMatrix = new THREE.Matrix4();
+
+                        function onSelect(event) {
+                            var controller = event.target;
+                            
+                            tempMatrix.identity().extractRotation(controller.matrixWorld);
+                            raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+                            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+                            var intersects = raycaster.intersectObjects(interactables);
+                            if (intersects.length > 0) {
+                                var btn = intersects[0].object;
+                                var action = btn.userData.action;
+
+                                if (action === 'ratio') {
+                                    currentRatioIndex = (currentRatioIndex + 1) % ratios.length;
+                                    setAspectRatio(ratios[currentRatioIndex]);
+                                    
+                                    updateButtonTexture(btn, btn.userData.label, btn.userData.isMuted, true, btn.userData.drawIcon);
+                                    setTimeout(() => updateButtonTexture(btn, btn.userData.label, btn.userData.isMuted, false, btn.userData.drawIcon), 150);
+                                } 
+                                else if (action === 'mute') {
+                                    btn.userData.isMuted = !btn.userData.isMuted;
+                                    btn.userData.label = btn.userData.isMuted ? 'Unmute' : 'Mute';
+                                    
+                                    var e = emu();
+                                    if (e) {
+                                        e.setVolume(btn.userData.isMuted ? 0 : 1.0);
+                                        e.volume = btn.userData.isMuted ? 0 : 1.0;
+                                    }
+                                    
+                                    updateButtonTexture(btn, btn.userData.label, btn.userData.isMuted, false, btn.userData.drawIcon);
+                                }
+                                else if (action === 'exit') {
+                                    if (_xrSession) _xrSession.end();
+                                }
+                            }
+                        }
+
+                        var laserGeo = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)
+                        ]);
+                        var laserMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+
+                        var controller0 = renderer.xr.getController(0);
+                        controller0.addEventListener('select', onSelect);
+                        controller0.add(new THREE.Line(laserGeo, laserMat)); 
+                        scene.add(controller0);
+
+                        var controller1 = renderer.xr.getController(1);
+                        controller1.addEventListener('select', onSelect);
+                        controller1.add(new THREE.Line(laserGeo, laserMat)); 
+                        scene.add(controller1);
+
+                        var origRaf = window.requestAnimationFrame;
+                        var rafCallbacks = [];
+                        window.requestAnimationFrame = function(cb) {
+                            if (_xrSession) { rafCallbacks.push(cb); return 0; }
+                            return origRaf.call(window, cb);
+                        };
+
+                        renderer.setAnimationLoop(function(time, frame) {
+                            if (!_xrSession) return;
+
+                            var cbs = rafCallbacks;
+                            rafCallbacks = [];
+                            for(var i = 0; i < cbs.length; i++) cbs[i](time);
+
+                            texture.needsUpdate = true;
+
+                            var g = gm();
+                            if (g && typeof g.simulateInput === 'function' && frame && frame.session.inputSources) {
+                                for (var i = 0; i < frame.session.inputSources.length; i++) {
+                                    var source = frame.session.inputSources[i];
+                                    if (!source.gamepad) continue;
+                                    
+                                    var pad = source.gamepad;
+                                    var isLeft = source.handedness === 'left';
+                                    var isRight = source.handedness === 'right';
+
+                                    var xAxis = pad.axes.length > 2 ? pad.axes[2] : (pad.axes[0] || 0);
+                                    var yAxis = pad.axes.length > 3 ? pad.axes[3] : (pad.axes[1] || 0);
+
+                                    if (isLeft) {
+                                        g.simulateInput(0, 6, xAxis < -0.5 ? 1 : 0); 
+                                        g.simulateInput(0, 7, xAxis > 0.5 ? 1 : 0);  
+                                        g.simulateInput(0, 4, yAxis < -0.5 ? 1 : 0); 
+                                        g.simulateInput(0, 5, yAxis > 0.5 ? 1 : 0);  
+                                        if (pad.buttons[4]) g.simulateInput(0, 9, pad.buttons[4].pressed ? 1 : 0); 
+                                        if (pad.buttons[5]) g.simulateInput(0, 1, pad.buttons[5].pressed ? 1 : 0); 
+                                        if (pad.buttons[0]) g.simulateInput(0, 12, pad.buttons[0].pressed ? 1 : 0); 
+                                        if (pad.buttons[1]) g.simulateInput(0, 10, pad.buttons[1].pressed ? 1 : 0); 
+                                        if (pad.buttons[3]) g.simulateInput(0, 2, pad.buttons[3].pressed ? 1 : 0); 
+                                    }
+                                    if (isRight) {
+                                        if (pad.buttons[4]) g.simulateInput(0, 8, pad.buttons[4].pressed ? 1 : 0); 
+                                        if (pad.buttons[5]) g.simulateInput(0, 0, pad.buttons[5].pressed ? 1 : 0); 
+                                        if (pad.buttons[0]) g.simulateInput(0, 13, pad.buttons[0].pressed ? 1 : 0); 
+                                        if (pad.buttons[1]) g.simulateInput(0, 11, pad.buttons[1].pressed ? 1 : 0); 
+                                        if (pad.buttons[3]) g.simulateInput(0, 3, pad.buttons[3].pressed ? 1 : 0); 
+                                    }
+                                }
+                            }
+
+                            renderer.render(scene, camera);
+                        });
+
+                        var g = gm();
+                        if (g && typeof g.simulateInput === 'function') g.simulateInput(0, 30, 1);
+
+                        vrBtn.classList.add('je-vr-active');
+                        vrBtn.title = _xrMode === 'immersive-ar' ? 'Exit AR' : 'Exit VR';
+                        
+                        session.addEventListener('end', function() {
+                            _xrSession = null;
+                            vrBtn.classList.remove('je-vr-active');
+                            vrBtn.title = _xrMode === 'immersive-ar' ? 'Enter AR' : 'Enter VR';
+                            
+                            window.requestAnimationFrame = origRaf; 
+                            renderer.dispose();
+                            
+                            var g = gm();
+                            if (g && typeof g.simulateInput === 'function') g.simulateInput(0, 30, 0);
+                        });
+
+                    }).catch(function(err) {
+                        console.warn('[JellyEmu] XR session request failed:', err);
+                    });
+            }
+
+            function _exitXR() {
+                if (_xrSession) _xrSession.end().catch(function() {});
+            }
+
+            function _onXREnd() {
+                _xrSession = null;
+                vrBtn.classList.remove('je-vr-active');
+                vrBtn.title = _xrMode === 'immersive-ar' ? 'Enter AR' : 'Enter VR';
+                var g = gm();
+                if (g && typeof g.simulateInput === 'function') g.simulateInput(0, 30, 0);
+            }
+
+            vrBtn.addEventListener('click', function() {
+                if (_xrSession) { _exitXR(); } else { _enterXR(); }
             });
 
             // Core Options Popup
