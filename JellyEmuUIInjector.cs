@@ -196,6 +196,7 @@ namespace JellyEmu.Services
                                     // Non-threaded cores work fine in an iframe
                                     var iframe = document.createElement('iframe');
                                     iframe.id = 'jellyemu-iframe';
+                                    iframe.allow = 'xr-spatial-tracking';
                                     iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
                                     iframe.src = playUrl;
                                     document.body.appendChild(iframe);
