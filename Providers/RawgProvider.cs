@@ -91,10 +91,52 @@ namespace JellyEmu.Providers
             _platformResolver = platformResolver;
         }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            searchInfo.ProviderIds.TryGetValue("RAWG", out var directId);
+            if (string.IsNullOrEmpty(directId))
+                directId = TryExtractEmbeddedRawgId(searchInfo.Path);
+
+            if (!string.IsNullOrEmpty(directId))
+            {
+                try
+                {
+                    var response = await GetHttpClient().GetAsync(
+                        $"https://api.rawg.io/api/games/{directId}?key={ApiKey}",
+                        cancellationToken).ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                        var root = document.RootElement;
+
+                        var sr = new RemoteSearchResult
+                        {
+                            Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
+                            ProviderIds = new Dictionary<string, string> { { "RAWG", directId } },
+                            SearchProviderName = Name
+                        };
+
+                        if (root.TryGetProperty("background_image", out var bg) && bg.ValueKind != JsonValueKind.Null)
+                        {
+                            var imgUrl = bg.GetString();
+                            if (!string.IsNullOrWhiteSpace(imgUrl)) sr.ImageUrl = imgUrl;
+                        }
+
+                        if (root.TryGetProperty("released", out var rel) && rel.ValueKind == JsonValueKind.String &&
+                            DateTime.TryParse(rel.GetString(), out var releaseDate))
+                            sr.ProductionYear = releaseDate.Year;
+
+                        return new[] { sr };
+                    }
+                }
+                catch { }
+                return results;
+            }
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
