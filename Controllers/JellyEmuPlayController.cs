@@ -130,10 +130,6 @@ namespace JellyEmu.Controllers
         .je-dockbtn.je-active {{ background: rgba(255,255,255,.2); }}
         .je-dock-sep {{ width: 1px; height: 24px; background: rgba(255,255,255,.15); margin: 0 2px; flex-shrink: 0; }}
 
-        /* ── Touch controls ── */
-        #touch_controls_gfx, #touch_keyboard_gfx {{ pointer-events: none; display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }}
-        #touch_controls_background {{ pointer-events: none; display: none; background: #000; opacity: 0.5; position: fixed; top: 0; left: 0; width: 100vw; height: 200vh; }}
-
         /* ── Top Bar ── */
         .je-bar {{ position: fixed; left: 0; right: 0; z-index: 90000; display: flex; align-items: center; transition: opacity .3s; }}
         #je-topbar {{ top: 0; height: 48px; justify-content: space-between; padding: 0 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); opacity: 0; pointer-events: none; }}
@@ -143,6 +139,77 @@ namespace JellyEmu.Controllers
         .je-topbtn:hover {{ background: rgba(255,255,255,.1); }}
         .je-topbtn:active {{ transform: scale(.93); }}
         .je-topbtn svg {{ width: 20px; height: 20px; fill: currentColor; }}
+
+        /* ── Hide Legacy Touch UI ── */
+        #touch_controls_gfx, #touch_keyboard_gfx, #touch_controls_background {{
+            display: none !important;
+        }}
+
+        /* ── Custom Touch UI ── */
+        #custom-touch-ui {{
+            position: fixed;
+            bottom: 80px; /* Moved up slightly to clear the dock */
+            left: 0;
+            right: 0;
+            display: none; 
+            justify-content: space-between;
+            padding: 20px;
+            pointer-events: none; 
+            z-index: 85000;
+        }}
+        #custom-touch-ui.je-active {{
+            display: flex;
+        }}
+        
+        /* Ensure it remains hidden on desktop/mouse environments */
+        @media (hover: hover) and (pointer: fine) {{
+            #custom-touch-ui, #custom-touch-ui.je-active {{
+                display: none !important;
+            }}
+        }}
+
+        /* D-Pad Grid */
+        .je-dpad {{
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            pointer-events: auto;
+        }}
+        .je-btn {{
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; 
+        }}
+        .je-btn:active {{ background: rgba(255, 255, 255, 0.4); }}
+
+        /* Placement in the grid */
+        #btn-up {{ grid-column: 2; grid-row: 1; border-radius: 12px 12px 4px 4px; }}
+        #btn-left {{ grid-column: 1; grid-row: 2; border-radius: 12px 4px 4px 12px; }}
+        #btn-right {{ grid-column: 3; grid-row: 2; border-radius: 4px 12px 12px 4px; }}
+        #btn-down {{ grid-column: 2; grid-row: 3; border-radius: 4px 4px 12px 12px; }}
+
+        /* Action Buttons */
+        .je-actions {{
+            display: flex;
+            align-items: flex-end;
+            gap: 15px;
+            pointer-events: auto;
+        }}
+        .je-btn-action {{
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+        }}
     </style>
 </head>
 <body>
@@ -168,27 +235,41 @@ namespace JellyEmu.Controllers
         <div id=""p8_frame"">
             <textarea id=""codo_textarea"" class=""emscripten"" style=""display:none; position:absolute; left:-9999px; height:0; overflow:hidden""></textarea>
 
-            <div id=""p8_menu_buttons_touch"" style=""position:absolute; width:100%; z-index:10; left:0; top:0;"">
-                <div class=""p8_menu_button"" id=""p8b_full""  style=""float:left; margin-left:10px""  onclick=""p8_give_focus(); p8_request_fullscreen();""></div>
-                <div class=""p8_menu_button"" id=""p8b_sound"" style=""float:left; margin-left:10px""  onclick=""p8_give_focus(); p8_create_audio_context(); Module.pico8ToggleSound();""></div>
-            </div>
-
             <div id=""p8_container"" onclick="""">
                 <div id=""p8_playarea"">
-                    <div id=""touch_controls_background"">&nbsp;</div>
+                    <div id=""touch_controls_background""></div>
                     <div id=""p8_playarea_flex"">
                         <canvas class=""emscripten"" id=""canvas"" oncontextmenu=""event.preventDefault();"" width=""128"" height=""128""></canvas>
                     </div>
                     <div id=""touch_controls_gfx"">
-                        <img src=""#"" id=""controls_right_panel"" style=""position:absolute; opacity:0.5;"">
-                        <img src=""#"" id=""controls_left_panel""  style=""position:absolute; opacity:0.5;"">
                     </div>
                     <div id=""touch_keyboard_gfx"">
-                        <img src=""#"" id=""controls_keyboard_panel"" style=""position:absolute; opacity:0.5;"">
                     </div>
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <div id=""custom-touch-ui"">
+        <div class=""je-dpad"">
+            <div class=""je-btn"" id=""btn-up"" data-mask=""4"">
+                <svg viewBox=""0 0 24 24"" width=""32"" height=""32"" fill=""currentColor""><path d=""M12 4l-8 8h6v8h4v-8h6z""/></svg>
+            </div>
+            <div class=""je-btn"" id=""btn-left"" data-mask=""1"">
+                <svg viewBox=""0 0 24 24"" width=""32"" height=""32"" fill=""currentColor""><path d=""M4 12l8-8v6h8v4h-8v6z""/></svg>
+            </div>
+            <div class=""je-btn"" id=""btn-right"" data-mask=""2"">
+                <svg viewBox=""0 0 24 24"" width=""32"" height=""32"" fill=""currentColor""><path d=""M20 12l-8-8v6h-8v4h8v6z""/></svg>
+            </div>
+            <div class=""je-btn"" id=""btn-down"" data-mask=""8"">
+                <svg viewBox=""0 0 24 24"" width=""32"" height=""32"" fill=""currentColor""><path d=""M12 20l8-8h-6v-8h-4v8h-6z""/></svg>
+            </div>
+        </div>
+        
+        <div class=""je-actions"">
+            <div class=""je-btn je-btn-action"" id=""btn-o"" data-mask=""16"">O</div>
+            <div class=""je-btn je-btn-action"" id=""btn-x"" data-mask=""32"">X</div>
         </div>
     </div>
 
@@ -213,7 +294,6 @@ namespace JellyEmu.Controllers
     </div>
 
     <script>
-    // ── JellyEmu exit ────────────────────────────────────────────────────────
     function jeExit() {{
         if (window.parent === window) {{
             try {{ var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); }} catch(e) {{}}
@@ -223,7 +303,6 @@ namespace JellyEmu.Controllers
         }}
     }}
 
-    // ── PICO-8 BBS shell globals (from lexaloffle.com BBS source) ────────────
     var p8_is_running = false;
     var p8_script = null;
     var Module = null;
@@ -258,16 +337,13 @@ namespace JellyEmu.Controllers
         'p8b_sound0':    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAANklEQVRIx2NgGDHg/8cX/5Hx0LEA3cChYwEugwavBcRG4qgFoxYMZwuGfk4efqXp8KnRBj0AAMz7cLDnG4FeAAAAAElFTkSuQmCC',
         'p8b_sound1':    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAPUlEQVRIx2NgGDHg/8cX/5Hx0LEA3cChYwEugwhZQLQDqG4BsZFIKMhGLRi1YChbMPRz8vArTYdPjTboAQCSVgpXUWQAMAAAAABJRU5ErkJggg==',
         'p8b_close':     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAU0lEQVRIx2NkoDFgpJsF/z+++I8iwS9BkuW49A+cBcRaREgf/Swg1SJi1dHfAkIG4EyOOIJy4Cwg1iJCiWDUAvItGLqpaOjm5KFfmg79Gm3ItioAl+mAGVYIZUUAAAAASUVORK5CYII=',
-        'p8b_cart':      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAZ0lEQVR4Ae2dsQrAMAhEa+ie1f//uq79Ajs1OKRyiGDTeuAQAr4cp5lpU5LzEH32ijqPvi2ioaUpgDqTp2BApHbrEs3k6fV5GRSgAD8DmJtsbegaDpb4iz6eAao7q5njHAfo9Lxiii5mqxbMNtaN0wAAABB0RVh0TG9kZVBORwAyMDExMDIyMeNZtsEAAAAASUVORK5CYII=',
-        'controls_left_panel':     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AAAEI0lEQVR42u3dMU7DQBCG0Tjam9DTcP8jpEmfswS5iHBhAsLxev/hvQY6pGXyZRTQ+nQCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHqbHEEtl+vt7hS+fLy/mXHBQqxEi/6aI/AiFW9SnB2BWDkDBAtAsADBAhAsAMECBAtAsAAECxAsAMECECxAsAAEC0CwONJ8tYvrXRAsImK19j0IFsPGSrQQLCJiNV+et7xAT7QQLIaN1dr3ooVgMWysRAvBIipWooVgERUr0UKwiIqVaCFYRMVKtBAsomIlWggWUbESLQSLqFiJFoJFVKxEC8EiKlaihWARFSvRQrDYJSSVfhaCBSBYAIIFCBbAHpoj4Bl/scOGBWDD4lX8iwE2LADBAgQLQLAABAsQLADBAhAsQLAABAtAsADBAhAsAMECBAtAsAAECxAsAMECECxAsMh1ud7uTsHZVDcZyFo8Yt5sVJ6NyUAaSNEyIymaXwZepIKd4mwoQbAFC0CwAMECECwAwQIEC0CwAAQLECwAwQIQLECwAAQLQLAAwQI4UHME2/10QZq7usyBObBhRQwpmBUb1nADuPbuaUD/p2ezMH+1admwhosVfBcxb2SCJVaIlmAhVoiWYIkVoiVagiVWiJZgiZVYIVqCJVaIlmgJllghWoIlViBagiVWiJZoCZZYIVqCJVYgWoIlViBaggUIlnc0sPELlmghVmIlWKKFWAmWaIFYCZZoIVYIlmghVoIlWiBWgiVaiJVgIVqIlWCJFoiVYIkWYiVYiBZiJViihViJ1XbNEWyL1mMQRYvfvIGJlQ1rmE0LzIoNyyBiDrBhAYIFIFiAYAEIFoBgAYIFIFgAggUIFoBgAQgWIFgAggUgWIBgDc+Nn1D/tdH8YupwgZy5qG4ykKIlVmZDsDjshSlazqQqH7p793Q2CBaAYAGCBSBYAIIFCBaAYAEIFiBYAIIFIFiAYAEIFoBgAYIFIFgAggUIFoBgAQgWIFgAggUgWIBgAQgWwENzBKxZPub9CJ7WjA0LsGFRV+9N5+jNDhsWgGABggUgWACCxW56fgjuA3cEiz9Z/nWwR0iWP8P/YCFYDBstsUKwiIiWWCFYRERLrBAsIqIlVggWEdESKwSLiGiJFYJFRLTECsEiIlpihWARES2xQrCIiJZYIVhEREusECwioiVWCBYx0RIrBIuoaIkVr+YhFHTZtMCGBQgWgGABCBYgWACCBSBYgGABCBaAYAGCBSBYAIIFCBbj2uOR8s6AEbhexgsWYri3SKhKczcXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMA2n+e0UMDzh3yTAAAAAElFTkSuQmCC',
-        'controls_right_panel':    'data:image/png;base64,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',
+        'p8b_cart':      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAZ0lEQVR4Ae2dsQrAMAhEa+ie1f//uq79Ajs1OKRyiGDTeuAQAr4cp5lpU5LzEH32ijqPvi2ioaUpgDqTp2BApHbrEs3k6fV5GRSgAD8DmJtsbegaDpb4iz6eAao7q5njHAfo9Lxiii5mqxbMNtaN0wAAABB0RVh0TG9kZVBORwAyMDExMDIyMeNZtsEAAAAASUVORK5CYII='
     }};
 
     document.addEventListener('touchstart', {{}}, {{passive:true}});
     document.addEventListener('touchmove',  {{}}, {{passive:true}});
     document.addEventListener('touchend',   {{}}, {{passive:true}});
 
-    // ── Dock / topbar show-on-hover ──────────────────────────────────────────
     var _jeIdleTimer = null;
     function _jeShowUI() {{
         document.getElementById('je-topbar').classList.add('je-active');
@@ -328,6 +404,9 @@ namespace JellyEmu.Controllers
         }}
     }}
 
+    p8_update_layout();
+    p8_update_button_icons();
+
     var p8_buttons_hash = -1;
     function p8_update_button_icons() {{
         var w = 24;
@@ -364,37 +443,52 @@ namespace JellyEmu.Controllers
         var container  = document.getElementById('p8_container');
         var frame      = document.getElementById('p8_frame');
         if (!canvas || !playarea || !container || !frame) {{ requestAnimationFrame(p8_update_layout); return; }}
+        
         var is_fs = document.fullscreenElement || document.webkitIsFullScreen;
         var fw = is_fs ? window.innerWidth  : Math.min(frame.offsetWidth,  window.innerWidth);
         var fh = is_fs ? window.innerHeight : Math.min(frame.offsetHeight, window.innerHeight);
         var csize = Math.min(fw, fh);
+        
         if (p8_touch_detected && p8_is_running) csize = Math.min(csize, Math.max(window.innerWidth, window.innerHeight) * 2/3);
         if (fw >= 512 && fh >= 512) csize = (csize+1) & ~0x7f;
         if (!is_fs) {{ csize = Math.min(csize, last_windowed_container_height, last_windowed_container_width / p8_aspect); }}
-        var ml = is_fs ? (fw - csize * p8_aspect) / 2 : 0;
-        var mt = is_fs ? (fh - csize) / 2 : 0;
-        var hash = csize + mt*1000.3 + ml*0.001 + fw*333.33 + fh*772.15;
+        
+        var hash = csize + fw*333.33 + fh*772.15; 
         if (is_fs) hash += 0.1237;
         if (!is_fs && !p8_touch_detected && p8_update_layout_hash === hash) {{ requestAnimationFrame(p8_update_layout); return; }}
         p8_update_layout_hash = hash;
+        
         if (!is_fs) {{
             last_windowed_container_height = (frame.parentNode && frame.parentNode.parentNode) ? frame.parentNode.parentNode.offsetHeight : fh;
             last_windowed_container_width  = (frame.parentNode && frame.parentNode.parentNode) ? frame.parentNode.parentNode.offsetWidth  : fw;
         }}
+        
         canvas.style.width  = (csize * p8_aspect) + 'px';
         canvas.style.height = csize + 'px';
-        canvas.style.marginLeft = ml + 'px';
-        canvas.style.marginTop  = mt + 'px';
+        canvas.style.marginLeft = '0px';
+        canvas.style.marginTop  = '0px';
+        
         var dock = document.getElementById('je-dock');
         if (dock) {{
             var canvasW = csize * p8_aspect;
             dock.style.maxWidth = canvasW + 'px';
         }}
+        
         container.style.width  = (csize * p8_aspect) + 'px';
         container.style.height = csize + 'px';
-        document.getElementById('touch_controls_gfx').style.display    = (p8_touch_detected && p8_is_running) ? 'table' : 'none';
+        
+        // --- NEW: Shift the container up on mobile devices ---
+        if (p8_touch_detected && p8_is_running) {{
+            container.style.marginTop = '60px'; // Leaves a little space for the top bar
+        }} else {{
+            container.style.marginTop = 'auto'; // Re-centers for desktop/mouse
+        }}
+        
+        document.getElementById('touch_controls_gfx').style.display    = 'none';
         document.getElementById('touch_keyboard_gfx').style.display    = 'none';
+        
         if (!p8_is_running) playarea.style.display = 'none';
+        
         requestAnimationFrame(p8_update_layout);
     }}
 
@@ -429,36 +523,49 @@ namespace JellyEmu.Controllers
                 if(e.preventDefault)e.preventDefault();
     }},{{passive:false}});
 
-    // Touch button events (condensed)
-    function pico8_buttons_event(e,step){{
-        if(!p8_is_running)return;
-        pico8_buttons[0]=0;
-        var num=e.touches?e.touches.length:0;
-        for(var i=0;i<num;i++){{
-            var t=e.touches[i],x=t.clientX,y=t.clientY,w=window.innerWidth,h=window.innerHeight;
-            var r=Math.min(w,h)/12;if(r>40)r=40;
-            var b=0;
-            if(y>h-r*8){{
-                e.preventDefault();
-                if(x<w/2&&x<r*6){{
-                    var cx=r*3,cy=h-r*3,dx=x-cx,dy=y-cy,dz=r/3;
-                    if(Math.abs(dx)>Math.abs(dy)*0.6){{if(dx<-dz)b|=1;if(dx>dz)b|=2;}}
-                    if(Math.abs(dy)>Math.abs(dx)*0.6){{if(dy<-dz)b|=4;if(dy>dz)b|=8;}}
-                }}else if(x>w-r*6){{
-                    if((h-y)>(w-x)*0.8)b|=0x10;
-                    if((w-x)>(h-y)*0.8)b|=0x20;
-                }}
-            }}
-            pico8_buttons[0]|=b;
-        }}
-    }}
-    addEventListener('touchstart',function(e){{pico8_buttons_event(e,0);}},{{passive:false}});
-    addEventListener('touchmove', function(e){{pico8_buttons_event(e,1);}},{{passive:false}});
-    addEventListener('touchend',  function(e){{pico8_buttons_event(e,2);}},{{passive:false}});
 
-    // ── Boot ─────────────────────────────────────────────────────────────────
-    p8_update_layout();
-    p8_update_button_icons();
+    // --- Custom Touch UI Logic ---
+    var customTouchUI = document.getElementById('custom-touch-ui');
+    var touchButtons = document.querySelectorAll('#custom-touch-ui .je-btn');
+
+    // Show the UI when any touch is detected on the screen
+    window.addEventListener('touchstart', function() {{
+        if (p8_is_running && !customTouchUI.classList.contains('je-active')) {{
+            customTouchUI.classList.add('je-active');
+        }}
+    }}, {{passive: true}});
+
+    // Hide the UI if real mouse movement is detected (e.g. on 2-in-1 laptops)
+    window.addEventListener('mousemove', function(e) {{
+        if (Math.abs(e.movementX) > 0 || Math.abs(e.movementY) > 0) {{
+            if (customTouchUI.classList.contains('je-active')) {{
+                customTouchUI.classList.remove('je-active');
+            }}
+        }}
+    }}, {{passive: true}});
+
+    // Handle the button presses via Bitmask
+    touchButtons.forEach(function(btn) {{
+        var mask = parseInt(btn.getAttribute('data-mask'), 10);
+
+        // Apply the bitmask when pressed
+        btn.addEventListener('touchstart', function(e) {{
+            e.preventDefault(); // Stop double-firing or zooming
+            pico8_buttons[0] |= mask;
+            btn.style.background = 'rgba(255, 255, 255, 0.4)';
+        }}, {{passive: false}});
+
+        // Remove the bitmask when released
+        var releaseHandler = function(e) {{
+            e.preventDefault();
+            pico8_buttons[0] &= ~mask;
+            btn.style.background = '';
+        }};
+
+        btn.addEventListener('touchend', releaseHandler, {{passive: false}});
+        btn.addEventListener('touchcancel', releaseHandler, {{passive: false}});
+    }});
+
 
     var canvas = document.getElementById('canvas');
     Module = {{}};

@@ -1,13 +1,51 @@
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 namespace JellyEmu
 {
     internal static class RomExtensions
     {
-        public static bool IsRomPath(string? path)
+        /// <summary>
+        /// For sidecar lookups, returns the "logical" base path.
+        /// .p8.png  → strips both extensions  → "Game"
+        /// .p8      → strips extension         → "Game"
+        /// .zip     → strips extension         → "Game"
+        /// </summary>
+        public static string EffectivePicoPath(string path)
+        {
+            if (path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
+                return path[..^7];
+            return Path.Combine(
+                Path.GetDirectoryName(path) ?? string.Empty,
+                Path.GetFileNameWithoutExtension(path));
+        }
+
+        /// <summary>
+        /// Returns true for any PICO-8 cart path (.p8, .p8.png, or a .zip containing a .p8 or .p8.png entry).
+        /// Used by JellyEmuLexaloffleProvider; excluded from all ROM providers.
+        /// </summary>
+        public static bool IsPico8Path(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
             if (path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase)) return true;
+            if (Path.GetExtension(path).Equals(".p8", StringComparison.OrdinalIgnoreCase)) return true;
+            if (Path.GetExtension(path).Equals(".zip", StringComparison.OrdinalIgnoreCase) && File.Exists(path))
+            {
+                try
+                {
+                    using var zip = ZipFile.OpenRead(path);
+                    return zip.Entries.Any(e =>
+                        e.FullName.EndsWith(".p8", StringComparison.OrdinalIgnoreCase) ||
+                        e.FullName.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase));
+                }
+                catch { }
+            }
+            return false;
+        }
+
+        public static bool IsRomPath(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
             var ext = Path.GetExtension(path);
             if (!string.IsNullOrEmpty(ext)) return PlatformResolver.AllRomExtensions.Contains(ext);
             if (Directory.Exists(path))

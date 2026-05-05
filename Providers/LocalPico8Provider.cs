@@ -33,33 +33,7 @@ namespace JellyEmu.Providers
 
         public string Name => "Local PICO-8 Assets";
 
-        /// <summary>
-        /// Returns true for .p8, .p8.png, and .zip files tagged or folder-hinted as PICO-8.
-        /// Note: .zip requires a PICO-8 tag — extension alone is ambiguous.
-        /// </summary>
-        public static bool IsPico8Path(string? path)
-        {
-            if (string.IsNullOrEmpty(path)) return false;
-            if (path.EndsWith(".p8",     StringComparison.OrdinalIgnoreCase)) return true;
-            if (path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase)) return true;
-            if (path.EndsWith(".zip",    StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
-
-        /// <summary>
-        /// For sidecar lookups, returns the "logical" base path.
-        /// .p8.png  → strips both extensions  → "Game"
-        /// .p8      → strips extension         → "Game"
-        /// .zip     → strips extension         → "Game"
-        /// </summary>
-        public static string EffectivePath(string path)
-        {
-            if (path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
-                return path[..^7];
-            return Path.Combine(
-                Path.GetDirectoryName(path) ?? string.Empty,
-                Path.GetFileNameWithoutExtension(path));
-        }
+        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsPico8Path(item.Path);
 
         /// <summary>
         /// For a .zip bundle, finds the first .p8.png or .p8 entry and returns
@@ -88,10 +62,10 @@ namespace JellyEmu.Providers
         {
             var result = new MetadataResult<Book>();
 
-            if (!IsPico8Path(info.Path))
+            if (!RomExtensions.IsPico8Path(info.Path))
                 return Task.FromResult(result);
 
-            var basePath = EffectivePath(info.Path);
+            var basePath = RomExtensions.EffectivePicoPath(info.Path);
             var dir      = Path.GetDirectoryName(info.Path) ?? string.Empty;
             var baseName = Path.GetFileName(basePath);
 
@@ -194,8 +168,6 @@ namespace JellyEmu.Providers
             return Task.FromResult(result);
         }
 
-        public bool Supports(BaseItem item) => item is Book;
-
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) =>
             new[] { ImageType.Primary, ImageType.Backdrop };
 
@@ -205,10 +177,10 @@ namespace JellyEmu.Providers
         {
             var list = new List<RemoteImageInfo>();
 
-            if (string.IsNullOrEmpty(item.Path) || !IsPico8Path(item.Path))
+            if (string.IsNullOrEmpty(item.Path) || !RomExtensions.IsPico8Path(item.Path))
                 return Task.FromResult<IEnumerable<RemoteImageInfo>>(list);
 
-            var basePath = EffectivePath(item.Path);
+            var basePath = RomExtensions.EffectivePicoPath(item.Path);
 
             foreach (var ext in new[] { ".jpg", ".png" })
             {

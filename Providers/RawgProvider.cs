@@ -69,7 +69,7 @@ namespace JellyEmu.Providers
 
     public class RawgMetadataProvider : BaseRawgProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
     {
-        public string Name => "RAWG Video Game Database";
+        public string Name => "RAWG Metadata Provider";
         public int Order => 2;
 
         private readonly PlatformResolver _platformResolver;
@@ -231,7 +231,7 @@ namespace JellyEmu.Providers
 
     public class RawgImageProvider : BaseRawgProvider, IRemoteImageProvider, IHasOrder
     {
-        public string Name => "RAWG Video Game Database";
+        public string Name => "RAWG Image Provider";
         public int Order => 2;
 
         public RawgImageProvider(IHttpClientFactory httpClientFactory, ILogger<RawgImageProvider> logger)
@@ -280,7 +280,7 @@ namespace JellyEmu.Providers
 
     public class RawgPersonMetadataProvider : BaseRawgProvider, IRemoteMetadataProvider<Person, PersonLookupInfo>, IHasOrder
     {
-        public string Name => "RAWG Creators";
+        public string Name => "RAWG Creator Metadata Provider";
         public int Order => 1;
 
         public RawgPersonMetadataProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonMetadataProvider> logger)
@@ -384,7 +384,7 @@ namespace JellyEmu.Providers
 
     public class RawgPersonImageProvider : BaseRawgProvider, IRemoteImageProvider, IHasOrder
     {
-        public string Name => "RAWG Creators";
+        public string Name => "RAWG Creator Image Provider";
         public int Order => 1;
 
         public RawgPersonImageProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonImageProvider> logger)
@@ -425,7 +425,7 @@ namespace JellyEmu.Providers
 
     public class RawgPersonExternalId : IExternalId
     {
-        public string ProviderName => "RAWG Database";
+        public string ProviderName => "RAWG";
         public string Key => "RAWG";
         public ExternalIdMediaType? Type => ExternalIdMediaType.Person;
         public string UrlFormatString => "https://rawg.io/creators/{0}";
@@ -434,11 +434,12 @@ namespace JellyEmu.Providers
 
     public class RawgGameExternalId : IExternalId
     {
-        public string ProviderName => "RAWG Database";
+        public string ProviderName => "RAWG";
         public string Key => "RAWG";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://rawg.io/games/{0}";
-        public bool Supports(IHasProviderIds item) => item is Book;
+        public bool Supports(IHasProviderIds item) 
+            => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
     }
 
     public class RawgExternalUrlProvider : IExternalUrlProvider

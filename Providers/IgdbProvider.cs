@@ -103,7 +103,7 @@ namespace JellyEmu.Providers
 
     public class IgdbMetadataProvider : BaseIgdbProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
     {
-        public string Name => "IGDB Video Game Database";
+        public string Name => "IGDB Metadata Provider";
         public int Order => 1;
 
         private readonly PlatformResolver _platformResolver;
@@ -282,7 +282,7 @@ namespace JellyEmu.Providers
 
     public class IgdbImageProvider : BaseIgdbProvider, IRemoteImageProvider, IHasOrder
     {
-        public string Name => "IGDB Video Game Database";
+        public string Name => "IGDB Image Provider";
         public int Order => 1;
 
         public IgdbImageProvider(IHttpClientFactory httpClientFactory, ILogger<IgdbImageProvider> logger)
@@ -363,7 +363,7 @@ namespace JellyEmu.Providers
         public string Key => "IGDBSlug";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://www.igdb.com/games/{0}";
-        public bool Supports(IHasProviderIds item) => item is Book;
+        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
     }
 
     public class IgdbExternalUrlProvider : IExternalUrlProvider
