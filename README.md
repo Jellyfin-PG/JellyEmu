@@ -251,13 +251,16 @@ Sometimes, game titles are ambiguous, or a metadata provider grabs the wrong ver
 
 You can force JellyEmu to link the ROM to a specific database entry by adding a provider ID directly into the filename. The plugin will use this exact ID to fetch artwork and descriptions, and will automatically hide the token from the UI.
 
-* **For IGDB:** Use `[igdb-ID]` 
-* **For RAWG:** Use `[rawg-SLUG]`
-* **For Lexaloffle:** Use `[loid-ID]`
+| Provider | Tag |
+| :--- | :--- |
+| **RAWG** | [rawg-19291] |
+| **IGDB** | [igdb-9102] |
+| **Wikipedia** | [wiki-8482] |
+| **LexalOffle** | [loid-819821] |
 
 **Examples:**
 * `Doom [igdb-1039].iso` ➔ Forces the IGDB entry for the 1993 original, rather than the 2016 reboot.
-* `Aladdin (Sega) [rawg-disneys-aladdin-1993].md` ➔ Forces the exact RAWG entry.
+* `Aladdin (Sega) [rawg-871812].md` ➔ Forces the exact RAWG entry.
 
 You can combine provider IDs and platform tokens safely. For example:
 `Sonic Adventure [igdb-3273][Sega CD].chd` will properly match the IGDB database entry, assign it to the Sega CD platform, and display cleanly as simply **Sonic Adventure**.
