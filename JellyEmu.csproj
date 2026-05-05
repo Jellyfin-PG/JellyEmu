@@ -4,6 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 
     <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
@@ -21,6 +22,7 @@
   <ItemGroup>
     <PackageReference Include="Jellyfin.Controller" Version="10.11.0" />
     <PackageReference Include="Jellyfin.Model" Version="10.11.0" />
+    <PackageReference Include="Scriban" Version="7.1.0" />
     <PackageReference Include="System.Text.Encodings.Web" Version="9.0.0" />
   </ItemGroup>
 
@@ -30,6 +32,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Configuration\configPage.html" LogicalName="JellyEmu.Configuration.configPage.html" />
+    <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html"/>
   </ItemGroup>
 
 </Project>

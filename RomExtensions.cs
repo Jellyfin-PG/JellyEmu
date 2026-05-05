@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using MediaBrowser.Controller.Entities;
 
 namespace JellyEmu
 {
@@ -74,6 +75,16 @@ namespace JellyEmu
                 catch { }
             }
             return path;
+        }
+
+        public static string GetPico8Extension(BaseItem item)
+        {
+            var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".p8.png";
+
+            if (!string.IsNullOrEmpty(item.Path) &&
+                item.Path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
+                ext = ".p8.png";
+            return ext;
         }
 
         public static string CleanName(string name)
