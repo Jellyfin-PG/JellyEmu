@@ -33,7 +33,7 @@
   </a>
    
   <a href="assets/screen02.png">
-    <img src="assets/screen02.png" width="45%" alt="Jellyemu playing" />
+    <img src="assets/screen02.png" width="45%" alt="Jellyemu rom emulator" />
   </a>
 
   <a href="assets/screen03.png">
@@ -42,6 +42,10 @@
 
   <a href="assets/screen04.png">
     <img src="assets/screen04.png" width="45%" alt="Jellyemu save state browser" />
+  </a>
+  
+  <a href="assets/screen05.png">
+    <img src="assets/screen05.png" width="45%" alt="Jellyemu pico8 emulator" />
   </a>
 </p>
 <p align="center">
