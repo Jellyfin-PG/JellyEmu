@@ -19,7 +19,7 @@ namespace JellyEmu.Providers
             _platformResolver = platformResolver;
         }
 
-        public string Name => "Retro Games Local Assets";
+        public string Name => "Local Rom Assets";
 
         public Task<MetadataResult<Book>> GetMetadata(ItemInfo info, IDirectoryService directoryService, CancellationToken cancellationToken)
         {
@@ -103,7 +103,7 @@ namespace JellyEmu.Providers
             return Task.FromResult(result);
         }
 
-        public bool Supports(BaseItem item) => item is Book;
+        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 

@@ -328,7 +328,7 @@ namespace JellyEmu
                 ".col", ".cv", ".ngp", ".ngc", ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
-                ".xex", ".xiso", ".vpk", ".p8", ".p8.png",
+                ".xex", ".xiso", ".vpk",
             };
     }
 

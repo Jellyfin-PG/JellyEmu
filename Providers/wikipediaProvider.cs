@@ -69,7 +69,7 @@ namespace JellyEmu.Providers
 
     public class WikipediaMetadataProvider : BaseWikipediaProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
     {
-        public string Name => "Wikipedia";
+        public string Name => "Wikipedia Metadata Provider";
         public int Order => 3;
 
         private readonly PlatformResolver _platformResolver;
@@ -189,7 +189,7 @@ namespace JellyEmu.Providers
 
     public class WikipediaImageProvider : BaseWikipediaProvider, IRemoteImageProvider, IHasOrder
     {
-        public string Name => "Wikipedia";
+        public string Name => "Wikipedia Image Provider";
         public int Order => 3;
 
         public WikipediaImageProvider(IHttpClientFactory httpClientFactory, ILogger<WikipediaImageProvider> logger)
@@ -278,7 +278,8 @@ namespace JellyEmu.Providers
         public string Key => "Wikipedia";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://en.wikipedia.org/?curid={0}";
-        public bool Supports(IHasProviderIds item) => item is Book;
+        public bool Supports(IHasProviderIds item) 
+            => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
     }
 
     public class WikipediaExternalUrlProvider : IExternalUrlProvider

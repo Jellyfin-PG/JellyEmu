@@ -78,7 +78,7 @@ namespace JellyEmu.Providers
 
     public class RommMetadataProvider : BaseRommProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
     {
-        public string Name => "Romm";
+        public string Name => "Romm Metadata Provider";
         public int Order => 4;
 
         private readonly PlatformResolver _platformResolver;
@@ -276,13 +276,13 @@ namespace JellyEmu.Providers
 
     public class RommImageProvider : BaseRommProvider, IRemoteImageProvider, IHasOrder
     {
-        public string Name => "Romm";
+        public string Name => "Romm Image Provider";
         public int Order => 4;
 
         public RommImageProvider(IHttpClientFactory httpClientFactory, ILogger<RommImageProvider> logger)
             : base(httpClientFactory, logger) { }
 
-        public bool Supports(BaseItem item) => item is Book;
+        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 
