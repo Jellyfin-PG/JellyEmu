@@ -296,6 +296,7 @@ namespace JellyEmu.Providers
         public RawgPersonMetadataProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonMetadataProvider> logger)
             : base(httpClientFactory, logger) { }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(PersonLookupInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();

@@ -392,6 +392,7 @@ namespace JellyEmu.Providers
             ILogger<LexaloffleMetadataProvider> logger)
             : base(appPaths, httpClientFactory, logger) { }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(
             BookInfo searchInfo, CancellationToken cancellationToken)
         {
