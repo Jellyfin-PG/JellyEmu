@@ -152,7 +152,8 @@
 
         /* ── Mobile ── */
         @media (max-width: 768px) {
-            #je-dock { gap: 2px; padding: 5px 8px; bottom: 8px; }
+            #je-dock { gap: 2px; padding: 5px 8px; bottom: 8px; max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
+            #je-dock::-webkit-scrollbar { display: none; }
             .je-dockbtn { width: 38px; height: 38px; }
             .je-dockbtn svg { width: 20px; height: 20px; }
             .je-popup { width: 96%; max-height: 85vh; border-radius: 12px; }
@@ -365,6 +366,22 @@
             var loader = document.getElementById('je-loader');
             var topbar = document.getElementById('je-topbar');
             var dock   = document.getElementById('je-dock');
+
+            var dock = document.getElementById('je-dock');
+            var isDown = false, startX, scrollLeft;
+
+            function onStart(x) { isDown = true; startX = x - dock.offsetLeft; scrollLeft = dock.scrollLeft; dock.style.cursor = 'grabbing'; }
+            function onEnd() { isDown = false; dock.style.cursor = 'grab'; }
+            function onMove(x) { if (!isDown) return; dock.scrollLeft = scrollLeft - (x - dock.offsetLeft - startX); }
+
+            dock.addEventListener('mousedown',  function(e) { onStart(e.pageX); });
+            dock.addEventListener('mouseleave', onEnd);
+            dock.addEventListener('mouseup',    onEnd);
+            dock.addEventListener('mousemove',  function(e) { e.preventDefault(); onMove(e.pageX); });
+
+            dock.addEventListener('touchstart', function(e) { onStart(e.touches[0].pageX); }, { passive: true });
+            dock.addEventListener('touchend',   onEnd);
+            dock.addEventListener('touchmove',  function(e) { onMove(e.touches[0].pageX); }, { passive: true });
 
             function dismissLoader() {
                 if (!loader || loader.classList.contains('je-dismiss')) return;
