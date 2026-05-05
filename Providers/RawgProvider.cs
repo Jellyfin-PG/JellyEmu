@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
@@ -26,6 +27,13 @@ namespace JellyEmu.Providers
             var client = HttpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
             return client;
+        }
+
+        protected static string? TryExtractEmbeddedRawgId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = Regex.Match(path, @"\[rawg-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         /// <summary>
@@ -137,6 +145,8 @@ namespace JellyEmu.Providers
             if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
 
             info.ProviderIds.TryGetValue("RAWG", out var gameId);
+            if (string.IsNullOrEmpty(gameId))
+                gameId = TryExtractEmbeddedRawgId(info.Path);
             if (string.IsNullOrEmpty(gameId))
                 gameId = (await GetSearchResults(info, cancellationToken).ConfigureAwait(false)).FirstOrDefault()?.ProviderIds["RAWG"];
             if (string.IsNullOrEmpty(gameId)) return result;

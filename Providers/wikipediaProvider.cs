@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -23,6 +24,13 @@ namespace JellyEmu.Providers
             var client = HttpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0 (https://github.com/grimmdev/JellyEmu)");
             return client;
+        }
+
+        protected static string? TryExtractEmbeddedWikiId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = Regex.Match(path, @"\[wiki-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         /// <summary>
@@ -145,6 +153,8 @@ namespace JellyEmu.Providers
             if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
 
             info.ProviderIds.TryGetValue("Wikipedia", out var pageId);
+            if (string.IsNullOrEmpty(pageId))
+                pageId = TryExtractEmbeddedWikiId(info.Path);
             if (string.IsNullOrEmpty(pageId))
                 pageId = (await GetSearchResults(info, cancellationToken).ConfigureAwait(false)).FirstOrDefault()?.ProviderIds["Wikipedia"];
             if (string.IsNullOrEmpty(pageId)) return result;

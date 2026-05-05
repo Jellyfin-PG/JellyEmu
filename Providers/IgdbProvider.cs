@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -23,6 +24,13 @@ namespace JellyEmu.Providers
         {
             HttpClientFactory = httpClientFactory;
             Logger = logger;
+        }
+
+        protected static string? TryExtractEmbeddedIgdbId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = Regex.Match(path, @"\[igdb-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         protected async Task<string> GetTokenAsync(CancellationToken cancellationToken)
@@ -188,6 +196,9 @@ namespace JellyEmu.Providers
             info.ProviderIds.TryGetValue("IGDBSlug", out slug);
 
             if (string.IsNullOrEmpty(gameId))
+                gameId = TryExtractEmbeddedIgdbId(info.Path);
+
+            if (string.IsNullOrEmpty(gameId))
             {
                 var resolved = await ResolveGameAsync(info.Name, cancellationToken).ConfigureAwait(false);
                 gameId = resolved.id;
@@ -302,6 +313,8 @@ namespace JellyEmu.Providers
             {
                 var resolved = await ResolveGameAsync(item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
                 gameId = resolved.id;
+                if (!string.IsNullOrEmpty(resolved.slug))
+                item.SetProviderId("IGDBSlug", resolved.slug);
             }
             if (string.IsNullOrEmpty(gameId)) return list;
 
@@ -360,6 +373,15 @@ namespace JellyEmu.Providers
     public class IgdbGameExternalId : IExternalId
     {
         public string ProviderName => "IGDB";
+        public string Key => "IGDB";
+        public ExternalIdMediaType? Type => null;
+        public string UrlFormatString => "https://www.igdb.com/games/{0}";
+        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
+    }
+
+    public class IgdbGameExternalSlug : IExternalId
+    {
+        public string ProviderName => "IGDBSlug";
         public string Key => "IGDBSlug";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://www.igdb.com/games/{0}";
@@ -372,7 +394,9 @@ namespace JellyEmu.Providers
 
         public IEnumerable<string> GetExternalUrls(BaseItem item)
         {
-            if (item is Book && item.TryGetProviderId("IGDB", out var gameId))
+            if (item.TryGetProviderId("IGDBSlug", out var slug))
+                yield return $"https://www.igdb.com/games/{slug}";
+            else if (item.TryGetProviderId("IGDB", out var gameId))
                 yield return $"https://www.igdb.com/games/{gameId}";
         }
     }
