@@ -48,6 +48,13 @@ namespace JellyEmu.Providers
             _logger            = logger;
         }
 
+        protected static string? TryExtractEmbeddedLexalId(string? input)
+        {
+            if (string.IsNullOrEmpty(input)) return null;
+            var match = Regex.Match(input, @"\[loid-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
         protected async Task<ScrapedCart?> FetchAndCacheAsync(
             string loid, CancellationToken cancellationToken)
         {
@@ -393,7 +400,7 @@ namespace JellyEmu.Providers
 
             var loid = searchInfo.GetProviderId(ProviderId);
             if (string.IsNullOrEmpty(loid) && !string.IsNullOrEmpty(searchInfo.Name))
-                loid = LexaloffleIdParser.ParseFromString(searchInfo.Name);
+                loid = TryExtractEmbeddedLexalId(searchInfo.Name);
 
             if (!string.IsNullOrEmpty(loid))
             {
@@ -456,9 +463,9 @@ namespace JellyEmu.Providers
 
             var loid = info.GetProviderId(ProviderId);
             if (string.IsNullOrEmpty(loid) && !string.IsNullOrEmpty(info.Path))
-                loid = LexaloffleIdParser.ParseFromString(info.Path);
+                loid = TryExtractEmbeddedLexalId(info.Path);
             if (string.IsNullOrEmpty(loid) && !string.IsNullOrEmpty(info.Name))
-                loid = LexaloffleIdParser.ParseFromString(info.Name);
+                loid = TryExtractEmbeddedLexalId(info.Name);
 
             if (string.IsNullOrEmpty(loid))
                 return result;
