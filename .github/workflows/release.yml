@@ -39,7 +39,7 @@ jobs:
         run: |
           cd publish
           zip -j ../JellyEmu_${{ steps.version.outputs.VERSION }}.zip \
-            JellyEmu.dll
+            JellyEmu.dll Scriban.dll
 
       - name: Compute MD5 checksum
         id: checksum
@@ -73,7 +73,7 @@ jobs:
             ## JellyEmu v${{ steps.version.outputs.VERSION }}
 
             ### Installation
-            Download `JellyEmu_${{ steps.version.outputs.VERSION }}.zip`, extract, and copy the DLLs to your Jellyfin plugins folder.
+            Download `JellyEmu_${{ steps.version.outputs.VERSION }}.zip`, extract, and copy both DLLs to your Jellyfin plugins folder.
 
             **MD5:** `${{ steps.checksum.outputs.MD5 }}`
 
