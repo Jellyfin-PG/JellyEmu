@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
@@ -26,6 +27,13 @@ namespace JellyEmu.Providers
             var client = HttpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
             return client;
+        }
+
+        protected static string? TryExtractEmbeddedRawgId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = Regex.Match(path, @"\[rawg-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         /// <summary>
@@ -83,10 +91,52 @@ namespace JellyEmu.Providers
             _platformResolver = platformResolver;
         }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            searchInfo.ProviderIds.TryGetValue("RAWG", out var directId);
+            if (string.IsNullOrEmpty(directId))
+                directId = TryExtractEmbeddedRawgId(searchInfo.Path);
+
+            if (!string.IsNullOrEmpty(directId))
+            {
+                try
+                {
+                    var response = await GetHttpClient().GetAsync(
+                        $"https://api.rawg.io/api/games/{directId}?key={ApiKey}",
+                        cancellationToken).ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                        var root = document.RootElement;
+
+                        var sr = new RemoteSearchResult
+                        {
+                            Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
+                            ProviderIds = new Dictionary<string, string> { { "RAWG", directId } },
+                            SearchProviderName = Name
+                        };
+
+                        if (root.TryGetProperty("background_image", out var bg) && bg.ValueKind != JsonValueKind.Null)
+                        {
+                            var imgUrl = bg.GetString();
+                            if (!string.IsNullOrWhiteSpace(imgUrl)) sr.ImageUrl = imgUrl;
+                        }
+
+                        if (root.TryGetProperty("released", out var rel) && rel.ValueKind == JsonValueKind.String &&
+                            DateTime.TryParse(rel.GetString(), out var releaseDate))
+                            sr.ProductionYear = releaseDate.Year;
+
+                        return new[] { sr };
+                    }
+                }
+                catch { }
+                return results;
+            }
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
@@ -137,6 +187,8 @@ namespace JellyEmu.Providers
             if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
 
             info.ProviderIds.TryGetValue("RAWG", out var gameId);
+            if (string.IsNullOrEmpty(gameId))
+                gameId = TryExtractEmbeddedRawgId(info.Path);
             if (string.IsNullOrEmpty(gameId))
                 gameId = (await GetSearchResults(info, cancellationToken).ConfigureAwait(false)).FirstOrDefault()?.ProviderIds["RAWG"];
             if (string.IsNullOrEmpty(gameId)) return result;
@@ -286,20 +338,44 @@ namespace JellyEmu.Providers
         public RawgPersonMetadataProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonMetadataProvider> logger)
             : base(httpClientFactory, logger) { }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(PersonLookupInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
-            if (string.IsNullOrEmpty(ApiKey) || string.IsNullOrEmpty(searchInfo.Name)) return results;
+            if (string.IsNullOrEmpty(ApiKey)) return results;
 
-            searchInfo.ProviderIds.TryGetValue("RAWG", out var rawgId);
-            if (!string.IsNullOrEmpty(rawgId))
+            searchInfo.ProviderIds.TryGetValue("RAWG", out var directId);
+
+            if (!string.IsNullOrEmpty(directId))
             {
-                results.Add(new RemoteSearchResult
+                try
                 {
-                    Name = searchInfo.Name,
-                    ProviderIds = new Dictionary<string, string> { { "RAWG", rawgId } },
-                    SearchProviderName = Name
-                });
+                    var response = await GetHttpClient().GetAsync(
+                        $"https://api.rawg.io/api/creators/{directId}?key={ApiKey}",
+                        cancellationToken).ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                        var root = doc.RootElement;
+
+                        var sr = new RemoteSearchResult
+                        {
+                            Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? searchInfo.Name : searchInfo.Name,
+                            ProviderIds = new Dictionary<string, string> { { "RAWG", directId } },
+                            SearchProviderName = Name
+                        };
+
+                        if (root.TryGetProperty("image", out var img) && img.ValueKind == JsonValueKind.String)
+                        {
+                            var imgUrl = img.GetString();
+                            if (!string.IsNullOrWhiteSpace(imgUrl)) sr.ImageUrl = imgUrl;
+                        }
+
+                        return new[] { sr };
+                    }
+                }
+                catch { }
                 return results;
             }
 
@@ -309,15 +385,14 @@ namespace JellyEmu.Providers
                 var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    using var doc = JsonDocument.Parse(json);
+                    using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     if (doc.RootElement.TryGetProperty("results", out var arr) && arr.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var creator in arr.EnumerateArray().Take(5))
                         {
                             if (!creator.TryGetProperty("id", out var idEl) || !creator.TryGetProperty("name", out var nameEl)) continue;
 
-                            var res = new RemoteSearchResult
+                            var sr = new RemoteSearchResult
                             {
                                 Name = nameEl.GetString() ?? string.Empty,
                                 ProviderIds = new Dictionary<string, string> { { "RAWG", idEl.GetInt32().ToString() } },
@@ -327,10 +402,10 @@ namespace JellyEmu.Providers
                             if (creator.TryGetProperty("image", out var imgEl) && imgEl.ValueKind == JsonValueKind.String)
                             {
                                 var imgUrl = imgEl.GetString();
-                                if (!string.IsNullOrWhiteSpace(imgUrl)) res.ImageUrl = imgUrl;
+                                if (!string.IsNullOrWhiteSpace(imgUrl)) sr.ImageUrl = imgUrl;
                             }
 
-                            results.Add(res);
+                            results.Add(sr);
                         }
                     }
                 }
@@ -358,8 +433,7 @@ namespace JellyEmu.Providers
                 var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    using var doc = JsonDocument.Parse(json);
+                    using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     var root = doc.RootElement;
 
                     var person = new Person
@@ -408,8 +482,7 @@ namespace JellyEmu.Providers
                 var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    using var doc = JsonDocument.Parse(json);
+                    using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     if (doc.RootElement.TryGetProperty("image", out var img) && img.ValueKind != JsonValueKind.Null)
                     {
                         var imgUrl = img.GetString();

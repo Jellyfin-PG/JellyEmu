@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -23,6 +24,13 @@ namespace JellyEmu.Providers
         {
             HttpClientFactory = httpClientFactory;
             Logger = logger;
+        }
+
+        protected static string? TryExtractEmbeddedIgdbId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = Regex.Match(path, @"\[igdb-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         protected async Task<string> GetTokenAsync(CancellationToken cancellationToken)
@@ -117,10 +125,62 @@ namespace JellyEmu.Providers
             _platformResolver = platformResolver;
         }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            // If the user supplied an IGDB id directly, do a direct lookup instead of name search
+            searchInfo.ProviderIds.TryGetValue("IGDB", out var directId);
+            if (string.IsNullOrEmpty(directId))
+                directId = TryExtractEmbeddedIgdbId(searchInfo.Path);
+
+            if (!string.IsNullOrEmpty(directId))
+            {
+                try
+                {
+                    var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                    var content = new StringContent(
+                        $"where id = {directId}; fields id,name,slug,first_release_date,cover.image_id; limit 1;",
+                        Encoding.UTF8, "text/plain");
+                    var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                        if (document.RootElement.GetArrayLength() > 0)
+                        {
+                            var game = document.RootElement[0];
+                            var gameId = game.GetProperty("id").GetInt32().ToString();
+                            var slug = game.TryGetProperty("slug", out var s) ? s.GetString() ?? gameId : gameId;
+
+                            var searchResult = new RemoteSearchResult
+                            {
+                                Name = game.GetProperty("name").GetString() ?? string.Empty,
+                                ProviderIds = new Dictionary<string, string> { { "IGDB", gameId }, { "IGDBSlug", slug } },
+                                SearchProviderName = Name
+                            };
+
+                            if (game.TryGetProperty("first_release_date", out var releaseUnix))
+                                searchResult.ProductionYear = DateTimeOffset.FromUnixTimeSeconds(releaseUnix.GetInt64()).UtcDateTime.Year;
+
+                            if (game.TryGetProperty("cover", out var cover) &&
+                                cover.TryGetProperty("image_id", out var cId) &&
+                                cId.ValueKind != JsonValueKind.Null)
+                            {
+                                var cIdStr = cId.GetString();
+                                if (!string.IsNullOrWhiteSpace(cIdStr))
+                                    searchResult.ImageUrl = $"https://images.igdb.com/igdb/image/upload/t_cover_big/{cIdStr}.jpg";
+                            }
+
+                            return new[] { searchResult };
+                        }
+                    }
+                }
+                catch { }
+                return results; // empty, direct lookup failed
+            }
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
@@ -186,6 +246,9 @@ namespace JellyEmu.Providers
             info.ProviderIds.TryGetValue("IGDB", out var gameId);
             string? slug = null;
             info.ProviderIds.TryGetValue("IGDBSlug", out slug);
+
+            if (string.IsNullOrEmpty(gameId))
+                gameId = TryExtractEmbeddedIgdbId(info.Path);
 
             if (string.IsNullOrEmpty(gameId))
             {
@@ -302,6 +365,8 @@ namespace JellyEmu.Providers
             {
                 var resolved = await ResolveGameAsync(item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
                 gameId = resolved.id;
+                if (!string.IsNullOrEmpty(resolved.slug))
+                item.SetProviderId("IGDBSlug", resolved.slug);
             }
             if (string.IsNullOrEmpty(gameId)) return list;
 
@@ -360,6 +425,15 @@ namespace JellyEmu.Providers
     public class IgdbGameExternalId : IExternalId
     {
         public string ProviderName => "IGDB";
+        public string Key => "IGDB";
+        public ExternalIdMediaType? Type => null;
+        public string UrlFormatString => "https://www.igdb.com/games/{0}";
+        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
+    }
+
+    public class IgdbGameExternalSlug : IExternalId
+    {
+        public string ProviderName => "IGDBSlug";
         public string Key => "IGDBSlug";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://www.igdb.com/games/{0}";
@@ -372,7 +446,9 @@ namespace JellyEmu.Providers
 
         public IEnumerable<string> GetExternalUrls(BaseItem item)
         {
-            if (item is Book && item.TryGetProviderId("IGDB", out var gameId))
+            if (item.TryGetProviderId("IGDBSlug", out var slug))
+                yield return $"https://www.igdb.com/games/{slug}";
+            else if (item.TryGetProviderId("IGDB", out var gameId))
                 yield return $"https://www.igdb.com/games/{gameId}";
         }
     }

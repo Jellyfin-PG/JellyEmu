@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -23,6 +24,13 @@ namespace JellyEmu.Providers
             var client = HttpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0 (https://github.com/grimmdev/JellyEmu)");
             return client;
+        }
+
+        protected static string? TryExtractEmbeddedWikiId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = Regex.Match(path, @"\[wiki-(\d+)\]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
         }
 
         /// <summary>
@@ -83,10 +91,53 @@ namespace JellyEmu.Providers
             _platformResolver = platformResolver;
         }
 
+        // Identify
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+
+            searchInfo.ProviderIds.TryGetValue("Wikipedia", out var directId);
+            if (string.IsNullOrEmpty(directId))
+                directId = TryExtractEmbeddedWikiId(searchInfo.Path);
+
+            if (!string.IsNullOrEmpty(directId))
+            {
+                try
+                {
+                    var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=300&pageids={directId}&format=json";
+                    var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                        if (document.RootElement.TryGetProperty("query", out var q) &&
+                            q.TryGetProperty("pages", out var pages) &&
+                            pages.TryGetProperty(directId, out var page))
+                        {
+                            var title = page.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+                            var sr = new RemoteSearchResult
+                            {
+                                Name = title,
+                                ProviderIds = new Dictionary<string, string> { { "Wikipedia", directId } },
+                                SearchProviderName = Name
+                            };
+
+                            if (page.TryGetProperty("thumbnail", out var thumb) &&
+                                thumb.TryGetProperty("source", out var src))
+                            {
+                                var imgUrl = src.GetString();
+                                if (!string.IsNullOrWhiteSpace(imgUrl))
+                                    sr.ImageUrl = imgUrl;
+                            }
+
+                            return new[] { sr };
+                        }
+                    }
+                }
+                catch { }
+                return results;
+            }
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
@@ -145,6 +196,8 @@ namespace JellyEmu.Providers
             if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
 
             info.ProviderIds.TryGetValue("Wikipedia", out var pageId);
+            if (string.IsNullOrEmpty(pageId))
+                pageId = TryExtractEmbeddedWikiId(info.Path);
             if (string.IsNullOrEmpty(pageId))
                 pageId = (await GetSearchResults(info, cancellationToken).ConfigureAwait(false)).FirstOrDefault()?.ProviderIds["Wikipedia"];
             if (string.IsNullOrEmpty(pageId)) return result;
