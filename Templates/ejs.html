@@ -472,14 +472,14 @@
             // Auto-hide docks
             var hideTimer = null;
             var HIDE_MS = 3000;
-            var popupOpen = false;
+            window._jePopupOpen = false;
 
             function showDocks() {
                 if (!topbar.classList.contains('je-active')) return;
                 topbar.classList.remove('je-hidden');
                 dock.classList.remove('je-hidden');
                 clearTimeout(hideTimer);
-                if (!popupOpen) {
+                if (!window._jePopupOpen) {
                     hideTimer = setTimeout(function() {
                         topbar.classList.add('je-hidden');
                         dock.classList.add('je-hidden');
@@ -504,27 +504,29 @@
             // Dock buttons: refocus game after each click (unless a popup opened)
             document.addEventListener('click', function(ev) {
                 var btn = ev.target.closest && ev.target.closest('.je-dockbtn');
-                if (btn && !popupOpen) { setTimeout(refocusGame, 50); }
+                if (btn && !window._jePopupOpen) { setTimeout(refocusGame, 50); }
             }, true);
 
             // Popup management
             function openPopup(id) {
                 closeAllPopups();
                 var el = document.getElementById(id);
-                if (el) { el.classList.add('je-open'); popupOpen = true; clearTimeout(hideTimer); }
+                if (el) { el.classList.add('je-open'); window._jePopupOpen = true; clearTimeout(hideTimer); }
             }
             function closePopup(id) {
                 var el = document.getElementById(id);
                 if (el) el.classList.remove('je-open');
-                popupOpen = false;
+                window._jePopupOpen = false;
                 showDocks();
                 refocusGame();
             }
             function closeAllPopups() {
                 document.querySelectorAll('.je-overlay.je-open').forEach(function(el) { el.classList.remove('je-open'); });
-                popupOpen = false;
+                window._jePopupOpen = false;
                 refocusGame();
             }
+            window._jeOpenPopup  = openPopup;
+            window._jeClosePopup = closePopup;
             // Close buttons
             document.querySelectorAll('[data-close]').forEach(function(btn) {
                 btn.addEventListener('click', function() { closePopup(btn.getAttribute('data-close')); });
@@ -566,6 +568,7 @@
                 }
                 return new Blob([new TextEncoder().encode(JSON.stringify(data))], { type: 'application/octet-stream' });
             }
+            window._jeEnsureBinary = _jeEnsureBinary;
 
             // Focus management: EJS listens for keyboard on ejs_parent, not document
             function refocusGame() {
@@ -1186,21 +1189,21 @@
             });
 
             // Fast Forward
-            var ffActive = false;
+            window._jeFFActive = false;
             document.getElementById('je-btn-ff').addEventListener('click', function() {
                 var g = gm(); if (!g) return;
-                ffActive = !ffActive;
-                g.toggleFastForward(ffActive ? 1 : 0);
-                this.classList.toggle('je-active', ffActive);
+                window._jeFFActive = !window._jeFFActive;
+                g.toggleFastForward(window._jeFFActive ? 1 : 0);
+                this.classList.toggle('je-active', window._jeFFActive);
             });
 
             // Slow Motion
-            var slowActive = false;
+            window._jeSlowActive = false;
             document.getElementById('je-btn-slow').addEventListener('click', function() {
                 var g = gm(); if (!g) return;
-                slowActive = !slowActive;
-                g.toggleSlowMotion(slowActive ? 1 : 0);
-                this.classList.toggle('je-active', slowActive);
+                window._jeSlowActive = !window._jeSlowActive;
+                g.toggleSlowMotion(window._jeSlowActive ? 1 : 0);
+                this.classList.toggle('je-active', window._jeSlowActive);
             });
 
             // Save States popup
@@ -1473,448 +1476,6 @@
                 buildCheats();
             });
 
-            // EJS uses numeric button indices internally
-            var inputMap = {
-                0:  'B',                1:  'Y',               2:  'SELECT',          3:  'START',
-                4:  'UP',               5:  'DOWN',            6:  'LEFT',            7:  'RIGHT',
-                8:  'A',                9:  'X',               10: 'L',               11: 'R',
-                12: 'L2',              13: 'R2',              14: 'L3',              15: 'R3',
-                16: 'L STICK RIGHT',   17: 'L STICK LEFT',   18: 'L STICK DOWN',   19: 'L STICK UP',
-                20: 'R STICK RIGHT',   21: 'R STICK LEFT',   22: 'R STICK DOWN',   23: 'R STICK UP',
-                24: 'QUICK SAVE STATE', 25: 'QUICK LOAD STATE', 26: 'CHANGE STATE SLOT', 27: 'FAST FORWARD',
-                28: 'REWIND',           29: 'SLOW MOTION'
-            };
-
-            // Comprehensive keycode → display name map
-            var keyCodeMap = {
-                8: 'Backspace', 9: 'Tab', 13: 'Enter', 16: 'Shift', 17: 'Ctrl', 18: 'Alt',
-                19: 'Pause', 20: 'Caps Lock', 27: 'Escape', 32: 'Space', 33: 'Page Up',
-                34: 'Page Down', 35: 'End', 36: 'Home', 37: '← Left', 38: '↑ Up',
-                39: '→ Right', 40: '↓ Down', 45: 'Insert', 46: 'Delete',
-                48: '0', 49: '1', 50: '2', 51: '3', 52: '4',
-                53: '5', 54: '6', 55: '7', 56: '8', 57: '9',
-                65: 'A', 66: 'B', 67: 'C', 68: 'D', 69: 'E',
-                70: 'F', 71: 'G', 72: 'H', 73: 'I', 74: 'J',
-                75: 'K', 76: 'L', 77: 'M', 78: 'N', 79: 'O',
-                80: 'P', 81: 'Q', 82: 'R', 83: 'S', 84: 'T',
-                85: 'U', 86: 'V', 87: 'W', 88: 'X', 89: 'Y', 90: 'Z',
-                96: 'Num 0', 97: 'Num 1', 98: 'Num 2', 99: 'Num 3', 100: 'Num 4',
-                101: 'Num 5', 102: 'Num 6', 103: 'Num 7', 104: 'Num 8', 105: 'Num 9',
-                106: 'Num *', 107: 'Num +', 109: 'Num -', 110: 'Num .', 111: 'Num /',
-                112: 'F1', 113: 'F2', 114: 'F3', 115: 'F4', 116: 'F5',
-                117: 'F6', 118: 'F7', 119: 'F8', 120: 'F9', 121: 'F10',
-                122: 'F11', 123: 'F12', 144: 'Num Lock', 145: 'Scroll Lock',
-                186: ';', 187: '=', 188: ',', 189: '-', 190: '.', 191: '/',
-                192: '`', 219: '[', 220: '\\', 221: ']', 222: '\x27'
-            };
-
-            document.getElementById('je-btn-inputmap').addEventListener('click', function() {
-                var e = emu();
-                console.groupEnd();
-                buildKeyboardBinds();
-                buildGamepadBinds();
-                syncVGToggles();
-                openPopup('je-pop-inputmap');
-            });
-
-            // Translates native browser keystrokes into EJS strings
-            function getEjsKeyStr(ev) {
-                var k = ev.key.toLowerCase();
-                if (k === 'arrowup') return 'up arrow';
-                if (k === 'arrowdown') return 'down arrow';
-                if (k === 'arrowleft') return 'left arrow';
-                if (k === 'arrowright') return 'right arrow';
-                if (k === ' ') return 'space';
-                if (k === '+') return 'add';
-                if (k === '-') return 'subtract';
-                return k; 
-            }
-
-            // Translates legacy localstorage integer saves back into EJS strings
-            function legacyKeyCodeToStr(code) {
-                if (code === 0) return ''; // Explicitly catch the old '0 = unbound' flag
-                
-                var m = keyCodeMap[code];
-                if (!m) return String(code);
-                m = m.toLowerCase();
-                if (m.indexOf('up') > -1) return 'up arrow';
-                if (m.indexOf('down') > -1) return 'down arrow';
-                if (m.indexOf('left') > -1) return 'left arrow';
-                if (m.indexOf('right') > -1) return 'right arrow';
-                if (m === 'space') return 'space';
-                if (m === 'num +') return 'add';
-                if (m === 'num -') return 'subtract';
-                if (m === 'enter') return 'enter';
-                if (m === 'escape') return 'escape';
-                if (m.length === 1) return m; 
-                return m; 
-            }
-
-            function buildKeyboardBinds() {
-                var panel = document.getElementById('je-tab-kb');
-                panel.innerHTML = ''; 
-                
-                var e = emu(); if (!e) return;
-                var defaults = (window.EJS_defaultControls && window.EJS_defaultControls[0]) || {};
-                var c = (e.controls && e.controls[0]) || defaults;
-
-                function keyName(code) {
-                    if (code === undefined || code === null || code === 0 || code === '' || code === '0') return '—';
-                    if (typeof code === 'number' || !isNaN(Number(code))) {
-                        return keyCodeMap[Number(code)] || ('Key ' + code);
-                    }
-                    return String(code);
-                }
-
-                // Quick reverse lookup to fix corrupted strings from our last test
-                function fixCorruptedString(str) {
-                    if (!str) return 0;
-                    str = str.toLowerCase();
-                    if (str === 'up arrow') return 38;
-                    if (str === 'down arrow') return 40;
-                    if (str === 'left arrow') return 37;
-                    if (str === 'right arrow') return 39;
-                    if (str === 'space') return 32;
-                    if (str === 'add') return 107;
-                    if (str === 'subtract') return 109;
-                    if (str === 'enter') return 13;
-                    if (str.length === 1) return str.toUpperCase().charCodeAt(0);
-                    return 0; // Unbound fallback
-                }
-
-                var needsSave = false;
-
-                Object.keys(inputMap).forEach(function(keyStr) {
-                    (function(idx) {
-                        var key = parseInt(keyStr, 10);
-                        var row = document.createElement('div');
-                        row.className = 'je-bind-row';
-                        
-                        var entry = c[key] || defaults[key] || {};
-                        var rawVal = (entry.value !== undefined && entry.value !== '') ? entry.value : null;
-
-                        // AUTO-REVERT: If the saved value is a string from our last attempt, convert it BACK to an integer
-                        if (rawVal !== null && typeof rawVal === 'string' && isNaN(Number(rawVal))) {
-                            rawVal = fixCorruptedString(rawVal);
-                            if (!e.controls) e.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
-                            if (!e.controls[0]) e.controls[0] = {};
-                            if (!e.controls[0][key]) e.controls[0][key] = {};
-                            
-                            e.controls[0][key].value = rawVal;
-                            needsSave = true; // Flag to save the fix
-                        }
-
-                        var displayName = keyName(rawVal);
-
-                        row.innerHTML = '<span>' + inputMap[key] + '</span><span class="je-bind-key" data-btn="' + key + '">' + displayName + '</span>';
-                        
-                        var bk = row.querySelector('.je-bind-key');
-                        bk.addEventListener('click', function() {
-                            if (bk.classList.contains('je-listening')) return;
-                            
-                            bk.classList.add('je-listening');
-                            bk.textContent = 'Press a key...';
-
-                            function onKey(ev) {
-                                ev.preventDefault();
-                                ev.stopPropagation();
-                                
-                                var kc = ev.keyCode;
-                                
-                                // Escape cancels
-                                if (kc === 27) { 
-                                    bk.textContent = displayName; 
-                                    bk.classList.remove('je-listening'); 
-                                    document.removeEventListener('keydown', onKey, true);
-                                    return; 
-                                }
-
-                                bk.textContent = keyName(kc);
-                                bk.classList.remove('je-listening');
-                                document.removeEventListener('keydown', onKey, true);
-
-                                if (!e.controls) e.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
-                                if (!e.controls[0]) e.controls[0] = {};
-                                if (!e.controls[0][key]) e.controls[0][key] = {};
-                                
-                                // Save strict integer required by EJS runtime!
-                                e.controls[0][key].value = kc;
-                                
-                                e.saveSettings();
-                                syncControlsToServer();
-                            }
-                            document.addEventListener('keydown', onKey, true);
-                        });
-                        
-                        panel.appendChild(row);
-                    })(parseInt(keyStr, 10));
-                });
-                
-                // Save out the fixed integer bindings if we caught any
-                if (needsSave) {
-                    e.saveSettings();
-                    syncControlsToServer();
-                }
-            }
-
-            // Translates EJS internal gamepad strings to human-readable UI labels
-            var _jeGpLabels = {
-                'BUTTON_1': 'A / Cross', 'BUTTON_2': 'B / Circle', 
-                'BUTTON_3': 'X / Square', 'BUTTON_4': 'Y / Triangle',
-                'LEFT_TOP_SHOULDER': 'LB / L1', 'RIGHT_TOP_SHOULDER': 'RB / R1',
-                'LEFT_BOTTOM_SHOULDER': 'LT / L2', 'RIGHT_BOTTOM_SHOULDER': 'RT / R2',
-                'SELECT': 'Select / Back', 'START': 'Start',
-                'LEFT_STICK': 'L3', 'RIGHT_STICK': 'R3',
-                'DPAD_UP': 'D-Up', 'DPAD_DOWN': 'D-Down', 
-                'DPAD_LEFT': 'D-Left', 'DPAD_RIGHT': 'D-Right',
-                'LEFT_STICK_X:+1': 'L-Stick →', 'LEFT_STICK_X:-1': 'L-Stick ←',
-                'LEFT_STICK_Y:+1': 'L-Stick ↓', 'LEFT_STICK_Y:-1': 'L-Stick ↑',
-                'RIGHT_STICK_X:+1': 'R-Stick →', 'RIGHT_STICK_X:-1': 'R-Stick ←',
-                'RIGHT_STICK_Y:+1': 'R-Stick ↓', 'RIGHT_STICK_Y:-1': 'R-Stick ↑'
-            };
-
-            function getFriendlyGpLabel(ejsString) {
-                if (!ejsString) return '—';
-                return _jeGpLabels[ejsString] || ejsString;
-            }
-
-            window.EJS_defaultControls = {
-                0: {
-                    // Face Buttons (B, Y, Select, Start)
-                    0:  { 'value': 88, 'value2': 'BUTTON_2' }, // X key
-                    1:  { 'value': 83, 'value2': 'BUTTON_4' }, // S key
-                    2:  { 'value': 86, 'value2': 'SELECT' },   // V key
-                    3:  { 'value': 13, 'value2': 'START' },    // Enter
-                    
-                    // D-Pad
-                    4:  { 'value': 38, 'value2': 'DPAD_UP' },    // Up Arrow
-                    5:  { 'value': 40, 'value2': 'DPAD_DOWN' },  // Down Arrow
-                    6:  { 'value': 37, 'value2': 'DPAD_LEFT' },  // Left Arrow
-                    7:  { 'value': 39, 'value2': 'DPAD_RIGHT' }, // Right Arrow
-                    
-                    // Face Buttons (A, X)
-                    8:  { 'value': 90, 'value2': 'BUTTON_1' }, // Z key
-                    9:  { 'value': 65, 'value2': 'BUTTON_3' }, // A key
-                    
-                    // Bumpers / Triggers
-                    10: { 'value': 81, 'value2': 'LEFT_TOP_SHOULDER' }, // Q key
-                    11: { 'value': 69, 'value2': 'RIGHT_TOP_SHOULDER' },// E key
-                    12: { 'value': 9,  'value2': 'LEFT_BOTTOM_SHOULDER' }, // Tab
-                    13: { 'value': 82, 'value2': 'RIGHT_BOTTOM_SHOULDER' }, // R key
-                    
-                    // Stick Clicks
-                    14: { 'value': 0, 'value2': 'LEFT_STICK' },
-                    15: { 'value': 0, 'value2': 'RIGHT_STICK' },
-                    
-                    // Analog Sticks
-                    16: { 'value': 72, 'value2': 'LEFT_STICK_X:+1' }, // H
-                    17: { 'value': 70, 'value2': 'LEFT_STICK_X:-1' }, // F
-                    18: { 'value': 71, 'value2': 'LEFT_STICK_Y:+1' }, // G
-                    19: { 'value': 84, 'value2': 'LEFT_STICK_Y:-1' }, // T
-                    20: { 'value': 76, 'value2': 'RIGHT_STICK_X:+1' }, // L
-                    21: { 'value': 74, 'value2': 'RIGHT_STICK_X:-1' }, // J
-                    22: { 'value': 75, 'value2': 'RIGHT_STICK_Y:+1' }, // K
-                    23: { 'value': 73, 'value2': 'RIGHT_STICK_Y:-1' }, // I
-                    
-                    // Hotkeys
-                    24: { 'value': 49 }, // 1
-                    25: { 'value': 50 }, // 2
-                    26: { 'value': 51 }, // 3
-                    27: { 'value': 107 }, // num +
-                    28: { 'value': 32 }, // space
-                    29: { 'value': 109 } // num -
-                },
-                1: {}, 2: {}, 3: {}
-            };
-
-            function buildGamepadBinds() {
-                var panel = document.getElementById('je-gp-binds');
-                // Create the 3-column header layout
-                panel.innerHTML = '<div class="je-bind-headers"><span>Action</span><span>Primary</span><span>Secondary</span></div>';
-                
-                // Detect gamepad status
-                var gps = navigator.getGamepads ? navigator.getGamepads() : [];
-                var gp = null;
-                for (var g = 0; g < gps.length; g++) { if (gps[g]) { gp = gps[g]; break; } }
-                document.getElementById('je-gp-status').textContent = gp ? ('Detected: ' + gp.id) : 'No gamepad detected';
-
-                var e = emu(); if (!e) return;
-                var defaults = (window.EJS_defaultControls && window.EJS_defaultControls[0]) || {};
-                var c = (e.controls && e.controls[0]) || defaults;
-
-                Object.keys(inputMap).forEach(function(keyStr) {
-                    (function(idx) {
-                        var key = parseInt(keyStr, 10);
-                        var row = document.createElement('div');
-                        row.className = 'je-bind-row';
-                        
-                        var entry = c[key] || defaults[key] || {};
-                        
-                        // Gamepads use value2 for primary, and sec_value2 for secondary
-                        var rawVal1 = (entry.value2 !== undefined && entry.value2 !== '') ? entry.value2 : null;
-                        var rawVal2 = (entry.sec_value2 !== undefined && entry.sec_value2 !== '') ? entry.sec_value2 : null;
-
-                        var disp1 = rawVal1 !== null ? getFriendlyGpLabel(String(rawVal1)) : '—';
-                        var disp2 = rawVal2 !== null ? getFriendlyGpLabel(String(rawVal2)) : '—';
-
-                        row.innerHTML = '<span class="je-bind-label">' + inputMap[key] + '</span>' +
-                                        '<span class="je-bind-key" data-target="primary">' + disp1 + '</span>' +
-                                        '<span class="je-bind-key" data-target="secondary">' + disp2 + '</span>';
-
-                        // Wire up both primary and secondary buttons
-                        row.querySelectorAll('.je-bind-key').forEach(function(bk) {
-                            bk.addEventListener('click', function() {
-                                if (bk.classList.contains('je-listening')) return;
-                                
-                                var isSecondary = bk.getAttribute('data-target') === 'secondary';
-                                bk.classList.add('je-listening');
-                                bk.textContent = 'Move stick or press...';
-
-                                // Snapshot current axes to prevent drift/accidental triggers
-                                var baseAxes = [];
-                                var gps0 = navigator.getGamepads ? navigator.getGamepads() : [];
-                                for (var gi0 = 0; gi0 < gps0.length; gi0++) {
-                                    var p0 = gps0[gi0]; if (!p0) continue;
-                                    for (var ai0 = 0; ai0 < p0.axes.length; ai0++) { baseAxes[ai0] = p0.axes[ai0]; }
-                                    break;
-                                }
-
-                                var pollId = setInterval(function() {
-                                    var gps2 = navigator.getGamepads ? navigator.getGamepads() : [];
-                                    for (var gi = 0; gi < gps2.length; gi++) {
-                                        var pad = gps2[gi]; if (!pad) continue;
-                                        
-                                        // 1. Check Buttons (Mirroring EJS standards)
-                                        var ejsButtonMap = [
-                                            'BUTTON_1', 'BUTTON_2', 'BUTTON_3', 'BUTTON_4',
-                                            'LEFT_TOP_SHOULDER', 'RIGHT_TOP_SHOULDER', 
-                                            'LEFT_BOTTOM_SHOULDER', 'RIGHT_BOTTOM_SHOULDER',
-                                            'SELECT', 'START', 'LEFT_STICK', 'RIGHT_STICK',
-                                            'DPAD_UP', 'DPAD_DOWN', 'DPAD_LEFT', 'DPAD_RIGHT'
-                                        ];
-
-                                        for (var bi = 0; bi < pad.buttons.length; bi++) {
-                                            if (pad.buttons[bi].pressed) {
-                                                clearInterval(pollId);
-                                                var ejsVal = bi < ejsButtonMap.length ? ejsButtonMap[bi] : ('GAMEPAD_' + bi);
-                                                
-                                                bk.textContent = getFriendlyGpLabel(ejsVal);
-                                                bk.classList.remove('je-listening');
-
-                                                // Update emulator state
-                                                if (!e.controls) e.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
-                                                if (!e.controls[0]) e.controls[0] = {};
-                                                if (!e.controls[0][key]) e.controls[0][key] = {};
-
-                                                if (isSecondary) {
-                                                    e.controls[0][key].sec_value2 = ejsVal;
-                                                } else {
-                                                    e.controls[0][key].value2 = ejsVal;
-                                                }
-                                                
-                                                e.saveSettings();
-                                                syncControlsToServer();
-                                                return;
-                                            }
-                                        }
-
-                                        // 2. Check Axes (Mirroring EJS standards)
-                                        var ejsAxisMap = ['LEFT_STICK_X', 'LEFT_STICK_Y', 'RIGHT_STICK_X', 'RIGHT_STICK_Y'];
-                                        for (var ai = 0; ai < pad.axes.length; ai++) {
-                                            var base = baseAxes[ai] || 0;
-                                            var val = pad.axes[ai];
-                                            
-                                            // EJS standard threshold is > 0.5
-                                            if (Math.abs(val) > 0.5 && Math.abs(val - base) > 0.5) {
-                                                clearInterval(pollId);
-                                                
-                                                var axisName = ai < ejsAxisMap.length ? ejsAxisMap[ai] : ('EXTRA_STICK_' + ai);
-                                                var dir = val > 0 ? ':+1' : ':-1';
-                                                var ejsVal = axisName + dir;
-                                                
-                                                bk.textContent = getFriendlyGpLabel(ejsVal);
-                                                bk.classList.remove('je-listening');
-
-                                                // Update emulator state
-                                                if (!e.controls) e.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
-                                                if (!e.controls[0]) e.controls[0] = {};
-                                                if (!e.controls[0][key]) e.controls[0][key] = {};
-
-                                                if (isSecondary) {
-                                                    e.controls[0][key].sec_value2 = ejsVal;
-                                                } else {
-                                                    e.controls[0][key].value2 = ejsVal;
-                                                }
-                                                
-                                                e.saveSettings();
-                                                syncControlsToServer();
-                                                return;
-                                            }
-                                        }
-                                    }
-                                }, 50);
-
-                                // Cancel mapping if nothing is pressed for 10 seconds
-                                setTimeout(function() {
-                                    if (bk.classList.contains('je-listening')) {
-                                        clearInterval(pollId);
-                                        bk.classList.remove('je-listening');
-                                        bk.textContent = isSecondary ? disp2 : disp1;
-                                    }
-                                }, 10000);
-                            });
-                        });
-                        panel.appendChild(row);
-                    })(parseInt(keyStr, 10));
-                });
-            }
-
-            function syncVGToggles() {
-                var e = emu(); if (!e) return;
-                var vgOn = document.getElementById('je-vg-toggle');
-                if (e.virtualGamepad) { vgOn.checked = e.virtualGamepad.style.display !== 'none'; }
-            }
-            document.getElementById('je-vg-toggle').addEventListener('change', function() {
-                var e = emu(); if (!e || !e.toggleVirtualGamepad) return;
-                e.toggleVirtualGamepad(this.checked);
-            });
-            document.getElementById('je-vg-lefty').addEventListener('change', function() {
-                var e = emu(); if (!e || !e.toggleVirtualGamepadLeftHanded) return;
-                e.toggleVirtualGamepadLeftHanded(this.checked);
-            });
-            document.getElementById('je-input-reset').addEventListener('click', function() {
-                var e = emu(); if (!e) return;
-                
-                if (!e.controls) e.controls = { 0: {}, 1: {}, 2: {}, 3: {} };
-                if (!e.controls[0]) e.controls[0] = {};
-
-                // Pull directly from our explicit C# template, ignoring EJS's internal memory
-                var defaults = window.EJS_defaultControls && window.EJS_defaultControls[0] ? window.EJS_defaultControls[0] : {};
-                
-                // Forcefully apply both value (Keyboard) and value2 (Gamepad)
-                Object.keys(inputMap).forEach(function(keyStr) {
-                    var k = parseInt(keyStr, 10);
-                    if (!e.controls[0][k]) e.controls[0][k] = {};
-                    
-                    if (defaults[k] && defaults[k].value !== undefined) {
-                        e.controls[0][k].value = defaults[k].value;
-                    } else {
-                        delete e.controls[0][k].value;
-                    }
-                    
-                    if (defaults[k] && defaults[k].value2 !== undefined) {
-                        e.controls[0][k].value2 = defaults[k].value2;
-                    } else {
-                        delete e.controls[0][k].value2;
-                    }
-                });
-
-                e.saveSettings();
-                syncControlsToServer();
-                buildKeyboardBinds();
-                buildGamepadBinds();
-            });
-
             // Screenshot
             document.getElementById('je-btn-screenshot').addEventListener('click', function() {
                 var g = gm(); if (!g) return;
@@ -2062,14 +1623,6 @@
                     dockMinBtn.classList.remove('je-hidden');
                 }
             };
-
-            // Dock popup buttons
-            document.getElementById('je-btn-inputmap').addEventListener('click', function() {
-                buildKeyboardBinds();
-                buildGamepadBinds();
-                syncVGToggles();
-                openPopup('je-pop-inputmap');
-            });
         })();
     </script>
     <script>
@@ -2327,6 +1880,15 @@
         });
         {{ end }}
     </script>
+    <script>
+        window.JellyEmuConfig = {
+            itemId:      '{{ item_id }}',
+            userId:      '{{ user_id }}',
+            savePostUrl: '{{ save_post_url }}',
+            activeSlot:  {{ active_slot }}
+        };
+    </script>
+    <script src="/jellyemu/assets/inputmap.js"></script>
     <script src="{{ ejs_base }}/loader.js"></script>
 </body>
 </html>

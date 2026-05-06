@@ -9,9 +9,9 @@
     <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
     <RootNamespace>JellyEmu</RootNamespace>
-    <Version>0.6.5.0</Version>
-    <AssemblyVersion>0.6.5.0</AssemblyVersion>
-    <FileVersion>0.6.5.0</FileVersion>
+    <Version>0.6.6.0</Version>
+    <AssemblyVersion>0.6.6.0</AssemblyVersion>
+    <FileVersion>0.6.6.0</FileVersion>
     <Authors>Jellyfin-PG</Authors>
     <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -34,6 +34,7 @@
     <EmbeddedResource Include="Configuration\configPage.html" LogicalName="JellyEmu.Configuration.configPage.html" />
     <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html"/>
     <EmbeddedResource Include="Templates\ejs.html" LogicalName="JellyEmu.Templates.ejs.html"/>
+    <EmbeddedResource Include="Web/inputmap.js" />
   </ItemGroup>
 
 </Project>
