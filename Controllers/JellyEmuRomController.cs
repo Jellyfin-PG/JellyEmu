@@ -18,7 +18,7 @@ namespace JellyEmu.Controllers
         public JellyEmuRomController(
             ILibraryManager libraryManager,
             IApplicationPaths appPaths,
-            ILogger<JellyEmuPico8Controller> logger,
+            ILogger<JellyEmuRomController> logger,
             JellyEmuEjsManager ejsManager,
             JellyEmuSessionService sessionService,
             IHttpClientFactory httpClientFactory)

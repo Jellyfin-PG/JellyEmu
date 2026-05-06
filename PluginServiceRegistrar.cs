@@ -29,6 +29,8 @@ namespace JellyEmu
 
             serviceCollection.AddSingleton<JellyEmuPico8Manager>();
 
+            serviceCollection.AddSingleton<JellyEmuThreeJsManager>();
+
             serviceCollection.AddSingleton<JellyEmuSessionService>();
 
             serviceCollection.AddHostedService<JellyEmuInjectorService>();

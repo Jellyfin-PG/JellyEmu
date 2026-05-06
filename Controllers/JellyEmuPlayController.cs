@@ -134,7 +134,8 @@ namespace JellyEmu.Controllers
 
             var core = ResolveCore(item);
             var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".zip";
-            var romUrl = $"/jellyemu/rom/{itemId}/{itemId}{ext}";
+            var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
+            var romUrl = $"/jellyemu/rom/{itemId}/{filename}{ext}";
 
             var hasSaves = !string.IsNullOrEmpty(userId);
             var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
