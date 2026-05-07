@@ -92,7 +92,7 @@ namespace JellyEmu.Controllers
                 var writtenFile = new System.IO.FileInfo(tempPath);
                 if (writtenFile.Length < 50)
                 {
-                    Logger.LogWarning(...);
+                    Logger.LogWarning("Save State too small.");
                     System.IO.File.Delete(tempPath);
                     return BadRequest("Save state was empty or corrupt.");
                 }
