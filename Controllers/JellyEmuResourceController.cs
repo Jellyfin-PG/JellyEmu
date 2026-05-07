@@ -49,6 +49,18 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the input mapping embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.xr.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.save.js")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult SaveJs()
+        {
+            return ServeEmbeddedJs("ejs.save.js");
+        }
+
+        /// <summary>
         /// Shared helper: finds and streams an embedded .js resource by filename.
         /// </summary>
         private IActionResult ServeEmbeddedJs(string filename)
