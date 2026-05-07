@@ -877,94 +877,6 @@
                 this.classList.toggle('je-active', window._jeSlowActive);
             });
 
-            // Save States popup
-            document.getElementById('je-btn-saves').addEventListener('click', function() {
-                buildSaveSlots();
-                openPopup('je-pop-saves');
-            });
-
-            function buildSaveSlots() {
-                var body = document.getElementById('je-saves-body');
-                body.innerHTML = '';
-                for (var i = 1; i <= 5; i++) {
-                    var slot = document.createElement('div');
-                    slot.className = 'je-slot';
-                    slot.innerHTML = '<div class="je-slot-num">' + i + '</div>' +
-                        '<div class="je-slot-info"><div>Slot ' + i + '</div><small id="je-slot-status-' + i + '">Checking…</small></div>' +
-                        '<div class="je-slot-actions">' +
-                        '<button class="je-btn" data-save="' + i + '">Save</button>' +
-                        '<button class="je-btn je-btn-primary" data-load="' + i + '">Load</button></div>';
-                    body.appendChild(slot);
-                    // Check if slot has data
-                    (function(s) {
-                        fetch('/jellyemu/save/{{ item_id }}/{{ user_id }}?slot=' + s, { method: 'HEAD' })
-                            .then(function(r) {
-                                var el = document.getElementById('je-slot-status-' + s);
-                                if (el) el.textContent = r.ok ? 'Has save data' : 'Empty';
-                            }).catch(function() {
-                                var el = document.getElementById('je-slot-status-' + s);
-                                if (el) el.textContent = 'Empty';
-                            });
-                    })(i);
-                }
-                // Wire save/load button(s)
-                body.querySelectorAll('[data-save]').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        var s = parseInt(btn.getAttribute('data-save'));
-                        var g = gm(); if (!g) return;
-                        Promise.resolve(g.getState()).then(function(rawState) {
-                            var state = _jeEnsureBinary(rawState);
-                            if (!state) return;
-                            console.log('[JellyEmu] Pipeline STAGE 1 (Client Gen): Payload size ->', state.size || state.byteLength, 'bytes');
-                            // Upload save state to server
-                            fetch('/jellyemu/save/{{ item_id }}/{{ user_id }}?slot=' + s, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/octet-stream' },
-                                body: state
-                            }).then(function(r) {
-                                if (!r.ok) throw new Error('Save rejected by server');
-                                var el = document.getElementById('je-slot-status-' + s);
-                                if (el) el.textContent = 'Saved!';
-                                // Capture and upload screenshot for this slot
-                                var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('canvas');
-                                if (canvas) {
-                                    try {
-                                        var dataUrl = canvas.toDataURL('image/png');
-                                        fetch('/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/' + s, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ dataUrl: dataUrl })
-                                        }).catch(function(err) { console.warn('[JellyEmu] Screenshot upload failed:', err); });
-                                    } catch(ex) { console.warn('[JellyEmu] Screenshot capture failed:', ex); }
-                                }
-                            }).catch(function(err) {
-                                console.error('[JellyEmu] Save failed:', err);
-                                var el = document.getElementById('je-slot-status-' + s);
-                                if (el) el.textContent = 'Save Failed';
-                            });
-                        });
-                    });
-                });
-                body.querySelectorAll('[data-load]').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        var s = parseInt(btn.getAttribute('data-load'));
-                        fetch('/jellyemu/save/{{ item_id }}/{{ user_id }}?slot=' + s)
-                            .then(function(r) {
-                                if (!r.ok) throw new Error('No save');
-                                return r.arrayBuffer();
-                            }).then(function(buf) {
-                                var g = gm(); if (!g) return;
-                                console.log('[JellyEmu] Pipeline STAGE 4 (Client Receive): Downloaded bytes ->', buf.byteLength);
-                                g.loadState(new Uint8Array(buf));
-                                closePopup('je-pop-saves');
-                            }).catch(function() {
-                                var el = document.getElementById('je-slot-status-' + s);
-                                if (el) el.textContent = 'No save to load';
-                            });
-                    });
-                });
-            }
-
             // Volume popup
             var _jeCurrentVol = 1.0; // Single source of truth for the session
             var _jeLastVol = 1.0;    // Memory for the mute toggle
@@ -1431,23 +1343,6 @@
             });
             _jePostCanvasScreenshot(savePromise);
         };
-        // EJS_onSaveUpdate fires on battery/SRAM saves detected by hash comparison.
-        window.EJS_onSaveUpdate = function(e) {
-            if (!e || !e.save) return;
-            var save = _jeEnsureBinary(e.save);
-            console.log('[JellyEmu] Pipeline STAGE 1 (Client SRAM Gen): Payload size ->', save.size || save.byteLength, 'bytes');
-            var savePromise = fetch('{{ save_post_url }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/octet-stream' },
-                body: save
-            }).then(function(r) {
-                if (!r.ok) throw new Error('Server rejected save');
-                try { window.parent.postMessage({ type: 'jellyemu-save-written', itemId: '{{ item_id }}' }, '*'); } catch(_) {}
-            }).catch(function(err) {
-                console.error('[JellyEmu] Save update upload failed:', err);
-            });
-            _jePostCanvasScreenshot(savePromise);
-        };
         // Auto-save on exit if the user pref is enabled.
         // EJS_onExit is called by both EmulatorJSs own exit menu item and our
         // custom exit button. The _jellyEmuExiting flag prevents double-firing.
@@ -1501,8 +1396,7 @@
             try {
                 if (!window.EJS_emulator || !window.EJS_emulator.gameManager) throw new Error('EJS_emulator not fully initialized');
                 
-                EJS_emulator.gameManager.saveSaveFiles();
-                Promise.resolve(EJS_emulator.gameManager.getSaveFile()).then(function(rawState) {
+                Promise.resolve(EJS_emulator.gameManager.getState()).then(function(rawState) {
                     var stateData = _jeEnsureBinary(rawState);
                     if (!stateData) {
                         _fallbackClose();
@@ -1559,6 +1453,7 @@
         };
     </script>
     <script src="/jellyemu/assets/ejs.input.js"></script>
+    <script src="/jellyemu/assets/ejs.save.js"></script>
     <script src="/jellyemu/assets/ejs.xr.js"></script>
     <script src="{{ ejs_base }}/loader.js"></script>
 </body>
