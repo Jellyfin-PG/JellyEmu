@@ -1281,38 +1281,7 @@
                 return;
             }
             
-            try {
-                if (!window.EJS_emulator || !window.EJS_emulator.gameManager) throw new Error('EJS_emulator not fully initialized');
-                
-                Promise.resolve(EJS_emulator.gameManager.getState()).then(function(rawState) {
-                    var stateData = _jeEnsureBinary(rawState);
-                    if (!stateData) {
-                        _fallbackClose();
-                        return;
-                    }
-                    var saveFlush = fetch('{{ save_post_url }}', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/octet-stream' },
-                        body: stateData
-                    }).then(function(r) {
-                        if (!r.ok) throw new Error('Server rejected save');
-                        try { window.parent.postMessage({ type: 'jellyemu-save-written', itemId: '{{ item_id }}' }, '*'); } catch(_) {}
-                    }).catch(function(err) {
-                        console.error('[JellyEmu] Auto-save on exit failed:', err);
-                    });
-                    _jeUploadScreenshot(activeSlot, saveFlush);
-                    Promise.all([sessionStop, playtimeFlush, saveFlush]).finally(function() {
-                        try { window.parent.postMessage({ type: 'jellyemu-session-end', itemId: '{{ item_id }}', seconds: sessionSeconds }, '*'); } catch(_) {}
-                        closeIframe();
-                    });
-                }).catch(function(err) {
-                    console.warn('[JellyEmu] Promise.resolve(getSaveFile) failed', err);
-                    _fallbackClose();
-                });
-            } catch (ex) {
-                console.warn('[JellyEmu] Auto-save sequence crashed, triggering fallback exit:', ex);
-                _fallbackClose();
-            }
+            _fallbackClose();
         };
 
         // Hook EmulatorJS screenshot button to push to Romm via parent

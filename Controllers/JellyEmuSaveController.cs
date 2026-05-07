@@ -76,26 +76,37 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            if (Request.ContentLength == 0)
+            if (Request.ContentLength is 0)
                 return BadRequest("Empty save body.");
 
             var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slotNum);
 
-            using (var fs = System.IO.File.Create(path))
-                await Request.Body.CopyToAsync(fs);
+            var tempPath = path + ".tmp";
 
-            var writtenFile = new System.IO.FileInfo(path);
-            if (writtenFile.Length < 50)
+            try
             {
-                Logger.LogWarning("[JellyEmu] Save state for item {ItemId} user {UserId} slot {Slot} was suspiciously small ({Bytes} bytes). Deleting it.",
-                    itemId, userId, slotNum, writtenFile.Length);
-                System.IO.File.Delete(path);
-                return BadRequest("Save state was empty or corrupt.");
-            }
+                using (var fs = System.IO.File.Create(tempPath))
+                    await Request.Body.CopyToAsync(fs, HttpContext.RequestAborted);
 
-            Logger.LogInformation("[JellyEmu] Pipeline STAGE 2 (Server Receive): Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                itemId, userId, slotNum, writtenFile.Length);
+                var writtenFile = new System.IO.FileInfo(tempPath);
+                if (writtenFile.Length < 50)
+                {
+                    Logger.LogWarning(...);
+                    System.IO.File.Delete(tempPath);
+                    return BadRequest("Save state was empty or corrupt.");
+                }
+
+                Logger.LogInformation("[JellyEmu] Pipeline STAGE 2 (Server Receive): Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                    itemId, userId, slotNum, writtenFile.Length);
+                System.IO.File.Move(tempPath, path, overwrite: true);
+            }
+            catch
+            {
+                if (System.IO.File.Exists(tempPath))
+                    System.IO.File.Delete(tempPath);
+                throw;
+            }
             return Ok();
         }
 
