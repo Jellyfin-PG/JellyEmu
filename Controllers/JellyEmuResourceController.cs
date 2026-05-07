@@ -26,14 +26,26 @@ namespace JellyEmu.Controllers
 
         /// <summary>
         /// Serves the input mapping embedded JS resource.
-        /// Path: GET /jellyemu/assets/inputmap.js
+        /// Path: GET /jellyemu/assets/ejs.input.js
         /// </summary>
-        [HttpGet("/jellyemu/assets/inputmap.js")]
+        [HttpGet("/jellyemu/assets/ejs.input.js")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult InputMapJs()
+        public IActionResult InputJs()
         {
-            return ServeEmbeddedJs("inputmap.js");
+            return ServeEmbeddedJs("ejs.input.js");
+        }
+
+        /// <summary>
+        /// Serves the input mapping embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.xr.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.xr.js")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult XrJs()
+        {
+            return ServeEmbeddedJs("ejs.xr.js");
         }
 
         /// <summary>
@@ -42,7 +54,7 @@ namespace JellyEmu.Controllers
         private IActionResult ServeEmbeddedJs(string filename)
         {
             const string contentType = "application/javascript";
-            Response.Headers["Cache-Control"] = "public, max-age=3600";
+            //Response.Headers["Cache-Control"] = "public, max-age=3600";
 
             var assembly = typeof(JellyEmuResourceController).Assembly;
             var resourceName = assembly.GetManifestResourceNames()

@@ -31,10 +31,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Config Page -->
     <EmbeddedResource Include="Configuration\configPage.html" LogicalName="JellyEmu.Configuration.configPage.html" />
+    <!-- Templates -->
     <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html"/>
     <EmbeddedResource Include="Templates\ejs.html" LogicalName="JellyEmu.Templates.ejs.html"/>
-    <EmbeddedResource Include="Web/inputmap.js" />
+    <!-- Script Modules-->
+    <EmbeddedResource Include="Web/ejs.input.js" />
+    <EmbeddedResource Include="Web/ejs.xr.js" />
   </ItemGroup>
 
 </Project>
