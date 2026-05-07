@@ -73,18 +73,7 @@
                         var el = document.getElementById('je-slot-status-' + s);
                         if (el) el.textContent = 'Saved!';
 
-                        // Capture and upload screenshot for this slot
-                        var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('canvas');
-                        if (canvas) {
-                            try {
-                                var dataUrl = canvas.toDataURL('image/png');
-                                fetch('/jellyemu/save-screenshot/' + itemId + '/' + userId + '/' + s, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ dataUrl: dataUrl })
-                                }).catch(function (err) { console.warn('[JellyEmu] Screenshot upload failed:', err); });
-                            } catch (ex) { console.warn('[JellyEmu] Screenshot capture failed:', ex); }
-                        }
+                        window._jeUploadScreenshot(s);
                     }).catch(function (err) {
                         console.error('[JellyEmu] Save failed:', err);
                         var el = document.getElementById('je-slot-status-' + s);

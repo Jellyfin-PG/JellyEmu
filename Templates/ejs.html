@@ -352,9 +352,14 @@
     <div id="je-fps"></div>
     <div id="game"></div>
     <script>
-        // Patch getContext BEFORE loader.js so EJS gets a WebGL context with
-        // preserveDrawingBuffer:true — without this, toDataURL always returns black
-        // because the buffer is cleared after each frame is composited to screen.
+        window.JellyEmuConfig = {
+            itemId:      '{{ item_id }}',
+            userId:      '{{ user_id }}',
+            savePostUrl: '{{ save_post_url }}',
+            activeSlot:  {{ active_slot }}
+        };
+    </script>
+    <script>
         (function() {
             var _origGetContext = HTMLCanvasElement.prototype.getContext;
             HTMLCanvasElement.prototype.getContext = function(type, attrs) {
@@ -1070,10 +1075,9 @@
                     a.download = (window.EJS_gameName || 'screenshot') + '.png';
                     a.click();
                     URL.revokeObjectURL(url);
-                    // Also post to parent
                     try {
-                        var canvas = document.querySelector('canvas');
-                        if (canvas) window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: canvas.toDataURL('image/png') }, '*');
+                        var s = window._jeCaptureCanvas();
+                        if (s) window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: s }, '*');
                     } catch(ex) {}
                 }).catch(function(err) { console.warn('[JellyEmu] Screenshot failed:', err); });
             });
@@ -1300,23 +1304,23 @@
         // Record session start time for playtime tracking
         var _jellyEmuSessionStart = Date.now();
 
-        // Auto-upload save state whenever EmulatorJS writes one
-        // Capture the canvas and POST as save-state screenshot.
-        // preserveDrawingBuffer:true is patched onto getContext above so
-        // toDataURL works at any time, not just during the render tick.
-        function _jePostCanvasScreenshot(savePostPromise) {
-            var dataUrl = null;
+        function _jeCaptureCanvas() {
             try {
                 var canvas = document.querySelector('canvas.ejs_canvas') ||
-                             document.querySelector('#game canvas') ||
-                             document.querySelector('canvas');
+                            document.querySelector('#game canvas') ||
+                            document.querySelector('canvas');
                 if (canvas && canvas.width > 0 && canvas.height > 0) {
-                    dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+                    return canvas.toDataURL('image/jpeg', 0.88);
                 }
             } catch(e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
+            return null;
+        }
+
+        function _jeUploadScreenshot(slot, afterPromise) {
+            var dataUrl = _jeCaptureCanvas();
             if (!dataUrl || !dataUrl.startsWith('data:image')) return;
-            (savePostPromise || Promise.resolve()).then(function() {
-                fetch('/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/{{ active_slot }}', {
+            (afterPromise || Promise.resolve()).then(function() {
+                fetch('/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/' + slot, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ dataUrl: dataUrl })
@@ -1324,12 +1328,13 @@
             });
         }
 
+        window._jeCaptureCanvas    = _jeCaptureCanvas;
+        window._jeUploadScreenshot = _jeUploadScreenshot;
+
         window.EJS_onSaveState = function(e) {
             if (!e || !e.state) return;
             var state = _jeEnsureBinary(e.state);
             console.log('[JellyEmu] Pipeline STAGE 1 (Client AutoGen): Payload size ->', state.size || state.byteLength, 'bytes');
-            // Capture canvas NOW — synchronously, before the fetch, so we get the
-            // current game frame rather than whatever is on screen after the round-trip
             var savePromise = fetch('{{ save_post_url }}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream' },
@@ -1341,11 +1346,9 @@
             }).catch(function(err) {
                 console.error('[JellyEmu] Save upload failed:', err);
             });
-            _jePostCanvasScreenshot(savePromise);
+            _jeUploadScreenshot(activeSlot, savePromise);
         };
-        // Auto-save on exit if the user pref is enabled.
-        // EJS_onExit is called by both EmulatorJSs own exit menu item and our
-        // custom exit button. The _jellyEmuExiting flag prevents double-firing.
+
         var _jellyEmuExiting = false;
         window.EJS_onExit = function() {
             if (_jellyEmuExiting) return;
@@ -1372,11 +1375,9 @@
 
             function closeIframe() {
                 if (window.parent === window) {
-                    // New tab: broadcast exit signal, then close self
                     try { var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); } catch(e) {}
                     window.close();
                 } else {
-                    // Iframe: tell parent to remove it
                     window.parent.postMessage('close-jellyemu', '*');
                 }
             }
@@ -1402,7 +1403,6 @@
                         _fallbackClose();
                         return;
                     }
-                    // Capture before the fetch so rAF fires on the current frame
                     var saveFlush = fetch('{{ save_post_url }}', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/octet-stream' },
@@ -1413,9 +1413,8 @@
                     }).catch(function(err) {
                         console.error('[JellyEmu] Auto-save on exit failed:', err);
                     });
-                    _jePostCanvasScreenshot(saveFlush);
+                    _jeUploadScreenshot(activeSlot, saveFlush);
                     Promise.all([sessionStop, playtimeFlush, saveFlush]).finally(function() {
-                        // Notify parent of session end for Romm playtime reporting
                         try { window.parent.postMessage({ type: 'jellyemu-session-end', itemId: '{{ item_id }}', seconds: sessionSeconds }, '*'); } catch(_) {}
                         closeIframe();
                     });
@@ -1435,10 +1434,8 @@
             if (!btn) return;
             setTimeout(function() {
                 try {
-                    var canvas = document.querySelector('#game canvas') || document.querySelector('canvas');
-                    if (!canvas) return;
-                    var dataUrl = canvas.toDataURL('image/png');
-                    window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: dataUrl }, '*');
+                    var s = window._jeCaptureCanvas();
+                    window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: s }, '*');
                 } catch(e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
             }, 200);
         });
