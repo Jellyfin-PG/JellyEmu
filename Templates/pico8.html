@@ -150,7 +150,6 @@
         </button>
     </div>
 
-    <!-- PICO-8 frame (mirrors Lexaloffle BBS structure exactly) -->
     <div id="p8_frame_0">
         <div id="p8_frame">
             <textarea id="codo_textarea" class="emscripten" style="display:none; position:absolute; left:-9999px; height:0; overflow:hidden"></textarea>
@@ -206,6 +205,10 @@
         <!-- Sound -->
         <button class="je-dockbtn" id="je-btn-sound" title="Sound" onclick="p8_give_focus(); p8_create_audio_context(); Module.pico8ToggleSound();">
             <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        </button>
+        <!-- Screenshot -->
+        <button class="je-dockbtn" id="je-btn-screenshot" title="Screenshot" onclick="p8_save_screenshot();">
+            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
         </button>
         <!-- Fullscreen -->
         <button class="je-dockbtn" id="je-btn-full" title="Fullscreen" onclick="p8_give_focus(); p8_request_fullscreen();">
@@ -289,6 +292,29 @@
         if (codo_textarea && codo_textarea.style.display != 'none')
             codo_textarea.style.display = 'none';
     }, {passive:true});
+
+    function p8_save_screenshot() {
+        try {
+            var canvas = document.querySelector('canvas.emscripten') ||
+                        document.querySelector('#p8_playarea_flex canvas') ||
+                        document.querySelector('canvas');
+            if (canvas && canvas.width > 0 && canvas.height > 0) {
+                var scale = 8;
+                var offscreen = document.createElement('canvas');
+                offscreen.width  = canvas.width  * scale;
+                offscreen.height = canvas.height * scale;
+
+                var ctx = offscreen.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(canvas, 0, 0, offscreen.width, offscreen.height);
+                var s = offscreen.toDataURL('image/jpeg', 0.88);
+                var a = document.createElement('a');
+                a.href = s;
+                a.download = '{{ game_name }}'.replace(/[^a-z0-9]/gi, '_') + '.png';
+                a.click();
+            }
+        } catch(e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
+    }
 
     function p8_give_focus() {
         var el = codo_textarea || document.getElementById('codo_textarea');
