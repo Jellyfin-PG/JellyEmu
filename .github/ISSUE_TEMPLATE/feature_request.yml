@@ -1,0 +1,43 @@
+name: "Feature Request"
+description: "Suggest a new feature or improvement"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+
+  - type: input
+    id: jellyfin_version
+    attributes:
+      label: Jellyfin Version (if relevant)
+      placeholder: "10.9.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: feature
+    attributes:
+      label: Feature Description
+      description: What would you like added or improved?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem It Solves
+      description: What issue does this fix or improve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Suggested Implementation (optional)
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context / Screenshots
+    validations:
+      required: false
