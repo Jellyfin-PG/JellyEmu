@@ -492,7 +492,7 @@
                 }
             }
             function startAutoHide() {
-                ['mousemove','mousedown','touchstart','touchmove','keydown'].forEach(function(evt) {
+                ['mousemove','mousedown','touchstart','touchmove'].forEach(function(evt) {
                     document.addEventListener(evt, showDocks, { passive: true });
                 });
                 [topbar, dock].forEach(function(el) {
@@ -1082,6 +1082,7 @@
                 dock.classList.add('je-minimized');
                 dockMinBtn.classList.add('je-active');
                 dockMinBtn.classList.remove('je-hidden');
+                topbar.classList.add('je-hidden');
             });
             dockMinBtn.addEventListener('click', function() {
                 dockMinimized = false;
