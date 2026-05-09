@@ -1,0 +1,36 @@
+name: "Question / Support"
+description: "Ask for help or clarification"
+title: "[Question]: "
+labels: ["question"]
+body:
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What do you need help with?
+    validations:
+      required: true
+
+  - type: input
+    id: jellyfin_version
+    attributes:
+      label: Jellyfin Version (if relevant)
+      placeholder: "10.9.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Include setup details, logs, etc.
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / Logs
+    validations:
+      required: false
