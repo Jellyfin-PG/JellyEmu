@@ -523,7 +523,7 @@ namespace JellyEmu.Services
                         const cachedCard = document.querySelector('.card[data-id="' + id + '"][data-jellyemu-tags]');
                         if (cachedCard) {
                             const tags = cachedCard.getAttribute('data-jellyemu-tags').split(',');
-                            if (tags.includes('Game')) {
+                            if (tags.includes('JellyEmu')) {
                                 perf.mark('details-fast-path:' + id);
                                 currentItemIsGame = true;
                                 cachedTags        = tags;
@@ -535,7 +535,7 @@ namespace JellyEmu.Services
                         window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), id).then(item => {
                             perf.mark('details-getItem-end:' + id);
                             perf.measure('details-getItem:' + id, 'details-getItem-start:' + id, 'details-getItem-end:' + id);
-                            if (item && item.Tags && item.Tags.includes('Game')) {
+                            if (item && item.Tags && item.Tags.includes('JellyEmu')) {
                                 currentItemIsGame = true;
                                 cachedTags        = item.Tags;
                                 // Poll until .itemMiscInfo-primary exists, then inject once.
@@ -784,7 +784,7 @@ namespace JellyEmu.Services
                                         const badgeWrap = document.createElement('div');
                                         badgeWrap.className = 'jellyemu-card-badge-wrap';
                                         badgeWrap.style.cssText = 'position:absolute;bottom:4px;left:4px;display:flex;gap:3px;flex-wrap:wrap;z-index:2;pointer-events:none;';
-                                        item.Tags.filter(t => t !== 'Game').forEach(function(tag) {
+                                        item.Tags.filter(t => t !== 'JellyEmu').forEach(function(tag) {
                                             const badge = document.createElement('span');
                                             const isRegion      = knownRegions.has(tag);
                                             const isDisc        = isDiscTag(tag);
@@ -877,7 +877,7 @@ namespace JellyEmu.Services
                             const cardId = card.getAttribute('data-id');
                             if (cardId && window.ApiClient) {
                                 queueGetItem(cardId, function(item) {
-                                    if (item && item.Tags && item.Tags.includes('Game')) {
+                                    if (item && item.Tags && item.Tags.includes('JellyEmu')) {
                                         applyGameCardTreatment(card);
                                     }
                                 });

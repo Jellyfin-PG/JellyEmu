@@ -90,7 +90,8 @@ namespace JellyEmu
         public static string CleanName(string name)
         {
             var stripped = PlatformResolver.CleanDisplayName(name ?? string.Empty);
-            var cleaned = Regex.Replace(stripped.Replace("_", " ").Replace("-", " "), @"\s+", " ").Trim();
+            var noBrackets = Regex.Replace(stripped, @"\(.*?\)|\[.*?\]", " ");
+            var cleaned = Regex.Replace(noBrackets.Replace("_", " ").Replace("-", " "), @"\s+", " ").Trim();
             return cleaned;
         }
 

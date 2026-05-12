@@ -79,7 +79,7 @@ namespace JellyEmu.Controllers
             };
 
             var items = _libraryManager.GetItemList(query)
-                .Where(i => i.Tags != null && i.Tags.Contains("Game", StringComparer.OrdinalIgnoreCase));
+                .Where(i => i.Tags != null && i.Tags.Contains("JellyEmu", StringComparer.OrdinalIgnoreCase));
 
             if (!string.IsNullOrWhiteSpace(systemFilter))
                 items = items.Where(i =>
@@ -209,7 +209,7 @@ namespace JellyEmu.Controllers
 
             var systems = allRoms
                 .SelectMany(i => i.Tags ?? Array.Empty<string>())
-                .Where(t => !string.Equals(t, "Game", StringComparison.OrdinalIgnoreCase))
+                .Where(t => !string.Equals(t, "JellyEmu", StringComparison.OrdinalIgnoreCase))
                 .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
                 .Select(g => new
                 {

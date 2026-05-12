@@ -236,7 +236,7 @@ namespace JellyEmu.Controllers
                             {
                                 foreach (var tag in item.Tags)
                                 {
-                                    if (tag == "Game") continue;
+                                    if (tag == "JellyEmu") continue;
                                     if (knownRegions.Contains(tag)) { if (string.IsNullOrEmpty(region)) region = tag; }
                                     else                             { if (string.IsNullOrEmpty(platform)) platform = tag; }
                                 }
