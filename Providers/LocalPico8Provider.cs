@@ -69,7 +69,7 @@ namespace JellyEmu.Providers
             var dir      = Path.GetDirectoryName(info.Path) ?? string.Empty;
             var baseName = Path.GetFileName(basePath);
 
-            var tags = new List<string> { "Game", "PICO-8" };
+            var tags = new List<string> { "JellyEmu", "PICO-8" };
 
             if (info.Path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             {

@@ -186,7 +186,7 @@ namespace JellyEmu.Providers
                 var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
                 var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
-                var tags = new List<string> { "Game", consoleTag };
+                var tags = new List<string> { "JellyEmu", consoleTag };
                 if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
                 if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
 

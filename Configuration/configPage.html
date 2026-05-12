@@ -11,7 +11,7 @@
                 <p style="margin: 0; color: #aaa; font-size: 0.9em;">ROMs Scanned</p>
                 <h1 id="romCountDisplay" style="font-size: 4em; color: #00a4dc; margin: 4px 0;">...</h1>
                 <p style="color: #aaa; font-size: 0.85em; margin: 0;">Tagged <b>Book</b> items with the
-                    <code>Game</code> tag found in your library.
+                    <code>JellyEmu</code> tag found in your library.
                 </p>
             </div>
 
@@ -355,7 +355,7 @@
                     Fields: 'Tags'
                 }).then(function (result) {
                     var count = (result.Items || []).filter(function (i) {
-                        return i.Tags && i.Tags.includes('Game');
+                        return i.Tags && i.Tags.includes('JellyEmu');
                     }).length;
                     display.innerText = count;
                     display.style.color = count > 0 ? '#52B54B' : '#00a4dc';

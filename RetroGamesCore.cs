@@ -35,7 +35,7 @@ namespace JellyEmu
                         var displayName = PlatformResolver.CleanDisplayName(
                             Path.GetFileName(args.Path));
 
-                        var tags = new List<string> { "Game", consoleTag };
+                        var tags = new List<string> { "JellyEmu", consoleTag };
                         if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                         var parentFolder = Path.GetFileName(Path.GetDirectoryName(args.Path));
@@ -79,7 +79,7 @@ namespace JellyEmu
                 var displayName = PlatformResolver.CleanDisplayName(
                     Path.GetFileNameWithoutExtension(args.Path) ?? string.Empty);
 
-                var tags = new List<string> { "Game", consoleTag };
+                var tags = new List<string> { "JellyEmu", consoleTag };
                 if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
 
                 var parentFolder = Path.GetFileName(Path.GetDirectoryName(args.Path));
@@ -118,7 +118,7 @@ namespace JellyEmu
                     Path            = args.Path,
                     IsInMixedFolder = true,
                     SeriesName      = seriesName,
-                    Tags            = new[] { "Game", "PICO-8" }
+                    Tags            = new[] { "JellyEmu", "PICO-8" }
                 };
             }
 
