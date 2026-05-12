@@ -481,7 +481,7 @@ namespace JellyEmu.Providers
                 Overview        = scraped.Description,
                 ProductionYear  = scraped.Year,
                 CommunityRating = scraped.Stars > 0 ? (float?)scraped.Stars : null,
-                Tags            = new[] { "PICO-8", "JellyEmu" },
+                Tags            = new[] { "PICO-8", "JellyEmu", "Game" },
             };
 
             item.SetProviderId(ProviderId, loid);

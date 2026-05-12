@@ -33,7 +33,7 @@ namespace JellyEmu.Providers
                 var nfoPath = Path.ChangeExtension(info.Path, ".nfo");
                 if (File.Exists(nfoPath))
                 {
-                    var nfoTags = new List<string> { "JellyEmu", _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path)) };
+                    var nfoTags = new List<string> { "JellyEmu", "Game", _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path)) };
                     var nfoRegion = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
                     var nfoDisc = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
                     if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
