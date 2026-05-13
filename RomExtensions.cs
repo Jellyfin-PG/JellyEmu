@@ -1,5 +1,5 @@
 using System.IO.Compression;
-using System.Text.RegularExpressions;
+using JellyEmu.Utilities;
 using MediaBrowser.Controller.Entities;
 
 namespace JellyEmu
@@ -89,10 +89,7 @@ namespace JellyEmu
 
         public static string CleanName(string name)
         {
-            var stripped = PlatformResolver.CleanDisplayName(name ?? string.Empty);
-            var noBrackets = Regex.Replace(stripped, @"\(.*?\)|\[.*?\]", " ");
-            var cleaned = Regex.Replace(noBrackets.Replace("_", " ").Replace("-", " "), @"\s+", " ").Trim();
-            return cleaned;
+            return NameCleaner.CleanName(name);
         }
 
         /// <summary>
