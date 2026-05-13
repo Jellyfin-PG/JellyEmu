@@ -10,7 +10,7 @@
         html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }
         #game { width: 100%; height: 100%; }
 
-        /* Keep the elements in the DOM but hide them from view */
+        /* ── EJS Elements ── */
         .ejs_menu_bar, 
         .ejs_parent > div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),
         #je-loader + .ejs_parent .ejs_menu_bar {
@@ -496,7 +496,13 @@
                     document.addEventListener(evt, showDocks, { passive: true });
                 });
                 [topbar, dock].forEach(function(el) {
-                    el.addEventListener('mouseenter', function() { clearTimeout(hideTimer); topbar.classList.remove('je-hidden'); dock.classList.remove('je-hidden'); });
+                    el.addEventListener('mouseenter', function() {
+                        clearTimeout(hideTimer);
+                        if (!dockMinimized) {
+                            topbar.classList.remove('je-hidden');
+                            dock.classList.remove('je-hidden');
+                        }
+                    });
                     el.addEventListener('mouseleave', showDocks);
                 });
                 showDocks();
@@ -1090,11 +1096,14 @@
                 dockMinBtn.classList.remove('je-active');
                 showDocks();
             });
-            // Override showDocks to handle minimize FAB visibility
+            // Override showDocks to handle minimize FAB visibility and keep topbar hidden when dock is minimized
             var _origShowDocks = showDocks;
             showDocks = function() {
+                // Call original to handle regular dock visibility logic
                 _origShowDocks();
+                // If the dock is minimized, ensure the topbar stays hidden
                 if (dockMinimized) {
+                    topbar.classList.add('je-hidden');
                     dockMinBtn.classList.remove('je-hidden');
                 }
             };
