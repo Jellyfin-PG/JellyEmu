@@ -60,6 +60,11 @@ namespace JellyEmu
         /// </summary>
         public string RawgApiKey { get; set; } = string.Empty;
 
+        /// <summary>
+        /// SteamGridDB API Key. Get yours at https://www.steamgriddb.com/profile/api
+        /// </summary>
+        public string SteamGridDbApiKey { get; set; } = string.Empty;
+
         public string NetplayServer { get; set; } = string.Empty;
 
         /// <summary>

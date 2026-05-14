@@ -131,7 +131,6 @@ namespace JellyEmu.Providers
             var results = new List<RemoteSearchResult>();
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
 
-            // If the user supplied an IGDB id directly, do a direct lookup instead of name search
             searchInfo.ProviderIds.TryGetValue("IGDB", out var directId);
             if (string.IsNullOrEmpty(directId))
                 directId = TryExtractEmbeddedIgdbId(searchInfo.Path);
@@ -179,7 +178,7 @@ namespace JellyEmu.Providers
                     }
                 }
                 catch { }
-                return results; // empty, direct lookup failed
+                return results;
             }
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);

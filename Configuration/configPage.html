@@ -50,6 +50,20 @@
             </div>
 
             <div class="verticalSection" style="margin-top: 1.5em;">
+                <h2 class="sectionTitle">SteamGridDB Images</h2>
+                <p style="color: #aaa; margin-bottom: 1em;">
+                    Used for high-quality game grids, heroes, and logos.
+                    Get your API key at <a href="https://www.steamgriddb.com/profile/api" target="_blank"
+                        style="color: #00a4dc;">steamgriddb.com/profile/api</a>.
+                </p>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="steamGridDbApiKey">SteamGridDB API Key</label>
+                    <input id="steamGridDbApiKey" type="password" is="emby-input" class="emby-input"
+                        placeholder="Your SteamGridDB API key" autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="verticalSection" style="margin-top: 1.5em;">
                 <h2 class="sectionTitle">Romm Integration <span
                         style="font-size: 0.65em; vertical-align: middle; background: #555; color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px;">Disabled
                         by default</span></h2>
@@ -370,6 +384,7 @@
                     page.querySelector('#igdbClientId').value = config.IgdbClientId || '';
                     page.querySelector('#igdbClientSecret').value = config.IgdbClientSecret || '';
                     page.querySelector('#rawgApiKey').value = config.RawgApiKey || '';
+                    page.querySelector('#steamGridDbApiKey').value = config.SteamGridDbApiKey || '';
                     page.querySelector('#rommInstanceUrl').value = config.RommInstanceUrl || '';
                     page.querySelector('#rommUsername').value = config.RommUsername || '';
                     page.querySelector('#rommPassword').value = config.RommPassword || '';
@@ -392,6 +407,7 @@
                     config.IgdbClientId = page.querySelector('#igdbClientId').value.trim();
                     config.IgdbClientSecret = page.querySelector('#igdbClientSecret').value.trim();
                     config.RawgApiKey = page.querySelector('#rawgApiKey').value.trim();
+                    config.SteamGridDbApiKey = page.querySelector('#steamGridDbApiKey').value.trim();
                     config.RommEnabled = page.querySelector('#rommEnabled').value === 'true';
                     config.RommInstanceUrl = page.querySelector('#rommInstanceUrl').value.trim();
                     config.RommUsername = page.querySelector('#rommUsername').value.trim();
