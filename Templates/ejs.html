@@ -1,176 +1,893 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ game_name }}</title>
     <script src="/jellyemu/threejs/three.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }
-        #game { width: 100%; height: 100%; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #fff;
+        }
+
+        #game {
+            width: 100%;
+            height: 100%;
+        }
 
         /* ── EJS Elements ── */
-        .ejs_menu_bar, 
-        .ejs_parent > div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),
-        #je-loader + .ejs_parent .ejs_menu_bar {
+        .ejs_menu_bar,
+        .ejs_parent>div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),
+        #je-loader+.ejs_parent .ejs_menu_bar {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
             pointer-events: none !important;
         }
-        .ejs_bottom_bar_area, .ejs_loading_text, .ejs_start_button,
-        .ejs_settings_parent, .ejs_cheat_parent, .ejs_menu_bar_area,
-        .ejs_control_bar, .ejs_menu_bar, .ejs_menu_button, .ejs_bar_top { display: none !important; }
+
+        .ejs_bottom_bar_area,
+        .ejs_loading_text,
+        .ejs_start_button,
+        .ejs_settings_parent,
+        .ejs_cheat_parent,
+        .ejs_menu_bar_area,
+        .ejs_control_bar,
+        .ejs_menu_bar,
+        .ejs_menu_button,
+        .ejs_bar_top {
+            display: none !important;
+        }
 
         /* ── Loading Screen ── */
-        #je-loader { position: fixed; inset: 0; z-index: 99999; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; transition: opacity .4s ease, transform .4s ease; }
-        #je-loader.je-dismiss { opacity: 0; transform: scale(1.03); pointer-events: none; }
-        #je-loader-title { font-size: 28px; font-weight: 700; text-align: center; padding: 0 20px; }
-        #je-loader-system { display: inline-block; padding: 4px 16px; border-radius: 20px; background: rgba(255,255,255,.12); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }
-        #je-loader-status { font-size: 14px; opacity: .6; }
-        .je-spinner { width: 56px; height: 56px; border: 3px solid rgba(255,255,255,.15); border-top-color: #fff; border-radius: 50%; animation: je-spin 1s linear infinite; }
-        @keyframes je-spin { to { transform: rotate(360deg); } }
-        .je-pulse-ring { position: absolute; width: 90px; height: 90px; border-radius: 50%; border: 2px solid rgba(255,255,255,.08); animation: je-pulse 2s ease-out infinite; }
-        .je-pulse-ring:nth-child(2) { animation-delay: .6s; }
-        .je-pulse-ring:nth-child(3) { animation-delay: 1.2s; }
-        @keyframes je-pulse { 0% { transform: scale(.8); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
-        .je-loader-anim { position: relative; display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; }
+        #je-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            transition: opacity .4s ease, transform .4s ease;
+        }
+
+        #je-loader.je-dismiss {
+            opacity: 0;
+            transform: scale(1.03);
+            pointer-events: none;
+        }
+
+        #je-loader-title {
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        #je-loader-system {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, .12);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #je-loader-status {
+            font-size: 14px;
+            opacity: .6;
+        }
+
+        .je-spinner {
+            width: 56px;
+            height: 56px;
+            border: 3px solid rgba(255, 255, 255, .15);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: je-spin 1s linear infinite;
+        }
+
+        @keyframes je-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .je-pulse-ring {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, .08);
+            animation: je-pulse 2s ease-out infinite;
+        }
+
+        .je-pulse-ring:nth-child(2) {
+            animation-delay: .6s;
+        }
+
+        .je-pulse-ring:nth-child(3) {
+            animation-delay: 1.2s;
+        }
+
+        @keyframes je-pulse {
+            0% {
+                transform: scale(.8);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        .je-loader-anim {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 90px;
+            height: 90px;
+        }
 
         /* ── Shared Dock Styles ── */
-        .je-bar { position: fixed; z-index: 90000; transition: opacity .3s ease, transform .3s ease; }
-        .je-bar.je-hidden { opacity: 0; pointer-events: none; }
+        .je-bar {
+            position: fixed;
+            z-index: 90000;
+            transition: opacity .3s ease, transform .3s ease;
+        }
+
+        .je-bar.je-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
 
         /* ── Top Bar ── */
-        #je-topbar { top: 0; left: 0; right: 0; height: 48px; display: none; align-items: center; justify-content: space-between; padding: 0 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); }
-        #je-topbar.je-active { display: flex; }
-        #je-topbar-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-        .je-topbtn { background: none; border: none; color: #fff; cursor: pointer; padding: 8px; border-radius: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: background .15s; }
-        .je-topbtn:hover { background: rgba(255,255,255,.1); }
-        .je-topbtn:active { transform: scale(.93); }
-        .je-topbtn svg { width: 20px; height: 20px; fill: currentColor; }
+        #je-topbar {
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 48px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: rgba(0, 0, 0, .78);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        #je-topbar.je-active {
+            display: flex;
+        }
+
+        #je-topbar-title {
+            font-size: 15px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
+        }
+
+        .je-topbtn {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            transition: background .15s;
+        }
+
+        .je-topbtn:hover {
+            background: rgba(255, 255, 255, .1);
+        }
+
+        .je-topbtn:active {
+            transform: scale(.93);
+        }
+
+        .je-topbtn svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
 
         /* ── Bottom Dock ── */
-        #je-dock { bottom: 16px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 28px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1); }
-        #je-dock.je-active { display: flex; }
-        #je-dock.je-hidden { transform: translateX(-50%) translateY(20px); }
-        .je-dockbtn { background: none; border: none; color: #fff; cursor: pointer; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .1s; position: relative; }
-        .je-dockbtn:hover { background: rgba(255,255,255,.12); }
-        .je-dockbtn:active { transform: scale(.88); }
-        .je-dockbtn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .je-dockbtn:disabled:hover { background: none; }
-        .je-dockbtn:disabled:active { transform: none; }
-        .je-dockbtn svg { width: 22px; height: 22px; fill: currentColor; }
-        .je-dockbtn.je-active { background: rgba(255,255,255,.2); }
-        .je-dock-sep { width: 1px; height: 24px; background: rgba(255,255,255,.15); margin: 0 2px; flex-shrink: 0; }
+        #je-dock {
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            border-radius: 28px;
+            background: rgba(0, 0, 0, .78);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, .1);
+        }
+
+        #je-dock.je-active {
+            display: flex;
+        }
+
+        #je-dock.je-hidden {
+            transform: translateX(-50%) translateY(20px);
+        }
+
+        .je-dockbtn {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .15s, transform .1s;
+            position: relative;
+        }
+
+        .je-dockbtn:hover {
+            background: rgba(255, 255, 255, .12);
+        }
+
+        .je-dockbtn:active {
+            transform: scale(.88);
+        }
+
+        .je-dockbtn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .je-dockbtn:disabled:hover {
+            background: none;
+        }
+
+        .je-dockbtn:disabled:active {
+            transform: none;
+        }
+
+        .je-dockbtn svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        .je-dockbtn.je-active {
+            background: rgba(255, 255, 255, .2);
+        }
+
+        .je-dock-sep {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, .15);
+            margin: 0 2px;
+            flex-shrink: 0;
+        }
 
         /* ── Popup / Modal ── */
-        .je-overlay { position: fixed; inset: 0; z-index: 95000; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; }
-        .je-overlay.je-open { display: flex; }
-        .je-popup { background: rgba(20,20,20,.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.1); border-radius: 16px; width: 90%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; animation: je-pop-in .2s ease; }
-        .je-popup-lg { max-width: 680px; }
-        @keyframes je-pop-in { from { opacity: 0; transform: scale(.95); } to { opacity: 1; transform: scale(1); } }
-        .je-popup-hdr { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
-        .je-popup-hdr h3 { font-size: 16px; font-weight: 600; }
-        .je-closebtn { background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; line-height: 1; }
-        .je-closebtn:hover { background: rgba(255,255,255,.1); }
-        .je-popup-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .je-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 95000;
+            background: rgba(0, 0, 0, .6);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .je-overlay.je-open {
+            display: flex;
+        }
+
+        .je-popup {
+            background: rgba(20, 20, 20, .95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, .1);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 480px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            animation: je-pop-in .2s ease;
+        }
+
+        .je-popup-lg {
+            max-width: 680px;
+        }
+
+        @keyframes je-pop-in {
+            from {
+                opacity: 0;
+                transform: scale(.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .je-popup-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, .08);
+            flex-shrink: 0;
+        }
+
+        .je-popup-hdr h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .je-closebtn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            line-height: 1;
+        }
+
+        .je-closebtn:hover {
+            background: rgba(255, 255, 255, .1);
+        }
+
+        .je-popup-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
 
         /* ── Save Slots ── */
-        .je-slot { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); margin-bottom: 8px; transition: border-color .2s; }
-        .je-slot.je-slot-active { border-color: rgba(255,255,255,.35); }
-        .je-slot-num { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
-        .je-slot-thumb { width: 64px; height: 48px; border-radius: 6px; background: rgba(255,255,255,.05); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: .5; }
-        .je-slot-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .je-slot-info { flex: 1; min-width: 0; }
-        .je-slot-info small { opacity: .5; font-size: 11px; }
-        .je-slot-actions { display: flex; gap: 6px; flex-shrink: 0; }
-        .je-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; font-size: 12px; transition: background .15s; }
-        .je-btn:hover { background: rgba(255,255,255,.14); }
-        .je-btn-primary { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.25); }
+        .je-slot {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            margin-bottom: 8px;
+            transition: border-color .2s;
+        }
+
+        .je-slot.je-slot-active {
+            border-color: rgba(255, 255, 255, .35);
+        }
+
+        .je-slot-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .je-slot-thumb {
+            width: 64px;
+            height: 48px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, .05);
+            overflow: hidden;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            opacity: .5;
+        }
+
+        .je-slot-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .je-slot-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .je-slot-info small {
+            opacity: .5;
+            font-size: 11px;
+        }
+
+        .je-slot-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .je-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, .15);
+            background: rgba(255, 255, 255, .06);
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background .15s;
+        }
+
+        .je-btn:hover {
+            background: rgba(255, 255, 255, .14);
+        }
+
+        .je-btn-primary {
+            background: rgba(255, 255, 255, .18);
+            border-color: rgba(255, 255, 255, .25);
+        }
 
         /* ── Volume ── */
-        .je-vol-wrap { display: flex; flex-direction: column; gap: 16px; align-items: center; }
-        .je-vol-pct { font-size: 36px; font-weight: 700; }
-        .je-vol-slider { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); outline: none; }
-        .je-vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; cursor: pointer; }
+        .je-vol-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .je-vol-pct {
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        .je-vol-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, .15);
+            outline: none;
+        }
+
+        .je-vol-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+        }
 
         /* ── Cheats ── */
-        .je-cheat-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
-        .je-cheat-row:last-child { border-bottom: none; }
-        .je-cheat-name { flex: 1; font-size: 13px; }
-        .je-cheat-del { background: none; border: none; color: rgba(255,255,255,.4); cursor: pointer; font-size: 18px; padding: 2px 6px; }
-        .je-cheat-del:hover { color: #f44; }
-        .je-cheat-add { display: flex; gap: 8px; margin-top: 12px; }
-        .je-cheat-add input, .je-cheat-add textarea { flex: 1; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 8px 10px; color: #fff; font-size: 13px; resize: none; }
+        .je-cheat-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
+        }
+
+        .je-cheat-row:last-child {
+            border-bottom: none;
+        }
+
+        .je-cheat-name {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .je-cheat-del {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, .4);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 2px 6px;
+        }
+
+        .je-cheat-del:hover {
+            color: #f44;
+        }
+
+        .je-cheat-add {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .je-cheat-add input,
+        .je-cheat-add textarea {
+            flex: 1;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 8px;
+            padding: 8px 10px;
+            color: #fff;
+            font-size: 13px;
+            resize: none;
+        }
 
         /* ── Toggle Switch ── */
-        .je-toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
-        .je-toggle input { opacity: 0; width: 0; height: 0; }
-        .je-toggle-track { position: absolute; inset: 0; border-radius: 11px; background: rgba(255,255,255,.15); transition: background .2s; cursor: pointer; }
-        .je-toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
-        .je-toggle input:checked + .je-toggle-track { background: rgba(100,200,255,.6); }
-        .je-toggle input:checked + .je-toggle-track::after { transform: translateX(18px); }
+        .je-toggle {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+
+        .je-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .je-toggle-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 11px;
+            background: rgba(255, 255, 255, .15);
+            transition: background .2s;
+            cursor: pointer;
+        }
+
+        .je-toggle-track::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform .2s;
+        }
+
+        .je-toggle input:checked+.je-toggle-track {
+            background: rgba(100, 200, 255, .6);
+        }
+
+        .je-toggle input:checked+.je-toggle-track::after {
+            transform: translateX(18px);
+        }
 
         /* ── Settings Rows ── */
-        .je-setting { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
-        .je-setting:last-child { border-bottom: none; }
-        .je-setting-label { font-size: 13px; }
-        .je-setting select { background: rgba(30,30,30,.95); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 13px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; cursor: pointer; }
-        .je-setting select option { background: #1a1a1a; color: #fff; padding: 6px; }
-        .je-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: .4; margin: 16px 0 8px; }
-        .je-section-title:first-child { margin-top: 0; }
+        .je-setting {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
+        }
+
+        .je-setting:last-child {
+            border-bottom: none;
+        }
+
+        .je-setting-label {
+            font-size: 13px;
+        }
+
+        .je-setting select {
+            background: rgba(30, 30, 30, .95);
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: #fff;
+            font-size: 13px;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 28px;
+            cursor: pointer;
+        }
+
+        .je-setting select option {
+            background: #1a1a1a;
+            color: #fff;
+            padding: 6px;
+        }
+
+        .je-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            opacity: .4;
+            margin: 16px 0 8px;
+        }
+
+        .je-section-title:first-child {
+            margin-top: 0;
+        }
 
         /* ── Input Mapping ── */
-        .je-tabs { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 12px; }
-        .je-tab { padding: 8px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; opacity: .5; transition: opacity .2s; background: none; border-top: none; border-left: none; border-right: none; color: #fff; }
-        .je-tab.je-tab-active { opacity: 1; border-bottom-color: #fff; }
-        .je-tab-panel { display: none; }
-        .je-tab-panel.je-tab-active { display: block; }
+        .je-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .1);
+            margin-bottom: 12px;
+        }
+
+        .je-tab {
+            padding: 8px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            opacity: .5;
+            transition: opacity .2s;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            color: #fff;
+        }
+
+        .je-tab.je-tab-active {
+            opacity: 1;
+            border-bottom-color: #fff;
+        }
+
+        .je-tab-panel {
+            display: none;
+        }
+
+        .je-tab-panel.je-tab-active {
+            display: block;
+        }
+
         /* ── Input Mapping Grid ── */
-        .je-bind-headers { display: grid; grid-template-columns: 1fr 90px 90px; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.2); font-size: 11px; text-transform: uppercase; opacity: .6; margin-bottom: 8px; text-align: center; }
-        .je-bind-headers span:first-child { text-align: left; }
-        .je-bind-row { display: grid; grid-template-columns: 1fr 90px 90px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
-        .je-bind-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .je-bind-key { padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); cursor: pointer; text-align: center; font-size: 11px; transition: background .2s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .je-bind-key:hover { background: rgba(255,255,255,.15); }
-        .je-bind-key.je-listening { background: rgba(100,200,255,.2); border-color: rgba(100,200,255,.5); animation: je-pulse-bind 1s ease infinite; }
-        @keyframes je-pulse-bind { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
-        .je-gp-status { font-size: 12px; opacity: .5; margin-bottom: 12px; }
+        .je-bind-headers {
+            display: grid;
+            grid-template-columns: 1fr 90px 90px;
+            gap: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, .2);
+            font-size: 11px;
+            text-transform: uppercase;
+            opacity: .6;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .je-bind-headers span:first-child {
+            text-align: left;
+        }
+
+        .je-bind-row {
+            display: grid;
+            grid-template-columns: 1fr 90px 90px;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .06);
+            font-size: 13px;
+        }
+
+        .je-bind-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .je-bind-key {
+            padding: 4px 6px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .12);
+            cursor: pointer;
+            text-align: center;
+            font-size: 11px;
+            transition: background .2s;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .je-bind-key:hover {
+            background: rgba(255, 255, 255, .15);
+        }
+
+        .je-bind-key.je-listening {
+            background: rgba(100, 200, 255, .2);
+            border-color: rgba(100, 200, 255, .5);
+            animation: je-pulse-bind 1s ease infinite;
+        }
+
+        @keyframes je-pulse-bind {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .6;
+            }
+        }
+
+        .je-gp-status {
+            font-size: 12px;
+            opacity: .5;
+            margin-bottom: 12px;
+        }
 
         /* ── FPS Counter ── */
-        #je-fps { position: fixed; top: 56px; left: 16px; z-index: 89999; font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace; color: #0f0; background: rgba(0,0,0,.6); padding: 2px 8px; border-radius: 4px; pointer-events: none; display: none; text-shadow: 0 0 4px rgba(0,255,0,.5); }
-        #je-fps.je-active { display: block; }
+        #je-fps {
+            position: fixed;
+            top: 56px;
+            left: 16px;
+            z-index: 89999;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: #0f0;
+            background: rgba(0, 0, 0, .6);
+            padding: 2px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            display: none;
+            text-shadow: 0 0 4px rgba(0, 255, 0, .5);
+        }
+
+        #je-fps.je-active {
+            display: block;
+        }
 
         /* ── Dock Minimize ── */
-        #je-dock-min { position: fixed; bottom: 16px; right: 16px; z-index: 90000; width: 42px; height: 42px; border-radius: 50%; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1); color: #fff; cursor: pointer; display: none; align-items: center; justify-content: center; transition: opacity .3s ease, transform .3s ease; }
-        #je-dock-min.je-active { display: flex; }
-        #je-dock-min.je-hidden { opacity: 0; pointer-events: none; }
-        #je-dock-min:hover { background: rgba(255,255,255,.12); }
-        #je-dock-min:active { transform: scale(.88); }
-        #je-dock-min svg { width: 22px; height: 22px; fill: currentColor; }
-        #je-dock.je-minimized { display: none !important; }
+        #je-dock-min {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            z-index: 90000;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, .78);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, .1);
+            color: #fff;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: opacity .3s ease, transform .3s ease;
+        }
+
+        #je-dock-min.je-active {
+            display: flex;
+        }
+
+        #je-dock-min.je-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #je-dock-min:hover {
+            background: rgba(255, 255, 255, .12);
+        }
+
+        #je-dock-min:active {
+            transform: scale(.88);
+        }
+
+        #je-dock-min svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        #je-dock.je-minimized {
+            display: none !important;
+        }
 
         /* ── VR/AR Button ── */
-        #je-vr-btn { display: none; }
-        #je-vr-btn.je-vr-available { display: flex; }
-        #je-vr-btn.je-vr-active { color: #7df; background: rgba(100,200,255,.18); }
-        #je-vr-btn.je-vr-active:hover { background: rgba(100,200,255,.28); }
+        #je-vr-btn {
+            display: none;
+        }
+
+        #je-vr-btn.je-vr-available {
+            display: flex;
+        }
+
+        #je-vr-btn.je-vr-active {
+            color: #7df;
+            background: rgba(100, 200, 255, .18);
+        }
+
+        #je-vr-btn.je-vr-active:hover {
+            background: rgba(100, 200, 255, .28);
+        }
 
         /* ── Mobile ── */
         @media (max-width: 768px) {
-            #je-dock { gap: 2px; padding: 5px 8px; bottom: 8px; max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
-            #je-dock::-webkit-scrollbar { display: none; }
-            .je-dockbtn { width: 38px; height: 38px; }
-            .je-dockbtn svg { width: 20px; height: 20px; }
-            .je-popup { width: 96%; max-height: 85vh; border-radius: 12px; }
-            #je-topbar { height: 42px; padding: 0 10px; }
-            #je-topbar-title { font-size: 13px; }
-            #je-loader-title { font-size: 22px; }
-            #je-dock-min { bottom: 8px; right: 8px; width: 38px; height: 38px; }
+            #je-dock {
+                gap: 2px;
+                padding: 5px 8px;
+                bottom: 8px;
+                max-width: calc(100vw - 16px);
+                overflow-x: auto;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+                cursor: grab;
+            }
+
+            #je-dock::-webkit-scrollbar {
+                display: none;
+            }
+
+            .je-dockbtn {
+                width: 38px;
+                height: 38px;
+            }
+
+            .je-dockbtn svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .je-popup {
+                width: 96%;
+                max-height: 85vh;
+                border-radius: 12px;
+            }
+
+            #je-topbar {
+                height: 42px;
+                padding: 0 10px;
+            }
+
+            #je-topbar-title {
+                font-size: 13px;
+            }
+
+            #je-loader-title {
+                font-size: 22px;
+            }
+
+            #je-dock-min {
+                bottom: 8px;
+                right: 8px;
+                width: 38px;
+                height: 38px;
+            }
         }
     </style>
 </head>
+
 <body>
     <!-- Loading Screen -->
     <div id="je-loader">
@@ -188,14 +905,19 @@
     <!-- Top Bar -->
     <div id="je-topbar" class="je-bar">
         <span id="je-topbar-title">{{ game_name }}</span>
-        
+
         <div style="display: flex; gap: 8px; align-items: center;">
             <button class="je-topbtn" id="je-vr-btn" title="Enter VR">
-                <svg viewBox="0 0 24 24"><path d="M20.5 6H3.5C2.12 6 1 7.12 1 8.5v7C1 16.88 2.12 18 3.5 18h4.1l1.33-1.5h6.14L16.4 18h4.1c1.38 0 2.5-1.12 2.5-2.5v-7C23 7.12 21.88 6 20.5 6zM8 13.5C6.62 13.5 5.5 12.38 5.5 11S6.62 8.5 8 8.5 10.5 9.62 10.5 11 9.38 13.5 8 13.5zm8 0c-1.38 0-2.5-1.12-2.5-2.5S14.62 8.5 16 8.5 18.5 9.62 18.5 11 17.38 13.5 16 13.5z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M20.5 6H3.5C2.12 6 1 7.12 1 8.5v7C1 16.88 2.12 18 3.5 18h4.1l1.33-1.5h6.14L16.4 18h4.1c1.38 0 2.5-1.12 2.5-2.5v-7C23 7.12 21.88 6 20.5 6zM8 13.5C6.62 13.5 5.5 12.38 5.5 11S6.62 8.5 8 8.5 10.5 9.62 10.5 11 9.38 13.5 8 13.5zm8 0c-1.38 0-2.5-1.12-2.5-2.5S14.62 8.5 16 8.5 18.5 9.62 18.5 11 17.38 13.5 16 13.5z" />
+                </svg>
                 <span id="je-vr-label">VR</span>
             </button>
             <button class="je-topbtn" id="je-exit-btn" title="Exit">
-                <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
                 Exit
             </button>
         </div>
@@ -203,48 +925,96 @@
 
     <!-- Bottom Dock -->
     <div id="je-dock" class="je-bar">
-        <button class="je-dockbtn" id="je-btn-pause" title="Pause"><svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-play" title="Play" style="display:none"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-restart" title="Restart"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-pause" title="Pause"><svg viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-play" title="Play" style="display:none"><svg viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-restart" title="Restart"><svg viewBox="0 0 24 24">
+                <path
+                    d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            </svg></button>
         <div class="je-dock-sep"></div>
-        <button class="je-dockbtn" id="je-btn-ff" title="Fast Forward"><svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-slow" title="Slow Motion"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2V8h-2v8zm-3 0h2V8H8v8z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-ff" title="Fast Forward"><svg viewBox="0 0 24 24">
+                <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-slow" title="Slow Motion"><svg viewBox="0 0 24 24">
+                <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2V8h-2v8zm-3 0h2V8H8v8z" />
+            </svg></button>
         <div class="je-dock-sep"></div>
-        <button class="je-dockbtn" id="je-btn-saves" title="Save States"><svg viewBox="0 0 24 24"><path d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-io" title="Import / Export"><svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-vol" title="Volume"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-3.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-cheats" title="Cheats"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-inputmap" title="Input Mapping"><svg viewBox="0 0 24 24"><path d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-netplay" title="Netplay" disabled><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-saves" title="Save States"><svg viewBox="0 0 24 24">
+                <path
+                    d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-io" title="Import / Export"><svg viewBox="0 0 24 24">
+                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-vol" title="Volume"><svg viewBox="0 0 24 24">
+                <path
+                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-3.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-cheats" title="Cheats"><svg viewBox="0 0 24 24">
+                <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-inputmap" title="Input Mapping"><svg viewBox="0 0 24 24">
+                <path
+                    d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-netplay" title="Netplay" disabled><svg viewBox="0 0 24 24">
+                <path
+                    d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z" />
+            </svg></button>
         <div class="je-dock-sep"></div>
-        <button class="je-dockbtn" id="je-btn-screenshot" title="Screenshot"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-settings" title="Settings"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59-.24-1.13-.56-1.62-.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
-        <button class="je-dockbtn" id="je-btn-coreopts" title="Core Options"><svg viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-screenshot" title="Screenshot"><svg viewBox="0 0 24 24">
+                <path
+                    d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-settings" title="Settings"><svg viewBox="0 0 24 24">
+                <path
+                    d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59-.24-1.13-.56-1.62-.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z" />
+            </svg></button>
+        <button class="je-dockbtn" id="je-btn-coreopts" title="Core Options"><svg viewBox="0 0 24 24">
+                <path
+                    d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
+            </svg></button>
         <div class="je-dock-sep"></div>
         <button class="je-dockbtn" id="je-btn-fullscreen" title="Fullscreen">
-            <svg id="je-fs-enter" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-            <svg id="je-fs-exit" viewBox="0 0 24 24" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+            <svg id="je-fs-enter" viewBox="0 0 24 24">
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+            </svg>
+            <svg id="je-fs-exit" viewBox="0 0 24 24" style="display:none">
+                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+            </svg>
         </button>
     </div>
 
     <!-- Dock Minimize FAB -->
     <button id="je-dock-min" title="Expand Controls">
-        <svg viewBox="0 0 24 24"><path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/></svg>
+        <svg viewBox="0 0 24 24">
+            <path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z" />
+        </svg>
     </button>
 
     <!-- Popup: Core Options -->
     <div class="je-overlay" id="je-pop-coreopts">
         <div class="je-popup">
-            <div class="je-popup-hdr"><h3>Core Options</h3><button class="je-closebtn" data-close="je-pop-coreopts">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Core Options</h3><button class="je-closebtn" data-close="je-pop-coreopts">&times;</button>
+            </div>
             <div class="je-popup-body" id="je-coreopts-body">
-                </div>
+            </div>
         </div>
     </div>
 
     <!-- Popup: Save States -->
     <div class="je-overlay" id="je-pop-saves">
         <div class="je-popup">
-            <div class="je-popup-hdr"><h3>Save States</h3><button class="je-closebtn" data-close="je-pop-saves">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Save States</h3><button class="je-closebtn" data-close="je-pop-saves">&times;</button>
+            </div>
             <div class="je-popup-body" id="je-saves-body"></div>
         </div>
     </div>
@@ -252,17 +1022,24 @@
     <!-- Popup: Import/Export -->
     <div class="je-overlay" id="je-pop-io">
         <div class="je-popup">
-            <div class="je-popup-hdr"><h3>Import / Export</h3><button class="je-closebtn" data-close="je-pop-io">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Import / Export</h3><button class="je-closebtn" data-close="je-pop-io">&times;</button>
+            </div>
             <div class="je-popup-body">
                 <div class="je-section-title">Export to Device</div>
                 <div style="display:flex;gap:10px;margin-bottom:20px">
-                    <button class="je-btn je-btn-primary" id="je-io-exp-state" style="flex:1">Export State (.state)</button>
+                    <button class="je-btn je-btn-primary" id="je-io-exp-state" style="flex:1">Export State
+                        (.state)</button>
                     <button class="je-btn" id="je-io-exp-sram" style="flex:1">Export SRAM (.sav)</button>
                 </div>
-                
+
                 <div class="je-section-title">Import from Device</div>
-                <div id="je-io-dropzone" style="border:2px dashed rgba(255,255,255,.2);border-radius:12px;padding:30px 20px;text-align:center;transition:background .2s, border-color .2s;cursor:pointer;">
-                    <svg viewBox="0 0 24 24" style="width:32px;height:32px;fill:currentColor;opacity:.5;margin-bottom:10px"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <div id="je-io-dropzone"
+                    style="border:2px dashed rgba(255,255,255,.2);border-radius:12px;padding:30px 20px;text-align:center;transition:background .2s, border-color .2s;cursor:pointer;">
+                    <svg viewBox="0 0 24 24"
+                        style="width:32px;height:32px;fill:currentColor;opacity:.5;margin-bottom:10px">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                    </svg>
                     <div style="font-size:14px;font-weight:600;margin-bottom:4px">Click or Drop File Here</div>
                     <div style="font-size:12px;opacity:.5">Supports .state and .sav files</div>
                     <input type="file" id="je-io-file" style="display:none">
@@ -274,11 +1051,14 @@
     <!-- Popup: Volume -->
     <div class="je-overlay" id="je-pop-vol">
         <div class="je-popup" style="max-width:340px">
-            <div class="je-popup-hdr"><h3>Volume</h3><button class="je-closebtn" data-close="je-pop-vol">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Volume</h3><button class="je-closebtn" data-close="je-pop-vol">&times;</button>
+            </div>
             <div class="je-popup-body">
                 <div class="je-vol-wrap">
                     <div id="je-vol-pct" class="je-vol-pct">50%</div>
-                    <input type="range" min="0" max="1" step="0.01" value="1.0" class="je-vol-slider" id="je-vol-slider">
+                    <input type="range" min="0" max="1" step="0.01" value="1.0" class="je-vol-slider"
+                        id="je-vol-slider">
                     <button class="je-btn" id="je-vol-mute">Mute</button>
                 </div>
             </div>
@@ -288,13 +1068,17 @@
     <!-- Popup: Cheats -->
     <div class="je-overlay" id="je-pop-cheats">
         <div class="je-popup">
-            <div class="je-popup-hdr"><h3>Cheats</h3><button class="je-closebtn" data-close="je-pop-cheats">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Cheats</h3><button class="je-closebtn" data-close="je-pop-cheats">&times;</button>
+            </div>
             <div class="je-popup-body">
                 <div id="je-cheat-list"></div>
                 <div class="je-section-title" style="margin-top:16px">Add Cheat</div>
                 <div style="display:flex;flex-direction:column;gap:8px">
-                    <input id="je-cheat-name" placeholder="Cheat name" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px">
-                    <textarea id="je-cheat-code" placeholder="Cheat code" rows="2" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px;resize:none"></textarea>
+                    <input id="je-cheat-name" placeholder="Cheat name"
+                        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px">
+                    <textarea id="je-cheat-code" placeholder="Cheat code" rows="2"
+                        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#fff;font-size:13px;resize:none"></textarea>
                     <button class="je-btn je-btn-primary" id="je-cheat-add">Add Cheat</button>
                 </div>
             </div>
@@ -304,7 +1088,9 @@
     <!-- Popup: Input Mapping -->
     <div class="je-overlay" id="je-pop-inputmap">
         <div class="je-popup je-popup-lg">
-            <div class="je-popup-hdr"><h3>Input Mapping</h3><button class="je-closebtn" data-close="je-pop-inputmap">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Input Mapping</h3><button class="je-closebtn" data-close="je-pop-inputmap">&times;</button>
+            </div>
             <div class="je-popup-body">
                 <div class="je-tabs">
                     <button class="je-tab je-tab-active" data-tab="kb">Keyboard</button>
@@ -319,11 +1105,13 @@
                 <div class="je-tab-panel" id="je-tab-vg">
                     <div class="je-setting">
                         <span class="je-setting-label">Enable Virtual Controls</span>
-                        <label class="je-toggle"><input type="checkbox" id="je-vg-toggle"><span class="je-toggle-track"></span></label>
+                        <label class="je-toggle"><input type="checkbox" id="je-vg-toggle"><span
+                                class="je-toggle-track"></span></label>
                     </div>
                     <div class="je-setting">
                         <span class="je-setting-label">Left-Handed Mode</span>
-                        <label class="je-toggle"><input type="checkbox" id="je-vg-lefty"><span class="je-toggle-track"></span></label>
+                        <label class="je-toggle"><input type="checkbox" id="je-vg-lefty"><span
+                                class="je-toggle-track"></span></label>
                     </div>
                 </div>
                 <div style="margin-top:12px"><button class="je-btn" id="je-input-reset">Reset to Defaults</button></div>
@@ -334,18 +1122,66 @@
     <!-- Popup: Settings -->
     <div class="je-overlay" id="je-pop-settings">
         <div class="je-popup">
-            <div class="je-popup-hdr"><h3>Settings</h3><button class="je-closebtn" data-close="je-pop-settings">&times;</button></div>
+            <div class="je-popup-hdr">
+                <h3>Settings</h3><button class="je-closebtn" data-close="je-pop-settings">&times;</button>
+            </div>
             <div class="je-popup-body">
                 <div class="je-section-title">Graphics</div>
-                <div class="je-setting"><span class="je-setting-label">Shader</span><select id="je-set-shader"><option value="disabled">None</option><option value="2xScaleHQ.glslp">2x ScaleHQ</option><option value="4xScaleHQ.glslp">4x ScaleHQ</option><option value="sabr">SABR</option><option value="crt-aperture.glslp">CRT Aperture</option><option value="crt-easymode.glslp">CRT Easymode</option><option value="crt-geom.glslp">CRT Geom</option><option value="crt-mattias.glslp">CRT Mattias</option><option value="crt-beam">CRT Beam</option><option value="crt-caligari">CRT Caligari</option><option value="crt-lottes">CRT Lottes</option><option value="crt-zfast">CRT ZFast</option><option value="crt-yeetron">CRT Yeetron</option><option value="bicubic">Bicubic</option><option value="mix-frames">Mix Frames</option></select></div>
-                <div class="je-setting"><span class="je-setting-label">VSync</span><label class="je-toggle"><input type="checkbox" id="je-set-vsync" checked><span class="je-toggle-track"></span></label></div>
-                <div class="je-setting"><span class="je-setting-label">Video Rotation</span><select id="je-set-rotation"><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select></div>
+                <div class="je-setting"><span class="je-setting-label">Shader</span><select id="je-set-shader">
+                        <option value="disabled">None</option>
+                        <option value="2xScaleHQ.glslp">2x ScaleHQ</option>
+                        <option value="4xScaleHQ.glslp">4x ScaleHQ</option>
+                        <option value="sabr">SABR</option>
+                        <option value="crt-aperture.glslp">CRT Aperture</option>
+                        <option value="crt-easymode.glslp">CRT Easymode</option>
+                        <option value="crt-geom.glslp">CRT Geom</option>
+                        <option value="crt-mattias.glslp">CRT Mattias</option>
+                        <option value="crt-beam">CRT Beam</option>
+                        <option value="crt-caligari">CRT Caligari</option>
+                        <option value="crt-lottes">CRT Lottes</option>
+                        <option value="crt-zfast">CRT ZFast</option>
+                        <option value="crt-yeetron">CRT Yeetron</option>
+                        <option value="bicubic">Bicubic</option>
+                        <option value="mix-frames">Mix Frames</option>
+                    </select></div>
+                <div class="je-setting"><span class="je-setting-label">VSync</span><label class="je-toggle"><input
+                            type="checkbox" id="je-set-vsync" checked><span class="je-toggle-track"></span></label>
+                </div>
+                <div class="je-setting"><span class="je-setting-label">Video Rotation</span><select
+                        id="je-set-rotation">
+                        <option value="0">0°</option>
+                        <option value="1">90°</option>
+                        <option value="2">180°</option>
+                        <option value="3">270°</option>
+                    </select></div>
                 <div class="je-section-title">Performance</div>
-                <div class="je-setting"><span class="je-setting-label">Fast Forward Rate</span><select id="je-set-ffrate"><option value="2">2x</option><option value="3" selected>3x</option><option value="4">4x</option><option value="5">5x</option><option value="8">8x</option><option value="10">10x</option><option value="unlimited">Unlimited</option></select></div>
-                <div class="je-setting"><span class="je-setting-label">Slow Motion Rate</span><select id="je-set-smrate"><option value="2">2x</option><option value="3" selected>3x</option><option value="4">4x</option><option value="5">5x</option></select></div>
+                <div class="je-setting"><span class="je-setting-label">Fast Forward Rate</span><select
+                        id="je-set-ffrate">
+                        <option value="2">2x</option>
+                        <option value="3" selected>3x</option>
+                        <option value="4">4x</option>
+                        <option value="5">5x</option>
+                        <option value="8">8x</option>
+                        <option value="10">10x</option>
+                        <option value="unlimited">Unlimited</option>
+                    </select></div>
+                <div class="je-setting"><span class="je-setting-label">Slow Motion Rate</span><select
+                        id="je-set-smrate">
+                        <option value="2">2x</option>
+                        <option value="3" selected>3x</option>
+                        <option value="4">4x</option>
+                        <option value="5">5x</option>
+                    </select></div>
                 <div class="je-section-title">Display</div>
-                <div class="je-setting"><span class="je-setting-label">Screen Size</span><select id="je-set-screensize"><option value="fit" selected>Fit to Screen</option><option value="native">Native</option><option value="2x">2x</option><option value="3x">3x</option><option value="4x">4x</option></select></div>
-                <div class="je-setting"><span class="je-setting-label">Show FPS</span><label class="je-toggle"><input type="checkbox" id="je-set-fps"><span class="je-toggle-track"></span></label></div>
+                <div class="je-setting"><span class="je-setting-label">Screen Size</span><select id="je-set-screensize">
+                        <option value="fit" selected>Fit to Screen</option>
+                        <option value="native">Native</option>
+                        <option value="2x">2x</option>
+                        <option value="3x">3x</option>
+                        <option value="4x">4x</option>
+                    </select></div>
+                <div class="je-setting"><span class="je-setting-label">Show FPS</span><label class="je-toggle"><input
+                            type="checkbox" id="je-set-fps"><span class="je-toggle-track"></span></label></div>
             </div>
         </div>
     </div>
@@ -353,16 +1189,16 @@
     <div id="game"></div>
     <script>
         window.JellyEmuConfig = {
-            itemId:      '{{ item_id }}',
-            userId:      '{{ user_id }}',
+            itemId: '{{ item_id }}',
+            userId: '{{ user_id }}',
             savePostUrl: '{{ save_post_url }}',
-            activeSlot:  {{ active_slot }}
+            activeSlot: {{ active_slot }}
         };
     </script>
     <script>
-        (function() {
+        (function () {
             var _origGetContext = HTMLCanvasElement.prototype.getContext;
-            HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+            HTMLCanvasElement.prototype.getContext = function (type, attrs) {
                 if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
                     attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
                 }
@@ -371,20 +1207,22 @@
         })();
     </script>
     <script>
-        (function() {
+        (function () {
             // Core name map for loading screen badge
-            var coreNames = {nes:'NES',snes:'SNES',n64:'N64',gba:'Game Boy',gbc:'Game Boy Color',gba:'Game Boy Advance',nds:'Nintendo DS',
-                vb:'Virtual Boy',segaMD:'Sega Genesis',segaGG:'Game Gear',segaMS:'Master System',segaCD:'Sega CD',
-                sega32x:'Sega 32X',psx:'PlayStation',psp:'PSP',a2600:'Atari 2600',a7800:'Atari 7800',lynx:'Atari Lynx',
-                pce:'TurboGrafx-16',coleco:'ColecoVision',ngp:'Neo Geo Pocket',arcade:'Arcade',dos:'DOS',
-                '3do':'3DO',jaguar:'Atari Jaguar',mame2003:'MAME',ws:'WonderSwan', ss: 'Sega Saturn'};
+            var coreNames = {
+                nes: 'NES', snes: 'SNES', n64: 'N64', gba: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', nds: 'Nintendo DS',
+                vb: 'Virtual Boy', segaMD: 'Sega Genesis', segaGG: 'Game Gear', segaMS: 'Master System', segaCD: 'Sega CD',
+                sega32x: 'Sega 32X', psx: 'PlayStation', psp: 'PSP', a2600: 'Atari 2600', a7800: 'Atari 7800', lynx: 'Atari Lynx',
+                pce: 'TurboGrafx-16', coleco: 'ColecoVision', ngp: 'Neo Geo Pocket', arcade: 'Arcade', dos: 'DOS',
+                '3do': '3DO', jaguar: 'Atari Jaguar', mame2003_plus: 'MAME', ws: 'WonderSwan', ss: 'Sega Saturn'
+            };
             var sysEl = document.getElementById('je-loader-system');
             if (sysEl) { var cn = coreNames[window.EJS_core] || window.EJS_core || ''; sysEl.textContent = cn; }
 
             // Loading screen lifecycle
             var loader = document.getElementById('je-loader');
             var topbar = document.getElementById('je-topbar');
-            var dock   = document.getElementById('je-dock');
+            var dock = document.getElementById('je-dock');
 
             var dock = document.getElementById('je-dock');
             var isDown = false, startX, scrollLeft;
@@ -393,19 +1231,19 @@
             function onEnd() { isDown = false; dock.style.cursor = 'grab'; }
             function onMove(x) { if (!isDown) return; dock.scrollLeft = scrollLeft - (x - dock.offsetLeft - startX); }
 
-            dock.addEventListener('mousedown',  function(e) { onStart(e.pageX); });
+            dock.addEventListener('mousedown', function (e) { onStart(e.pageX); });
             dock.addEventListener('mouseleave', onEnd);
-            dock.addEventListener('mouseup',    onEnd);
-            dock.addEventListener('mousemove',  function(e) { e.preventDefault(); onMove(e.pageX); });
+            dock.addEventListener('mouseup', onEnd);
+            dock.addEventListener('mousemove', function (e) { e.preventDefault(); onMove(e.pageX); });
 
-            dock.addEventListener('touchstart', function(e) { onStart(e.touches[0].pageX); }, { passive: true });
-            dock.addEventListener('touchend',   onEnd);
-            dock.addEventListener('touchmove',  function(e) { onMove(e.touches[0].pageX); }, { passive: true });
+            dock.addEventListener('touchstart', function (e) { onStart(e.touches[0].pageX); }, { passive: true });
+            dock.addEventListener('touchend', onEnd);
+            dock.addEventListener('touchmove', function (e) { onMove(e.touches[0].pageX); }, { passive: true });
 
             function dismissLoader() {
                 if (!loader || loader.classList.contains('je-dismiss')) return;
                 loader.classList.add('je-dismiss');
-                setTimeout(function() { loader.style.display = 'none'; }, 450);
+                setTimeout(function () { loader.style.display = 'none'; }, 450);
                 topbar.classList.add('je-active');
                 dock.classList.add('je-active');
                 startAutoHide();
@@ -413,12 +1251,12 @@
             // Fallback: auto-dismiss after 30s
             setTimeout(dismissLoader, 30000);
 
-            window.EJS_onLoad = function() {
+            window.EJS_onLoad = function () {
                 dismissLoader();
             };
 
             // Hook into EJS start event
-            window.EJS_onGameStart = function() {
+            window.EJS_onGameStart = function () {
                 // Load percentage observer
                 if (_jeEjsObserver) _jeEjsObserver.disconnect();
                 clearInterval(_jeFindLoader);
@@ -427,13 +1265,13 @@
                 setTimeout(refocusGame, 500);
 
                 {{ if has_saves && slot_value > 0 }}
-                setTimeout(function() {
+                setTimeout(function () {
                     fetch('/jellyemu/save/{{ item_id }}/{{ user_id }}?slot={{ slot_value }}')
-                        .then(function(r) { if (r.ok) return r.arrayBuffer(); throw new Error('No save data'); })
-                        .then(function(buf) {
+                        .then(function (r) { if (r.ok) return r.arrayBuffer(); throw new Error('No save data'); })
+                        .then(function (buf) {
                             var g = gm(); if (g) g.loadState(new Uint8Array(buf));
                             console.log('[JellyEmu] Pipeline STAGE 4 (Client Direct Receive): Downloaded bytes ->', buf.byteLength);
-                        }).catch(function(e) { console.warn('[JellyEmu] Direct load failed:', e); });
+                        }).catch(function (e) { console.warn('[JellyEmu] Direct load failed:', e); });
                 }, 500);
                 {{ end }}
 
@@ -441,7 +1279,7 @@
                 // to decide whether to block keyboard input. Our CSS class-based hiding
                 // doesnt set inline style, so EJS thinks settings menu is open and blocks
                 // ALL keyboard input. Force inline style to 'none'.
-                setTimeout(function() {
+                setTimeout(function () {
                     var e = emu();
                     if (e) {
                         if (e.settingsMenu) e.settingsMenu.style.display = 'none';
@@ -454,22 +1292,22 @@
             var myStatusEl = document.getElementById('je-loader-status');
             var _jeEjsObserver = null;
 
-            var _jeFindLoader = setInterval(function() {
+            var _jeFindLoader = setInterval(function () {
                 var ejsTextEl = document.querySelector('.ejs_loading_text');
                 if (ejsTextEl) {
                     clearInterval(_jeFindLoader);
 
-                    _jeEjsObserver = new MutationObserver(function() {
+                    _jeEjsObserver = new MutationObserver(function () {
                         var text = ejsTextEl.textContent || ejsTextEl.innerText;
                         if (text && text.trim() !== '') {
                             myStatusEl.textContent = text;
                         }
                     });
 
-                    _jeEjsObserver.observe(ejsTextEl, { 
-                        childList: true, 
-                        characterData: true, 
-                        subtree: true 
+                    _jeEjsObserver.observe(ejsTextEl, {
+                        childList: true,
+                        characterData: true,
+                        subtree: true
                     });
                 }
             }, 200);
@@ -485,18 +1323,18 @@
                 dock.classList.remove('je-hidden');
                 clearTimeout(hideTimer);
                 if (!window._jePopupOpen) {
-                    hideTimer = setTimeout(function() {
+                    hideTimer = setTimeout(function () {
                         topbar.classList.add('je-hidden');
                         dock.classList.add('je-hidden');
                     }, HIDE_MS);
                 }
             }
             function startAutoHide() {
-                ['mousemove','mousedown','touchstart','touchmove'].forEach(function(evt) {
+                ['mousemove', 'mousedown', 'touchstart', 'touchmove'].forEach(function (evt) {
                     document.addEventListener(evt, showDocks, { passive: true });
                 });
-                [topbar, dock].forEach(function(el) {
-                    el.addEventListener('mouseenter', function() {
+                [topbar, dock].forEach(function (el) {
+                    el.addEventListener('mouseenter', function () {
                         clearTimeout(hideTimer);
                         if (!dockMinimized) {
                             topbar.classList.remove('je-hidden');
@@ -509,11 +1347,11 @@
             }
 
             // Refocus game on any click on the game area or after dock button press
-            document.getElementById('game').addEventListener('mousedown', function() {
+            document.getElementById('game').addEventListener('mousedown', function () {
                 setTimeout(refocusGame, 50);
             });
             // Dock buttons: refocus game after each click (unless a popup opened)
-            document.addEventListener('click', function(ev) {
+            document.addEventListener('click', function (ev) {
                 var btn = ev.target.closest && ev.target.closest('.je-dockbtn');
                 if (btn && !window._jePopupOpen) { setTimeout(refocusGame, 50); }
             }, true);
@@ -532,29 +1370,29 @@
                 refocusGame();
             }
             function closeAllPopups() {
-                document.querySelectorAll('.je-overlay.je-open').forEach(function(el) { el.classList.remove('je-open'); });
+                document.querySelectorAll('.je-overlay.je-open').forEach(function (el) { el.classList.remove('je-open'); });
                 window._jePopupOpen = false;
                 refocusGame();
             }
-            window._jeOpenPopup  = openPopup;
+            window._jeOpenPopup = openPopup;
             window._jeClosePopup = closePopup;
             // Close buttons
-            document.querySelectorAll('[data-close]').forEach(function(btn) {
-                btn.addEventListener('click', function() { closePopup(btn.getAttribute('data-close')); });
+            document.querySelectorAll('[data-close]').forEach(function (btn) {
+                btn.addEventListener('click', function () { closePopup(btn.getAttribute('data-close')); });
             });
             // Click outside popup to close
-            document.querySelectorAll('.je-overlay').forEach(function(ov) {
-                ov.addEventListener('click', function(e) { if (e.target === ov) { closeAllPopups(); showDocks(); refocusGame(); } });
+            document.querySelectorAll('.je-overlay').forEach(function (ov) {
+                ov.addEventListener('click', function (e) { if (e.target === ov) { closeAllPopups(); showDocks(); refocusGame(); }});
             });
 
             // Tab switching
-            document.querySelectorAll('.je-tab').forEach(function(tab) {
-                tab.addEventListener('click', function() {
+            document.querySelectorAll('.je-tab').forEach(function (tab) {
+                tab.addEventListener('click', function () {
                     var tabs = tab.parentElement.querySelectorAll('.je-tab');
-                    tabs.forEach(function(t) { t.classList.remove('je-tab-active'); });
+                    tabs.forEach(function (t) { t.classList.remove('je-tab-active'); });
                     tab.classList.add('je-tab-active');
                     var panels = tab.closest('.je-popup-body').querySelectorAll('.je-tab-panel');
-                    panels.forEach(function(p) { p.classList.remove('je-tab-active'); });
+                    panels.forEach(function (p) { p.classList.remove('je-tab-active'); });
                     var target = document.getElementById('je-tab-' + tab.getAttribute('data-tab'));
                     if (target) target.classList.add('je-tab-active');
                 });
@@ -562,7 +1400,7 @@
 
             // Helper: get emulator
             function emu() { return window.EJS_emulator; }
-            function gm()  { var e = emu(); return e ? e.gameManager : null; }
+            function gm() { var e = emu(); return e ? e.gameManager : null; }
 
             function _jeEnsureBinary(data) {
                 if (!data) return null;
@@ -575,7 +1413,7 @@
                         var bytes = new Uint8Array(binary.length);
                         for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
                         return new Blob([bytes], { type: 'application/octet-stream' });
-                    } catch(ex) { return new Blob([new TextEncoder().encode(data)], { type: 'application/octet-stream' }); }
+                    } catch (ex) { return new Blob([new TextEncoder().encode(data)], { type: 'application/octet-stream' }); }
                 }
                 return new Blob([new TextEncoder().encode(JSON.stringify(data))], { type: 'application/octet-stream' });
             }
@@ -596,7 +1434,7 @@
             var _syncTimer = null;
             function syncControlsToServer() {
                 clearTimeout(_syncTimer);
-                _syncTimer = setTimeout(function() {
+                _syncTimer = setTimeout(function () {
                     var e = emu(); if (!e) return;
                     var c = e.controls && e.controls[0] ? e.controls[0] : {};
                     // Split keyboard (value) and gamepad (value2) bindings
@@ -624,19 +1462,19 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
-                    }).catch(function(err) { console.warn('[JellyEmu] Controls sync failed:', err); });
+                    }).catch(function (err) { console.warn('[JellyEmu] Controls sync failed:', err); });
                 }, 800);
             }
 
             // Exit button
-            document.getElementById('je-exit-btn').addEventListener('click', function() {
+            document.getElementById('je-exit-btn').addEventListener('click', function () {
                 if (window.EJS_onExit) { EJS_onExit(); }
                 else if (window.opener) { window.close(); }
-                else { window.parent.postMessage('close-jellyemu','*'); }
+                else { window.parent.postMessage('close-jellyemu', '*'); }
             });
 
             // Core Options Popup
-            document.getElementById('je-btn-coreopts').addEventListener('click', function() {
+            document.getElementById('je-btn-coreopts').addEventListener('click', function () {
                 buildCoreOptions();
                 openPopup('je-pop-coreopts');
             });
@@ -644,7 +1482,7 @@
             function buildCoreOptions() {
                 var body = document.getElementById('je-coreopts-body');
                 var g = gm();
-                
+
                 if (!g || typeof g.getCoreOptions !== 'function') {
                     body.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:20px;">Core options not available yet.</div>';
                     return;
@@ -660,10 +1498,10 @@
                 body.innerHTML = '';
                 var hasOpts = false;
 
-                lines.forEach(function(line) {
+                lines.forEach(function (line) {
                     if (!line.trim()) return;
                     hasOpts = true;
-                    
+
                     // Splits "key|currentValue; val1|val2|val3"
                     var parts = line.split(/;\s*/);
                     if (parts.length < 2) return;
@@ -679,13 +1517,13 @@
 
                     var row = document.createElement('div');
                     row.className = 'je-setting';
-                    
+
                     var label = document.createElement('span');
                     label.className = 'je-setting-label';
                     label.textContent = displayKey;
-                    
+
                     var select = document.createElement('select');
-                    options.forEach(function(opt) {
+                    options.forEach(function (opt) {
                         var option = document.createElement('option');
                         option.value = opt;
                         option.textContent = opt;
@@ -694,7 +1532,7 @@
                     });
 
                     // Trigger the core change instantly on dropdown change
-                    select.addEventListener('change', function() {
+                    select.addEventListener('change', function () {
                         g.setVariable(key, this.value);
                     });
 
@@ -713,9 +1551,9 @@
             var iconEnter = document.getElementById('je-fs-enter');
             var iconExit = document.getElementById('je-fs-exit');
 
-            btnFs.addEventListener('click', function() {
+            btnFs.addEventListener('click', function () {
                 if (!document.fullscreenElement) {
-                    document.body.requestFullscreen().catch(function(err) {
+                    document.body.requestFullscreen().catch(function (err) {
                         console.warn('[JellyEmu] Fullscreen failed:', err);
                     });
                 } else {
@@ -726,7 +1564,7 @@
             });
 
             // Listen for the state change so the UI updates even if the user presses 'Esc'
-            document.addEventListener('fullscreenchange', function() {
+            document.addEventListener('fullscreenchange', function () {
                 if (document.fullscreenElement) {
                     iconEnter.style.display = 'none';
                     iconExit.style.display = '';
@@ -740,26 +1578,26 @@
 
             // Pause / Play
             var btnPause = document.getElementById('je-btn-pause');
-            var btnPlay  = document.getElementById('je-btn-play');
-            btnPause.addEventListener('click', function() {
+            var btnPlay = document.getElementById('je-btn-play');
+            btnPause.addEventListener('click', function () {
                 var e = emu(); if (!e || !e.started) return;
                 e.pause();
                 btnPause.style.display = 'none'; btnPlay.style.display = '';
             });
-            btnPlay.addEventListener('click', function() {
+            btnPlay.addEventListener('click', function () {
                 var e = emu(); if (!e || !e.started) return;
                 e.play();
                 btnPlay.style.display = 'none'; btnPause.style.display = '';
             });
 
             // Restart
-            document.getElementById('je-btn-restart').addEventListener('click', function() {
+            document.getElementById('je-btn-restart').addEventListener('click', function () {
                 var g = gm(); if (g) g.restart();
             });
 
             // Fast Forward
             window._jeFFActive = false;
-            document.getElementById('je-btn-ff').addEventListener('click', function() {
+            document.getElementById('je-btn-ff').addEventListener('click', function () {
                 var g = gm(); if (!g) return;
                 window._jeFFActive = !window._jeFFActive;
                 g.toggleFastForward(window._jeFFActive ? 1 : 0);
@@ -768,7 +1606,7 @@
 
             // Slow Motion
             window._jeSlowActive = false;
-            document.getElementById('je-btn-slow').addEventListener('click', function() {
+            document.getElementById('je-btn-slow').addEventListener('click', function () {
                 var g = gm(); if (!g) return;
                 window._jeSlowActive = !window._jeSlowActive;
                 g.toggleSlowMotion(window._jeSlowActive ? 1 : 0);
@@ -779,17 +1617,17 @@
             var _jeCurrentVol = 1.0; // Single source of truth for the session
             var _jeLastVol = 1.0;    // Memory for the mute toggle
 
-            document.getElementById('je-btn-vol').addEventListener('click', function() {
+            document.getElementById('je-btn-vol').addEventListener('click', function () {
                 var e = emu();
                 if (e) {
                     var slider = document.getElementById('je-vol-slider');
                     var isMuted = (_jeCurrentVol === 0);
-                    
+
                     // Sync the UI to our session tracker, ignoring EJS's reported value
                     slider.value = _jeCurrentVol;
                     document.getElementById('je-vol-pct').textContent = Math.round(_jeCurrentVol * 100) + '%';
                     document.getElementById('je-vol-mute').textContent = isMuted ? 'Unmute' : 'Mute';
-                    
+
                     // Force the emulator to match our tracked volume, just to be safe
                     e.setVolume(_jeCurrentVol);
                     e.volume = _jeCurrentVol;
@@ -797,17 +1635,17 @@
                 openPopup('je-pop-vol');
             });
 
-            document.getElementById('je-vol-slider').addEventListener('input', function() {
+            document.getElementById('je-vol-slider').addEventListener('input', function () {
                 var v = parseFloat(this.value);
                 _jeCurrentVol = v; // Update our session tracker
-                
+
                 document.getElementById('je-vol-pct').textContent = Math.round(v * 100) + '%';
-                
+
                 var e = emu();
-                if (e) { 
-                    e.setVolume(v); 
+                if (e) {
+                    e.setVolume(v);
                     e.volume = v; // Keep EJS property in sync
-                    
+
                     if (v > 0) {
                         document.getElementById('je-vol-mute').textContent = 'Mute';
                     } else {
@@ -816,31 +1654,31 @@
                 }
             });
 
-            document.getElementById('je-vol-mute').addEventListener('click', function() {
-                var e = emu(); 
+            document.getElementById('je-vol-mute').addEventListener('click', function () {
+                var e = emu();
                 if (!e) return;
-                
+
                 var slider = document.getElementById('je-vol-slider');
-                
+
                 if (_jeCurrentVol > 0) {
                     // Action: Mute
                     _jeLastVol = _jeCurrentVol; // Save current volume
                     _jeCurrentVol = 0;          // Update session tracker
-                    
+
                     e.setVolume(0);
                     e.volume = 0;
-                    
+
                     slider.value = 0;
                     document.getElementById('je-vol-pct').textContent = '0%';
                     this.textContent = 'Unmute';
                 } else {
                     // Action: Unmute
-                    var restoreVol = _jeLastVol > 0 ? _jeLastVol : 1.0; 
+                    var restoreVol = _jeLastVol > 0 ? _jeLastVol : 1.0;
                     _jeCurrentVol = restoreVol; // Restore session tracker
-                    
+
                     e.setVolume(restoreVol);
                     e.volume = restoreVol;
-                    
+
                     slider.value = restoreVol;
                     document.getElementById('je-vol-pct').textContent = Math.round(restoreVol * 100) + '%';
                     this.textContent = 'Mute';
@@ -859,14 +1697,14 @@
 
                 // Merge server cheat db with any user-added cheats already in e.cheats
                 // User-added cheats have no matching entry in _jeCheatsDb
-                var allCheats = _jeCheatsDb.map(function(ch) {
+                var allCheats = _jeCheatsDb.map(function (ch) {
                     // Find matching entry in e.cheats to preserve toggled state
-                    var live = (e.cheats || []).find(function(c) { return c.code === ch.code; });
+                    var live = (e.cheats || []).find(function (c) { return c.code === ch.code; });
                     return { desc: ch.desc, code: ch.code, checked: live ? !!live.checked : false, fromDb: true };
                 });
                 // Append any user-added cheats not in the db
-                (e.cheats || []).forEach(function(c) {
-                    if (!_jeCheatsDb.find(function(db) { return db.code === c.code; })) {
+                (e.cheats || []).forEach(function (c) {
+                    if (!_jeCheatsDb.find(function (db) { return db.code === c.code; })) {
                         allCheats.push({ desc: c.desc, code: c.code, checked: !!c.checked, fromDb: false });
                     }
                 });
@@ -876,7 +1714,7 @@
                     return;
                 }
 
-                allCheats.forEach(function(ch, idx) {
+                allCheats.forEach(function (ch, idx) {
                     var row = document.createElement('div');
                     row.className = 'je-cheat-row';
                     row.innerHTML = '<label class="je-toggle"><input type="checkbox"' + (ch.checked ? ' checked' : '') +
@@ -884,10 +1722,10 @@
                         ch.desc + '</span>' + (!ch.fromDb ? '<button class="je-cheat-del">&times;</button>' : '');
 
                     var cb = row.querySelector('input');
-                    cb.addEventListener('change', function() {
+                    cb.addEventListener('change', function () {
                         ch.checked = cb.checked;
                         // Find or create the entry in e.cheats and toggle it
-                        var liveIdx = (e.cheats || []).findIndex(function(c) { return c.code === ch.code; });
+                        var liveIdx = (e.cheats || []).findIndex(function (c) { return c.code === ch.code; });
                         if (cb.checked) {
                             if (liveIdx === -1) {
                                 e.cheats = e.cheats || [];
@@ -905,8 +1743,8 @@
 
                     var del = row.querySelector('.je-cheat-del');
                     if (del) {
-                        del.addEventListener('click', function() {
-                            var liveIdx = (e.cheats || []).findIndex(function(c) { return c.code === ch.code; });
+                        del.addEventListener('click', function () {
+                            var liveIdx = (e.cheats || []).findIndex(function (c) { return c.code === ch.code; });
                             if (liveIdx !== -1) {
                                 e.cheatChanged(false, ch.code, liveIdx);
                                 e.cheats.splice(liveIdx, 1);
@@ -920,7 +1758,7 @@
                 });
             }
 
-            document.getElementById('je-btn-cheats').addEventListener('click', function() {
+            document.getElementById('je-btn-cheats').addEventListener('click', function () {
                 openPopup('je-pop-cheats');
                 if (_jeCheatsLoaded) {
                     buildCheats();
@@ -929,22 +1767,22 @@
                 var list = document.getElementById('je-cheat-list');
                 list.innerHTML = '<div style="opacity:.4;font-size:13px">Loading cheats…</div>';
                 fetch('/jellyemu/cheats/{{ item_id }}')
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
                         _jeCheatsLoaded = true;
                         // data is [[name, code, status], ...] from the server
-                        _jeCheatsDb = (data || []).map(function(entry) {
+                        _jeCheatsDb = (data || []).map(function (entry) {
                             return { desc: entry[0], code: entry[1], checked: false };
                         });
                         buildCheats();
                     })
-                    .catch(function() {
+                    .catch(function () {
                         _jeCheatsLoaded = true; // don't retry on error
                         buildCheats();
                     });
             });
 
-            document.getElementById('je-cheat-add').addEventListener('click', function() {
+            document.getElementById('je-cheat-add').addEventListener('click', function () {
                 var name = document.getElementById('je-cheat-name').value.trim();
                 var code = document.getElementById('je-cheat-code').value.trim();
                 if (!name || !code) return;
@@ -958,9 +1796,9 @@
             });
 
             // Screenshot
-            document.getElementById('je-btn-screenshot').addEventListener('click', function() {
+            document.getElementById('je-btn-screenshot').addEventListener('click', function () {
                 var g = gm(); if (!g) return;
-                g.screenshot().then(function(pngBytes) {
+                g.screenshot().then(function (pngBytes) {
                     var blob = new Blob([pngBytes], { type: 'image/png' });
                     var url = URL.createObjectURL(blob);
                     var a = document.createElement('a');
@@ -971,12 +1809,12 @@
                     try {
                         var s = window._jeCaptureCanvas();
                         if (s) window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: s }, '*');
-                    } catch(ex) {}
-                }).catch(function(err) { console.warn('[JellyEmu] Screenshot failed:', err); });
+                    } catch (ex) { }
+                }).catch(function (err) { console.warn('[JellyEmu] Screenshot failed:', err); });
             });
 
             // Settings popup
-            document.getElementById('je-btn-settings').addEventListener('click', function() {
+            document.getElementById('je-btn-settings').addEventListener('click', function () {
                 syncSettingsUI();
                 openPopup('je-pop-settings');
             });
@@ -993,34 +1831,34 @@
                     document.getElementById('je-set-vsync').checked = e.settings['vsync'] !== 'disabled';
                 }
             }
-            document.getElementById('je-set-shader').addEventListener('change', function() {
+            document.getElementById('je-set-shader').addEventListener('change', function () {
                 var e = emu(); if (!e) return;
                 e.changeSettingOption('shader', this.value);
                 syncControlsToServer();
             });
-            document.getElementById('je-set-vsync').addEventListener('change', function() {
+            document.getElementById('je-set-vsync').addEventListener('change', function () {
                 var e = emu(); if (!e) return;
                 e.changeSettingOption('vsync', this.checked ? 'enabled' : 'disabled');
                 syncControlsToServer();
             });
-            document.getElementById('je-set-rotation').addEventListener('change', function() {
+            document.getElementById('je-set-rotation').addEventListener('change', function () {
                 var e = emu(); if (!e) return;
                 e.changeSettingOption('videoRotation', parseInt(this.value));
                 syncControlsToServer();
             });
-            document.getElementById('je-set-ffrate').addEventListener('change', function() {
+            document.getElementById('je-set-ffrate').addEventListener('change', function () {
                 var e = emu(); if (!e) return;
                 e.changeSettingOption('ff-ratio', this.value);
                 syncControlsToServer();
             });
-            document.getElementById('je-set-smrate').addEventListener('change', function() {
+            document.getElementById('je-set-smrate').addEventListener('change', function () {
                 var e = emu(); if (!e) return;
                 e.changeSettingOption('sm-ratio', this.value);
                 syncControlsToServer();
             });
 
             // Screen Size
-            document.getElementById('je-set-screensize').addEventListener('change', function() {
+            document.getElementById('je-set-screensize').addEventListener('change', function () {
                 var val = this.value;
                 var e = emu(); if (!e) return;
                 var canvas = e.canvas || document.querySelector('canvas');
@@ -1062,7 +1900,7 @@
                 }
                 requestAnimationFrame(fpsLoop);
             }
-            document.getElementById('je-set-fps').addEventListener('change', function() {
+            document.getElementById('je-set-fps').addEventListener('change', function () {
                 fpsOn = this.checked;
                 if (fpsOn) {
                     fpsEl.classList.add('je-active');
@@ -1083,14 +1921,14 @@
             minDockBtn.title = 'Minimize';
             minDockBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z" fill="currentColor"/></svg>';
             dock.appendChild(minDockBtn);
-            minDockBtn.addEventListener('click', function() {
+            minDockBtn.addEventListener('click', function () {
                 dockMinimized = true;
                 dock.classList.add('je-minimized');
                 dockMinBtn.classList.add('je-active');
                 dockMinBtn.classList.remove('je-hidden');
                 topbar.classList.add('je-hidden');
             });
-            dockMinBtn.addEventListener('click', function() {
+            dockMinBtn.addEventListener('click', function () {
                 dockMinimized = false;
                 dock.classList.remove('je-minimized');
                 dockMinBtn.classList.remove('je-active');
@@ -1098,7 +1936,7 @@
             });
             // Override showDocks to handle minimize FAB visibility and keep topbar hidden when dock is minimized
             var _origShowDocks = showDocks;
-            showDocks = function() {
+            showDocks = function () {
                 // Call original to handle regular dock visibility logic
                 _origShowDocks();
                 // If the dock is minimized, ensure the topbar stays hidden
@@ -1110,33 +1948,33 @@
         })();
     </script>
     <script>
-        window.EJS_player        = '#game';
-        window.EJS_core          = '{{ core }}';
-        window.EJS_gameUrl       = '{{ rom_url }}';
-        window.EJS_gameName      = '{{ game_name }}';
-        window.EJS_pathtodata    = '{{ ejs_base }}/';
+        window.EJS_player = '#game';
+        window.EJS_core = '{{ core }}';
+        window.EJS_gameUrl = '{{ rom_url }}';
+        window.EJS_gameName = '{{ game_name }}';
+        window.EJS_pathtodata = '{{ ejs_base }}/';
         window.EJS_startOnLoaded = true;
         window.EJS_askBeforeExit = true;
-        window.EJS_color         = '#00a4dc';
+        window.EJS_color = '#00a4dc';
 
         window.EJS_DEBUG_XX = window.debug;
         if (window.language !== "auto") {
             window.EJS_language = window.language;
         }
-        
+
         // Inject default options for save states, shader and video rotation
         window.EJS_defaultOptions = {
             {{ if active_shader && active_shader != "" }}
-            'shader': '{{ active_shader }}'
-            {{ end }}
+        'shader': '{{ active_shader }}'
+        {{ end }}
         };
         {{ if video_rotation != 0 }}
         window.EJS_videoRotation = {{ video_rotation }};
         {{ else }}
         // EJS_videoRotation: 0 (default, no rotation)
         {{ end }}
-        
-        {{ if is_dos_or_psp }}
+
+        {{ if needs_threads }}
         window.EJS_threads = true;
         {{ else }}
         // EJS_threads not required for this core
@@ -1154,7 +1992,7 @@
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun.nextcloud.com:3478' },
-            { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
             { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ];
         {{ end }}
@@ -1168,15 +2006,15 @@
         var _jellyToken = '';
         try {
             var _jellyCreds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
-            var _jellyServer = (_jellyCreds.Servers || []).find(function(s) { return s.UserId === '{{ user_id }}'; });
+            var _jellyServer = (_jellyCreds.Servers || []).find(function (s) { return s.UserId === '{{ user_id }}'; });
             _jellyToken = (_jellyServer && _jellyServer.AccessToken) || '';
-        } catch(e) {}
+        } catch (e) { }
 
         // Mark game as played in Jellyfin when the emulator launches
         fetch('/Users/{{ user_id }}/PlayedItems/{{ item_id }}', {
             method: 'POST',
             headers: { 'X-Emby-Authorization': 'MediaBrowser Client="JellyEmu", Device="Browser", DeviceId="jellyemu", Version="1.0", Token="' + _jellyToken + '"' }
-        }).catch(function(err) {
+        }).catch(function (err) {
             console.warn('[JellyEmu] Could not mark item as played:', err);
         });
 
@@ -1185,17 +2023,17 @@
         fetch('/jellyemu/session/start/{{ item_id }}/{{ user_id }}', {
             method: 'POST',
             headers: {
-                'X-JellyEmu-DeviceId':   _jellyEmuDeviceId,
+                'X-JellyEmu-DeviceId': _jellyEmuDeviceId,
                 'X-JellyEmu-DeviceName': (navigator.userAgent.indexOf('Mobi') !== -1 ? 'JellyEmu Mobile' : 'JellyEmu Browser')
             }
-        }).catch(function(err) {
+        }).catch(function (err) {
             console.warn('[JellyEmu] Could not open session:', err);
         });
 
         // Ping the session every 30 s to keep it alive and advance the elapsed timer
-        var _jellyEmuPingInterval = setInterval(function() {
+        var _jellyEmuPingInterval = setInterval(function () {
             fetch('/jellyemu/session/ping/{{ item_id }}/{{ user_id }}', { method: 'POST' })
-                .catch(function() {});
+                .catch(function () { });
         }, 30000);
 
         // Record session start time for playtime tracking
@@ -1204,31 +2042,31 @@
         function _jeCaptureCanvas() {
             try {
                 var canvas = document.querySelector('canvas.ejs_canvas') ||
-                            document.querySelector('#game canvas') ||
-                            document.querySelector('canvas');
+                    document.querySelector('#game canvas') ||
+                    document.querySelector('canvas');
                 if (canvas && canvas.width > 0 && canvas.height > 0) {
                     return canvas.toDataURL('image/jpeg', 0.88);
                 }
-            } catch(e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
+            } catch (e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
             return null;
         }
 
         function _jeUploadScreenshot(slot, afterPromise) {
             var dataUrl = _jeCaptureCanvas();
             if (!dataUrl || !dataUrl.startsWith('data:image')) return;
-            (afterPromise || Promise.resolve()).then(function() {
+            (afterPromise || Promise.resolve()).then(function () {
                 fetch('/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/' + slot, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ dataUrl: dataUrl })
-                }).catch(function() {});
+                }).catch(function () { });
             });
         }
 
-        window._jeCaptureCanvas    = _jeCaptureCanvas;
+        window._jeCaptureCanvas = _jeCaptureCanvas;
         window._jeUploadScreenshot = _jeUploadScreenshot;
 
-        window.EJS_onSaveState = function(e) {
+        window.EJS_onSaveState = function (e) {
             if (!e || !e.state) return;
             var state = _jeEnsureBinary(e.state);
             console.log('[JellyEmu] Pipeline STAGE 1 (Client AutoGen): Payload size ->', state.size || state.byteLength, 'bytes');
@@ -1236,29 +2074,29 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream' },
                 body: state
-            }).then(function(r) {
+            }).then(function (r) {
                 if (!r.ok) throw new Error('Server rejected save');
                 console.log('[JellyEmu] Save uploaded, status:', r.status);
-                try { window.parent.postMessage({ type: 'jellyemu-save-written', itemId: '{{ item_id }}' }, '*'); } catch(_) {}
-            }).catch(function(err) {
+                try { window.parent.postMessage({ type: 'jellyemu-save-written', itemId: '{{ item_id }}' }, '*'); } catch (_) { }
+            }).catch(function (err) {
                 console.error('[JellyEmu] Save upload failed:', err);
             });
             _jeUploadScreenshot(activeSlot, savePromise);
         };
 
         var _jellyEmuExiting = false;
-        window.EJS_onExit = function() {
+        window.EJS_onExit = function () {
             if (_jellyEmuExiting) return;
             _jellyEmuExiting = true;
 
             var prefs = {};
-            try { prefs = JSON.parse(localStorage.getItem('jellyemu-userprefs') || '{}'); } catch(e) {}
+            try { prefs = JSON.parse(localStorage.getItem('jellyemu-userprefs') || '{}'); } catch (e) { }
             var autoSave = prefs.autosave !== 'false'; // default on
 
             // Stop the session ping and close the Jellyfin session
             clearInterval(_jellyEmuPingInterval);
             var sessionStop = fetch('/jellyemu/session/stop/{{ item_id }}/{{ user_id }}', { method: 'POST' })
-                .catch(function() {});
+                .catch(function () { });
 
             // Always record playtime for this session
             var sessionSeconds = Math.round((Date.now() - (_jellyEmuSessionStart || Date.now())) / 1000);
@@ -1267,12 +2105,12 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: String(sessionSeconds)
-                  }).catch(function() {})
+                }).catch(function () { })
                 : Promise.resolve();
 
             function closeIframe() {
                 if (window.parent === window) {
-                    try { var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); } catch(e) {}
+                    try { var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); } catch (e) { }
                     window.close();
                 } else {
                     window.parent.postMessage('close-jellyemu', '*');
@@ -1280,8 +2118,8 @@
             }
 
             function _fallbackClose() {
-                Promise.all([sessionStop, playtimeFlush]).finally(function() {
-                    try { window.parent.postMessage({ type: 'jellyemu-session-end', itemId: '{{ item_id }}', seconds: sessionSeconds }, '*'); } catch(_) {}
+                Promise.all([sessionStop, playtimeFlush]).finally(function () {
+                    try { window.parent.postMessage({ type: 'jellyemu-session-end', itemId: '{{ item_id }}', seconds: sessionSeconds }, '*'); } catch (_) { }
                     closeIframe();
                 });
             }
@@ -1290,29 +2128,29 @@
                 _fallbackClose();
                 return;
             }
-            
+
             _fallbackClose();
         };
 
         // Hook EmulatorJS screenshot button to push to Romm via parent
-        document.addEventListener('click', function(ev) {
+        document.addEventListener('click', function (ev) {
             var btn = ev.target.closest && ev.target.closest('[data-action="screenshot"], .ejs-screenshot-btn, button[title*="creenshot"], button[aria-label*="creenshot"]');
             if (!btn) return;
-            setTimeout(function() {
+            setTimeout(function () {
                 try {
                     var s = window._jeCaptureCanvas();
                     window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: s }, '*');
-                } catch(e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
+                } catch (e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
             }, 200);
         });
         {{ end }}
     </script>
     <script>
         window.JellyEmuConfig = {
-            itemId:      '{{ item_id }}',
-            userId:      '{{ user_id }}',
+            itemId: '{{ item_id }}',
+            userId: '{{ user_id }}',
             savePostUrl: '{{ save_post_url }}',
-            activeSlot:  {{ active_slot }}
+            activeSlot: {{ active_slot }}
         };
     </script>
     <script src="/jellyemu/assets/ejs.input.js"></script>
@@ -1320,4 +2158,5 @@
     <script src="/jellyemu/assets/ejs.xr.js"></script>
     <script src="{{ ejs_base }}/loader.js"></script>
 </body>
+
 </html>
