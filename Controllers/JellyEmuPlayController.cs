@@ -198,7 +198,7 @@ namespace JellyEmu.Controllers
                 save_exists = saveExists,
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,
-                is_dos_or_psp = (core == "dos" || core == "psp")
+                needs_threads = (core == "dos" || core == "psp" || core == "arcade" || core == "mame2003_plus" || core == "amiga" || core == "3do" || core == "segaSaturn" || core == "jaguar")
             });
 
             // When opened as a new tab (threaded cores), these headers make the page

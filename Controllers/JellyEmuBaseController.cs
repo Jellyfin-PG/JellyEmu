@@ -97,7 +97,7 @@ namespace JellyEmu.Controllers
                 { "Commodore Plus/4", "plus4"       },
                 { "Commodore VIC-20", "vic20"       },
                 { "Arcade",           "arcade"      },
-                { "MAME 2003",        "mame2003"    },
+                { "MAME 2003",        "mame2003_plus" },
                 { "DOS",              "dos"         },
                 { "PICO-8",           "pico8"       },
             };
@@ -355,10 +355,16 @@ namespace JellyEmu.Controllers
             var core = ResolveCore(item);
             return core switch
             {
-                "pico8" => new CoreInfo(core, false, "pico8"),
-                "dos"   => new CoreInfo(core, true,  "ejs"),
-                "psp"   => new CoreInfo(core, true,  "ejs"),
-                _       => new CoreInfo(core, false, "ejs"),
+                "pico8"    => new CoreInfo(core, false, "pico8"),
+                "dos"      => new CoreInfo(core, true,  "ejs"),
+                "psp"      => new CoreInfo(core, true,  "ejs"),
+                "arcade"        => new CoreInfo(core, true,  "ejs"),
+                "mame2003_plus" => new CoreInfo(core, true,  "ejs"),
+                "amiga"         => new CoreInfo(core, true,  "ejs"),
+                "3do"           => new CoreInfo(core, true,  "ejs"),
+                "segaSaturn"    => new CoreInfo(core, true,  "ejs"),
+                "jaguar"        => new CoreInfo(core, true,  "ejs"),
+                _               => new CoreInfo(core, false, "ejs"),
             };
         }
 
