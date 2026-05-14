@@ -6,6 +6,7 @@ using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace JellyEmu.Controllers
 {
@@ -40,6 +41,12 @@ namespace JellyEmu.Controllers
             }
 
             Logger.LogInformation("[JellyEmu] Serving ROM: {Path}", item.Path);
+
+            var fileInfo = new FileInfo(item.Path);
+            Response.Headers["X-Rom-Hash"] = GetFileHash(item.Path);
+            Response.Headers["X-Rom-Size"] = fileInfo.Length.ToString();
+            Response.Headers["X-Rom-Extension"] = fileInfo.Extension;
+            Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(item.Path);
 
             var stream = System.IO.File.OpenRead(item.Path);
             var fileName = Path.GetFileName(item.Path);

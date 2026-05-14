@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using JellyEmu.Utilities;
 using MediaBrowser.Controller.Entities;
+using System.Security.Cryptography;
 
 namespace JellyEmu
 {
@@ -108,6 +109,14 @@ namespace JellyEmu
                     sb.Append(c);
             }
             return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
+        }
+
+        public static string GetFileHash(string path)
+        {
+            using var md5 = MD5.Create();
+            using var stream = File.OpenRead(path);
+            var hash = md5.ComputeHash(stream);
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
 }

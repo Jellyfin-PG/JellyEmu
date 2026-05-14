@@ -4,6 +4,8 @@ using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MediaBrowser.Model.Entities;
+using System.Security.Cryptography;
+using System.IO;
 
 namespace JellyEmu.Controllers
 {
@@ -399,6 +401,11 @@ namespace JellyEmu.Controllers
                 return item?.GetProviderId("Romm");
             }
             catch { return null; }
+        }
+
+        protected string GetFileHash(string path)
+        {
+            return RomExtensions.GetFileHash(path);
         }
     }
 }
