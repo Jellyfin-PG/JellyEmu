@@ -23,6 +23,13 @@ namespace JellyEmu.Providers
             _platformResolver = platformResolver;
         }
 
+        private static string? TryExtractEmbeddedHasheousId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = System.Text.RegularExpressions.Regex.Match(path, @"\[hash-(\d+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
         public string Name => "Hasheous";
         public int Order => 1;
 
@@ -32,6 +39,9 @@ namespace JellyEmu.Providers
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
 
             searchInfo.ProviderIds.TryGetValue("Hasheous", out var hasheousId);
+            if (string.IsNullOrEmpty(hasheousId))
+                hasheousId = TryExtractEmbeddedHasheousId(searchInfo.Path);
+
             searchInfo.ProviderIds.TryGetValue("MD5", out var md5);
 
             if (!string.IsNullOrEmpty(hasheousId) || !string.IsNullOrEmpty(md5))
@@ -97,6 +107,9 @@ namespace JellyEmu.Providers
             var result = new MetadataResult<Book> { HasMetadata = false };
             
             info.ProviderIds.TryGetValue("Hasheous", out var hasheousId);
+            if (string.IsNullOrEmpty(hasheousId))
+                hasheousId = TryExtractEmbeddedHasheousId(info.Path);
+
             info.ProviderIds.TryGetValue("MD5", out var md5);
 
             if (string.IsNullOrEmpty(hasheousId) && string.IsNullOrEmpty(md5))
@@ -148,7 +161,8 @@ namespace JellyEmu.Providers
                     if (!string.IsNullOrEmpty(gameId))
                         result.Item.SetProviderId("Hasheous", gameId);
                     
-                    result.Item.SetProviderId("MD5", md5);
+                    if (!string.IsNullOrEmpty(md5))
+                        result.Item.SetProviderId("MD5", md5);
 
                     if (matchRoot.TryGetProperty("signature", out var sig) && sig.TryGetProperty("game", out var gameSig))
                     {

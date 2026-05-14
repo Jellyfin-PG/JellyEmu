@@ -22,6 +22,13 @@ namespace JellyEmu.Providers
         public string Name => "SteamGridDB Image Provider";
         public int Order => 2;
 
+        private static string? TryExtractEmbeddedSteamGridDbId(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            var match = System.Text.RegularExpressions.Regex.Match(path, @"\[sgdb-(\d+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
         public bool Supports(BaseItem item) => item is Book;
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Logo };
@@ -33,6 +40,9 @@ namespace JellyEmu.Providers
             if (string.IsNullOrEmpty(apiKey)) return list;
 
             var gameId = item.GetProviderId("SteamGridDb");
+            if (string.IsNullOrEmpty(gameId))
+                gameId = TryExtractEmbeddedSteamGridDbId(item.Path);
+
             if (string.IsNullOrEmpty(gameId))
             {
                 gameId = await ResolveGameIdAsync(item.Name ?? RomExtensions.CleanName(item.Path) ?? string.Empty, apiKey, cancellationToken).ConfigureAwait(false);

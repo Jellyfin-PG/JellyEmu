@@ -27,7 +27,7 @@ namespace JellyEmu
         public override Guid Id => Guid.Parse("9bab105e-9af0-4e25-a87d-876713b60962");
 
         public static Plugin? Instance { get; private set; }
-
+ 
         public IEnumerable<PluginPageInfo> GetPages() => new[]
         {
             new PluginPageInfo
