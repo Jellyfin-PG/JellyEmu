@@ -38,7 +38,15 @@ namespace JellyEmu.Controllers
         {
             var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
             var path = GetSavePath(userId, itemId, slotNum);
-            return System.IO.File.Exists(path) ? Ok() : NotFound();
+
+            if (System.IO.File.Exists(path))
+            {
+                var lastModified = System.IO.File.GetLastWriteTimeUtc(path);
+                Response.Headers["last-modified"] = lastModified.ToString("R");
+                return Ok();
+            }
+
+            return NotFound();
         }
 
         /// <summary>
