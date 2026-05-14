@@ -3,6 +3,7 @@
   <h1>JellyEmu</h1>
   <p>A plugin for jellyfin 10.11+ to import, manage, play and share your roms and pico-8 games with users.</p>
   <p><sub>Now with romm integration, pico-8, and VR/AR support.</sub></p>
+  <p><sub>Checkout the official JellyEmu Client ([Vantage](https://github.com/Jellyfin-PG/Vantage)).</sub></p>
 </div>
 
 <p align="center">
