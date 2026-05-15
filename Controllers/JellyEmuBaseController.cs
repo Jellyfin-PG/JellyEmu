@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using MediaBrowser.Model.Entities;
 using System.Security.Cryptography;
 using System.IO;
+using System.Security.Claims;
 
 namespace JellyEmu.Controllers
 {
@@ -17,6 +18,19 @@ namespace JellyEmu.Controllers
     [ApiController]
     public abstract class JellyEmuBaseController : ControllerBase
     {
+        protected bool VerifyUser(string userId)
+        {
+            var authenticatedUserId = User.FindFirstValue("Jellyfin-UserId")
+                                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(authenticatedUserId, out var authGuid) ||
+                !Guid.TryParse(userId, out var targetGuid) ||
+                authGuid != targetGuid)
+            {
+                return false;
+            }
+            return true;
+        }
         protected readonly ILibraryManager LibraryManager;
         protected readonly IApplicationPaths AppPaths;
         protected readonly ILogger Logger;

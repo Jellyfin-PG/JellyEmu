@@ -6,6 +6,7 @@ using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
 using Microsoft.Extensions.Logging;
+using JellyEmu.Services;
 
 namespace JellyEmu.Providers
 {
@@ -13,17 +14,13 @@ namespace JellyEmu.Providers
     {
         protected readonly IHttpClientFactory HttpClientFactory;
         protected readonly ILogger Logger;
+        protected readonly IgdbClientService IgdbClientService;
 
-        protected static string ClientId => Plugin.Instance?.Configuration.IgdbClientId ?? string.Empty;
-        protected static string ClientSecret => Plugin.Instance?.Configuration.IgdbClientSecret ?? string.Empty;
-
-        private static string _accessToken = string.Empty;
-        private static DateTime _tokenExpiration = DateTime.MinValue;
-
-        protected BaseIgdbProvider(IHttpClientFactory httpClientFactory, ILogger logger)
+        protected BaseIgdbProvider(IHttpClientFactory httpClientFactory, ILogger logger, IgdbClientService igdbClientService)
         {
             HttpClientFactory = httpClientFactory;
             Logger = logger;
+            IgdbClientService = igdbClientService;
         }
 
         protected static string? TryExtractEmbeddedIgdbId(string? path)
@@ -31,37 +28,6 @@ namespace JellyEmu.Providers
             if (string.IsNullOrEmpty(path)) return null;
             var match = Regex.Match(path, @"\[igdb-(\d+)\]", RegexOptions.IgnoreCase);
             return match.Success ? match.Groups[1].Value : null;
-        }
-
-        protected async Task<string> GetTokenAsync(CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(ClientId) || string.IsNullOrEmpty(ClientSecret))
-                return string.Empty;
-
-            if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiration)
-                return _accessToken;
-
-            var url = $"https://id.twitch.tv/oauth2/token?client_id={ClientId}&client_secret={ClientSecret}&grant_type=client_credentials";
-            var client = HttpClientFactory.CreateClient();
-            var response = await client.PostAsync(url, null, cancellationToken).ConfigureAwait(false);
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                using var doc = JsonDocument.Parse(json);
-                _accessToken = doc.RootElement.GetProperty("access_token").GetString() ?? string.Empty;
-                _tokenExpiration = DateTime.UtcNow.AddSeconds(doc.RootElement.GetProperty("expires_in").GetInt32() - 60);
-                return _accessToken;
-            }
-            return string.Empty;
-        }
-
-        protected async Task<HttpClient> GetIgdbClientAsync(CancellationToken cancellationToken)
-        {
-            var client = HttpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("Client-ID", ClientId);
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {await GetTokenAsync(cancellationToken)}");
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-            return client;
         }
 
         /// <summary>
@@ -80,7 +46,7 @@ namespace JellyEmu.Providers
             {
                 try
                 {
-                    var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                    var client = await IgdbClientService.GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
                     var content = new StringContent($"search \"{query}\"; fields id,slug; limit 1;", Encoding.UTF8, "text/plain");
                     var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode)
@@ -115,14 +81,17 @@ namespace JellyEmu.Providers
         public int Order => 1;
 
         private readonly PlatformResolver _platformResolver;
+        private readonly ILogger<IgdbMetadataProvider> _logger;
 
         public IgdbMetadataProvider(
             IHttpClientFactory httpClientFactory,
             ILogger<IgdbMetadataProvider> logger,
-            PlatformResolver platformResolver)
-            : base(httpClientFactory, logger)
+            PlatformResolver platformResolver,
+            IgdbClientService igdbClientService)
+            : base(httpClientFactory, logger, igdbClientService)
         {
             _platformResolver = platformResolver;
+            _logger = logger;
         }
 
         // Identify
@@ -139,7 +108,7 @@ namespace JellyEmu.Providers
             {
                 try
                 {
-                    var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                    var client = await IgdbClientService.GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
                     var content = new StringContent(
                         $"where id = {directId}; fields id,name,slug,first_release_date,cover.image_id; limit 1;",
                         Encoding.UTF8, "text/plain");
@@ -188,7 +157,7 @@ namespace JellyEmu.Providers
             {
                 try
                 {
-                    var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                    var client = await IgdbClientService.GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
                     var content = new StringContent(
                         $"search \"{query}\"; fields id,name,slug,first_release_date,cover.image_id; limit 5;",
                         Encoding.UTF8, "text/plain");
@@ -207,11 +176,7 @@ namespace JellyEmu.Providers
                             var searchResult = new RemoteSearchResult
                             {
                                 Name = game.GetProperty("name").GetString() ?? string.Empty,
-                                ProviderIds = new Dictionary<string, string>
-                                {
-                                    { "IGDB", gameId },
-                                    { "IGDBSlug", slug }
-                                },
+                                ProviderIds = new Dictionary<string, string> { { "IGDB", gameId }, { "IGDBSlug", slug } },
                                 SearchProviderName = Name
                             };
 
@@ -259,7 +224,7 @@ namespace JellyEmu.Providers
 
             try
             {
-                var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                var client = await IgdbClientService.GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
                 var content = new StringContent(
                     $"where id = {gameId}; fields name,slug,summary,first_release_date,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,total_rating,total_rating_count,collection.name,franchises.name;",
                     Encoding.UTF8, "text/plain");
@@ -327,6 +292,39 @@ namespace JellyEmu.Providers
                             if (franchises[0].TryGetProperty("name", out var franchiseName))
                                 item.SeriesName = franchiseName.GetString();
 
+                        try
+                        {
+                            var ttbContent = new StringContent($"where game_id = {gameId}; fields normally,hastily,completely; limit 1;", Encoding.UTF8, "text/plain");
+                            var ttbResponse = await client.PostAsync("https://api.igdb.com/v4/game_time_to_beats", ttbContent, cancellationToken).ConfigureAwait(false);
+                            if (ttbResponse.IsSuccessStatusCode)
+                            {
+                                using var ttbDoc = JsonDocument.Parse(await ttbResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                                if (ttbDoc.RootElement.GetArrayLength() > 0)
+                                {
+                                    var ttb = ttbDoc.RootElement[0];
+                                    var codes = new List<string>();
+                                    
+                                    if (ttb.TryGetProperty("normally", out var norm) && norm.ValueKind == JsonValueKind.Number && norm.GetInt32() > 0)
+                                        codes.Add($"M{norm.GetInt32() / 3600}");
+                                    
+                                    if (ttb.TryGetProperty("hastily", out var haste) && haste.ValueKind == JsonValueKind.Number && haste.GetInt32() > 0)
+                                        codes.Add($"H{haste.GetInt32() / 3600}");
+                                    
+                                    if (ttb.TryGetProperty("completely", out var comp) && comp.ValueKind == JsonValueKind.Number && comp.GetInt32() > 0)
+                                        codes.Add($"C{comp.GetInt32() / 3600}");
+
+                                    if (codes.Count > 0)
+                                    {
+                                        item.SetProviderId("IgdbTTB", string.Join(",", codes));
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "[JellyEmu] Failed to fetch Time to Beat for game {Id}", gameId);
+                        }
+
                         item.SetProviderId("IGDB", gameId);
                         if (!string.IsNullOrEmpty(slug))
                             item.SetProviderId("IGDBSlug", slug);
@@ -346,8 +344,8 @@ namespace JellyEmu.Providers
         public string Name => "IGDB Image Provider";
         public int Order => 1;
 
-        public IgdbImageProvider(IHttpClientFactory httpClientFactory, ILogger<IgdbImageProvider> logger)
-            : base(httpClientFactory, logger) { }
+        public IgdbImageProvider(IHttpClientFactory httpClientFactory, ILogger<IgdbImageProvider> logger, IgdbClientService igdbClientService)
+            : base(httpClientFactory, logger, igdbClientService) { }
 
         public bool Supports(BaseItem item) => item is Book;
 
@@ -370,7 +368,7 @@ namespace JellyEmu.Providers
 
             try
             {
-                var client = await GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                var client = await IgdbClientService.GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
                 var content = new StringContent($"where id = {gameId}; fields cover.image_id,screenshots.image_id;", Encoding.UTF8, "text/plain");
                 var response = await client.PostAsync("https://api.igdb.com/v4/games", content, cancellationToken).ConfigureAwait(false);
 
@@ -425,7 +423,6 @@ namespace JellyEmu.Providers
         public string ProviderName => "IGDB";
         public string Key => "IGDB";
         public ExternalIdMediaType? Type => null;
-        public string UrlFormatString => "https://www.igdb.com/games/{0}";
         public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
     }
 

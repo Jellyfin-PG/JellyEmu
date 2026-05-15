@@ -73,6 +73,26 @@ namespace JellyEmu.Providers
                 return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
             return GetHttpClient().GetAsync(url, cancellationToken);
         }
+
+        protected static PersonKind MapPersonKind(string role)
+        {
+            if (string.IsNullOrEmpty(role)) return PersonKind.Author;
+            var r = role.ToLowerInvariant();
+            if (r.Contains("design"))     return PersonKind.Creator;
+            if (r.Contains("program"))    return PersonKind.Creator;
+            if (r.Contains("art"))        return PersonKind.Artist;
+            if (r.Contains("writing"))    return PersonKind.Writer;
+            if (r.Contains("writer"))     return PersonKind.Writer;
+            if (r.Contains("music"))      return PersonKind.Composer;
+            if (r.Contains("composer"))   return PersonKind.Composer;
+            if (r.Contains("director"))   return PersonKind.Director;
+            if (r.Contains("producer"))   return PersonKind.Producer;
+            if (r.Contains("sound"))      return PersonKind.Engineer;
+            if (r.Contains("audio"))      return PersonKind.Engineer;
+            if (r.Contains("editor"))     return PersonKind.Editor;
+            if (r.Contains("illustrat"))  return PersonKind.Illustrator;
+            return PersonKind.Author;
+        }
     }
 
     public class RawgMetadataProvider : BaseRawgProvider, IRemoteMetadataProvider<Book, BookInfo>, IHasOrder
@@ -254,12 +274,21 @@ namespace JellyEmu.Providers
                                 foreach (var member in teamArray.EnumerateArray())
                                 {
                                     if (!member.TryGetProperty("name", out var memberName) || string.IsNullOrWhiteSpace(memberName.GetString())) continue;
+                                    var rawName = memberName.GetString()?.Trim() ?? string.Empty;
+                                    if (string.IsNullOrWhiteSpace(rawName)) continue;
 
                                     string role = "Developer";
                                     if (member.TryGetProperty("positions", out var positions) && positions.ValueKind == JsonValueKind.Array && positions.GetArrayLength() > 0)
                                         role = positions[0].TryGetProperty("name", out var posName) ? (posName.GetString() ?? "Developer") : "Developer";
 
-                                    var pInfo = new PersonInfo { Name = memberName.GetString(), Type = PersonKind.Author, Role = role };
+                                     var pKind = MapPersonKind(role);
+                                     var pInfo = new PersonInfo { Name = $"{rawName} (RAWG)", Type = pKind, Role = role };
+
+                                     if (member.TryGetProperty("id", out var idEl))
+                                     {
+                                         var rawgId = idEl.ToString();
+                                         pInfo.ProviderIds = new Dictionary<string, string> { { "RAWG", rawgId } };
+                                     }
 
                                     if (member.TryGetProperty("image", out var imgEl) && imgEl.ValueKind == JsonValueKind.String)
                                     {
@@ -360,7 +389,7 @@ namespace JellyEmu.Providers
 
                         var sr = new RemoteSearchResult
                         {
-                            Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? searchInfo.Name : searchInfo.Name,
+                            Name = (root.TryGetProperty("name", out var n) ? n.GetString() ?? searchInfo.Name : searchInfo.Name) + " (RAWG)",
                             ProviderIds = new Dictionary<string, string> { { "RAWG", directId } },
                             SearchProviderName = Name
                         };
@@ -393,7 +422,7 @@ namespace JellyEmu.Providers
 
                             var sr = new RemoteSearchResult
                             {
-                                Name = nameEl.GetString() ?? string.Empty,
+                                Name = (nameEl.GetString() ?? string.Empty) + " (RAWG)",
                                 ProviderIds = new Dictionary<string, string> { { "RAWG", idEl.GetInt32().ToString() } },
                                 SearchProviderName = Name
                             };
@@ -435,9 +464,14 @@ namespace JellyEmu.Providers
                     using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     var root = doc.RootElement;
 
+                    var rawName = root.TryGetProperty("name", out var n) ? n.GetString() ?? info.Name : info.Name;
+                    var position = "Developer";
+                    if (root.TryGetProperty("positions", out var pArr) && pArr.ValueKind == JsonValueKind.Array && pArr.GetArrayLength() > 0)
+                        position = pArr[0].TryGetProperty("name", out var pName) ? (pName.GetString() ?? "Developer") : "Developer";
+
                     var person = new Person
                     {
-                        Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? info.Name : info.Name,
+                        Name = $"{rawName} (RAWG)",
                         Overview = root.TryGetProperty("description", out var d)
                             ? (d.GetString() ?? string.Empty)
                                 .Replace("<p>", "").Replace("</p>", "")

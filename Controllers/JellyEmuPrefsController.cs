@@ -43,9 +43,7 @@ namespace JellyEmu.Controllers
                 autosave      = prefs.Autosave,
                 shader        = prefs.Shader,
                 videoRotation      = prefs.VideoRotation,
-                controls           = prefs.Controls,
-                raUsername         = prefs.RaUsername,
-                raApiKey           = string.IsNullOrEmpty(prefs.RaApiKey) ? "" : "********"
+                controls           = prefs.Controls
             });
         }
 
@@ -71,9 +69,6 @@ namespace JellyEmu.Controllers
                 int Int(string key, int def) =>
                     r.TryGetProperty(key, out var v) ? v.GetInt32() : def;
 
-                var newRaApiKey = Str("raApiKey", current.RaApiKey);
-                if (newRaApiKey == "********") newRaApiKey = current.RaApiKey;
-
                 current = new UserFullPrefs(
                     Scale:              Str("scale",              current.Scale),
                     Mute:               Str("mute",               current.Mute),
@@ -84,8 +79,8 @@ namespace JellyEmu.Controllers
                     VideoRotation:      Int("videoRotation",      current.VideoRotation),
                     Controls:           Str("controls",           current.Controls),
                     ControllerControls: Str("controllerControls", current.ControllerControls),
-                    RaUsername:         Str("raUsername",         current.RaUsername),
-                    RaApiKey:           newRaApiKey);
+                    RaUsername:         current.RaUsername,
+                    RaApiKey:           current.RaApiKey);
             }
             catch { return BadRequest("Body must be a JSON object."); }
 
@@ -102,9 +97,7 @@ namespace JellyEmu.Controllers
                 shader             = current.Shader,
                 videoRotation      = current.VideoRotation,
                 controls           = current.Controls,
-                controllerControls = current.ControllerControls,
-                raUsername         = current.RaUsername,
-                raApiKey           = string.IsNullOrEmpty(current.RaApiKey) ? "" : "********"
+                controllerControls = current.ControllerControls
             });
         }
 

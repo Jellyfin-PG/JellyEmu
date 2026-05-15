@@ -29,7 +29,8 @@ namespace JellyEmu.Services
                 var injection = """
                 <style data-jellyemu-mods="1">
 
-                  #jellyemu-play-btn {
+                  #jellyemu-play-btn,
+                  #jellyemu-vantage-btn {
                       display: flex !important;
                       align-items: center !important;
                       justify-content: center !important;
@@ -45,12 +46,14 @@ namespace JellyEmu.Services
                       transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease !important;
                       transform: scale(1);
                   }
-                  #jellyemu-play-btn:hover {
+                  #jellyemu-play-btn:hover,
+                  #jellyemu-vantage-btn:hover {
                       transform: scale(1.18) !important;
                       background: rgba(255,255,255,0.25) !important;
                       color: #00a4dc !important;
                   }
-                  #jellyemu-play-btn .detailButton-content {
+                  #jellyemu-play-btn .detailButton-content,
+                  #jellyemu-vantage-btn .detailButton-content {
                       display: flex !important;
                       align-items: center !important;
                       justify-content: center !important;
@@ -246,8 +249,14 @@ namespace JellyEmu.Services
                     }
 
                     function dismissActionSheet(sheetRoot) {
+                        const container = document.querySelector('.dialogContainer');
+                        const backdrop = document.querySelector('.dialogBackdrop');
+                        
+                        if (container) container.remove();
+                        if (backdrop) backdrop.remove();
+
                         var dialog = sheetRoot.closest('.dialog') || sheetRoot.closest('[data-history]') || sheetRoot.parentElement;
-                        if (dialog) dialog.remove();
+                        if (dialog && dialog.parentNode) dialog.remove();
                     }
 
                     window.addEventListener('message', function(e) {
@@ -340,9 +349,61 @@ namespace JellyEmu.Services
                         if (playFromHereBtn) {
                             playFromHereBtn.style.display = 'none';
                         }
+
+                        if (!sheetRoot.querySelector('button[data-jellyemu-vantage]')) {
+                            const sourceCard = document.querySelector('.card[data-id="' + itemId + '"]');
+                            const tags = sourceCard && sourceCard.getAttribute('data-jellyemu-tags')
+                                ? sourceCard.getAttribute('data-jellyemu-tags').split(',')
+                                : null;
+
+                            if (tags && tags.includes('JellyEmu')) {
+                                const vantageBtn = document.createElement('button');
+                                vantageBtn.type = 'button';
+                                vantageBtn.setAttribute('data-jellyemu-vantage', '1');
+                                
+                                const playBtn = sheetRoot.querySelector('button[data-id="resume"]');
+                                if (playBtn) {
+                                    vantageBtn.className = playBtn.className;
+                                } else {
+                                    vantageBtn.className = 'actionSheetMenuItem emby-button';
+                                }
+
+                                vantageBtn.innerHTML = playBtn ? playBtn.innerHTML : '<i class="md-icon actionSheetItemIcon">open_in_new</i><div class="actionSheetItemText">Open in Vantage</div>';
+                                
+                                const icon = vantageBtn.querySelector('.actionSheetItemIcon');
+                                if (icon) {
+                                    icon.textContent = 'open_in_new';
+                                    icon.style.color = '';
+                                }
+                                
+                                const text = vantageBtn.querySelector('.actionSheetItemText');
+                                if (text) {
+                                    text.textContent = 'Open in Vantage';
+                                }
+                                vantageBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopImmediatePropagation();
+                                    
+                                    dismissActionSheet(sheetRoot);
+                                    
+                                    window.location.href = 'vantage://launch?itemId=' + itemId;
+                                }, true);
+                                
+                                const scroller = sheetRoot.querySelector('.actionSheetScroller');
+                                
+                                if (playBtn && playBtn.nextSibling) {
+                                    playBtn.parentNode.insertBefore(vantageBtn, playBtn.nextSibling);
+                                } else if (scroller) {
+                                    scroller.insertBefore(vantageBtn, scroller.firstChild);
+                                } else {
+                                    sheetRoot.appendChild(vantageBtn);
+                                }
+                            }
+                        }
                     }
 
                     let cachedTags = [];
+                    let cachedProviderIds = {};
 
                     function injectMiscInfo(page) {
                         page = page || getVisibleDetailPage();
@@ -371,6 +432,30 @@ namespace JellyEmu.Services
                             div.textContent = tag;
                             wrap.appendChild(div);
                         });
+
+                        // Time to Beat premium pill
+                        const ttbRaw = cachedProviderIds.IgdbTTB;
+                        if (ttbRaw && !wrap.querySelector('.jellyemu-ttb-pill')) {
+                            const data = ttbRaw.split(',');
+                            const map = {};
+                            data.forEach(d => map[d[0]] = d.substring(1));
+                            
+                            const pill = document.createElement('div');
+                            pill.className = 'mediaInfoItem jellyemu-ttb-pill';
+                            pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
+                            
+                            let title = 'Time to Beat: ';
+                            let labels = [];
+                            if (map.M) { labels.push(map.M + 'h'); title += 'Main: ' + map.M + 'h '; }
+                            if (map.H) { labels.push(map.H + 'h'); title += 'Main+Extras: ' + map.H + 'h '; }
+                            if (map.C) { labels.push(map.C + 'h'); title += 'Completionist: ' + map.C + 'h '; }
+                            
+                            pill.title = title.trim();
+                            pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:rgba(255,255,255,0.7);">hourglass_full</span>' + 
+                                labels.join(' \u2022 ');
+                            
+                            wrap.appendChild(pill);
+                        }
 
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
                         const itemId = currentItemId;
@@ -467,15 +552,7 @@ namespace JellyEmu.Services
                                         pill.onclick = (e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            const user = prompt('Enter RetroAchievements Username:');
-                                            if (!user) return;
-                                            const key = prompt('Enter RetroAchievements API Key (Get it from retroachievements.org settings):');
-                                            if (!key) return;
-                                            fetch('/jellyemu/prefs/' + userId, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ raUsername: user, raApiKey: key })
-                                            }).then(() => location.reload());
+                                            window.location.hash = JELLYEMU_SETTINGS_HASH;
                                         };
                                     } else {
                                         pill.title = 'RetroAchievements: ' + data.numUnlocked + ' / ' + data.numTotal + ' unlocked';
@@ -544,6 +621,23 @@ namespace JellyEmu.Services
                         });
 
                         detailButtonsContainer.insertBefore(btn, detailButtonsContainer.firstChild);
+
+                        if (currentItemId && !detailButtonsContainer.querySelector('#jellyemu-vantage-btn')) {
+                            const vBtn = document.createElement('button');
+                            vBtn.type      = 'button';
+                            vBtn.id        = 'jellyemu-vantage-btn';
+                            vBtn.className = 'jellyemu-play-btn-detail';
+                            vBtn.title     = 'Open in Vantage';
+                            vBtn.style.marginLeft = '.5em';
+                            vBtn.innerHTML = '<div class="detailButton-content"><span class="material-icons detailButton-icon" aria-hidden="true">open_in_new</span></div>';
+                            vBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.location.href = 'vantage://launch?itemId=' + currentItemId;
+                            });
+                            detailButtonsContainer.insertBefore(vBtn, btn.nextSibling);
+                        }
+
                         perf.mark('inject-play-end');
                         perf.measure('inject-play', 'inject-play-start', 'inject-play-end');
                     }
@@ -561,9 +655,8 @@ namespace JellyEmu.Services
                         perf.mark('details-start:' + id);
                         currentItemIsGame = false;
                         cachedTags        = [];
+                        cachedProviderIds = {};
 
-                        // page is passed from viewshow — use it directly rather than
-                        // querying getVisibleDetailPage() which may not find it yet
                         const visiblePage = page || getVisibleDetailPage();
                         const allDetailPages = document.querySelectorAll('.itemDetailPage');
                         allDetailPages.forEach(p => p.classList.remove('jellyemu-game-page'));
@@ -576,6 +669,7 @@ namespace JellyEmu.Services
                                 perf.mark('details-fast-path:' + id);
                                 currentItemIsGame = true;
                                 cachedTags        = tags;
+                                cachedProviderIds = {};
                                 injectAll(visiblePage);
                             }
                         }
@@ -587,11 +681,9 @@ namespace JellyEmu.Services
                             if (item && item.Tags && item.Tags.includes('JellyEmu')) {
                                 currentItemIsGame = true;
                                 cachedTags        = item.Tags;
-                                // Poll until .itemMiscInfo-primary exists, then inject once.
-                                // This resolves all timing races between getItem and DOM render.
+                                cachedProviderIds = item.ProviderIds || {};
                                 var _pollAttempts = 0;
                                 var _pollId = setInterval(function() {
-                                    // Stop if we've navigated to a different item
                                     if (currentItemId !== id) { clearInterval(_pollId); return; }
                                     var p = visiblePage || getVisibleDetailPage();
                                     if (!p) { if (++_pollAttempts > 20) clearInterval(_pollId); return; }
@@ -603,6 +695,7 @@ namespace JellyEmu.Services
                             } else {
                                 currentItemIsGame = false;
                                 cachedTags        = [];
+                                cachedProviderIds = {};
                                 if (visiblePage) visiblePage.classList.remove('jellyemu-game-page');
                             }
                             perf.mark('details-end:' + id);
@@ -618,8 +711,9 @@ namespace JellyEmu.Services
                         return null;
                     }
 
-                    const JELLYEMU_PREFS_HASH = '#/jellyemu-userprefs';
-                    const JELLYEMU_SAVES_HASH = '#/jellyemu-saves';
+                    const JELLYEMU_PREFS_HASH    = '#/jellyemu-userprefs';
+                    const JELLYEMU_SETTINGS_HASH = '#/jellyemu-settings';
+                    const JELLYEMU_SAVES_HASH    = '#/jellyemu-saves';
 
                     // Jellyfin fires 'viewshow' on official pages and 'pageshow' on both
                     // official and unofficial (custom hash) pages — both bubble from the
@@ -641,6 +735,11 @@ namespace JellyEmu.Services
                         if (hash.startsWith(JELLYEMU_SAVES_HASH)) {
                             _detailObserverDisconnect();
                             hijackJellyEmuSavesBrowser();
+                            return;
+                        }
+                        if (hash.startsWith(JELLYEMU_SETTINGS_HASH)) {
+                            _detailObserverDisconnect();
+                            hijackJellyEmuSettings();
                             return;
                         }
 
@@ -666,6 +765,7 @@ namespace JellyEmu.Services
                             if (currentItemId === id) return;
                             currentItemId     = id;
                             currentItemIsGame = false;
+                            cachedProviderIds = {};
                             processItemDetails(id, page);
                             return;
                         }
@@ -675,6 +775,7 @@ namespace JellyEmu.Services
                         _detailObserverDisconnect();
                         currentItemId     = null;
                         currentItemIsGame = false;
+                        cachedProviderIds = {};
                         page.querySelectorAll('.card').forEach(scheduleCardProcess);
                     }
 
@@ -686,6 +787,7 @@ namespace JellyEmu.Services
                         const hash = window.location.hash;
                         if (hash.startsWith(JELLYEMU_PREFS_HASH))  { return; }
                         if (hash.startsWith(JELLYEMU_SAVES_HASH))  { hijackJellyEmuSavesBrowser(); return; }
+                        if (hash.startsWith(JELLYEMU_SETTINGS_HASH)) { hijackJellyEmuSettings(); return; }
                         const prefsMenu = document.getElementById('myPreferencesMenuPage');
                         if (prefsMenu && !prefsMenu.classList.contains('hide')) injectPrefsMenuEntry(prefsMenu);
                         // If landing directly on a detail page, find it and process it
@@ -927,6 +1029,9 @@ namespace JellyEmu.Services
                             if (cardId && window.ApiClient) {
                                 queueGetItem(cardId, function(item) {
                                     if (item && item.Tags && item.Tags.includes('JellyEmu')) {
+                                        currentItemIsGame = true;
+                                        cachedTags        = item.Tags;
+                                        cachedProviderIds = item.ProviderIds || {};
                                         applyGameCardTreatment(card);
                                     }
                                 });
@@ -1067,12 +1172,22 @@ namespace JellyEmu.Services
                             window.location.hash = JELLYEMU_SAVES_HASH + (userId ? '?userId=' + userId : '');
                         });
 
-                        // In Jellyfin 10.11 the page has three verticalSections:
-                        //   1. user settings (.verticalSection-extrabottompadding, no extra class)
-                        //   2. .adminSection
-                        //   3. .userSection (Sign Out)
-                        // We want to append into the first one (user settings),
-                        // before the Administration block.
+                        const settingsAnchor = document.createElement('a');
+                        settingsAnchor.className = 'emby-button jellyemu-prefs-entry listItem-border';
+                        settingsAnchor.href = JELLYEMU_SETTINGS_HASH;
+                        settingsAnchor.style.cssText = 'display:block; margin:0; padding:0;';
+                        settingsAnchor.innerHTML = `
+                            <div class="listItem">
+                                <span class="material-icons listItemIcon listItemIcon-transparent settings" aria-hidden="true"></span>
+                                <div class="listItemBody">
+                                    <div class="listItemBodyText">JellyEmu Settings</div>
+                                </div>
+                            </div>`;
+                        settingsAnchor.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            window.location.hash = JELLYEMU_SETTINGS_HASH;
+                        });
+
                         const adminSection = page.querySelector('.adminSection');
                         const userSection  = page.querySelector('.userSection');
                         const targetSection =
@@ -1080,10 +1195,178 @@ namespace JellyEmu.Services
                             || page.querySelector('.verticalSection')
                             || page.querySelector('.readOnlyContent')
                             || page;
-                        // DOM not ready yet — target section has no children, Jellyfin hasn't rendered
+
                         if (!targetSection.children.length) return false;
+                        targetSection.appendChild(settingsAnchor);
                         targetSection.appendChild(savesAnchor);
                         return true;
+                    }
+
+                    function hijackJellyEmuSettings() {
+                        const activePage = document.querySelector('.page:not(.hide):not(#myPreferencesMenuPage)');
+                        if (!activePage) return;
+
+                        if (activePage.hasAttribute('data-jellyemu-settings-hijacked')) {
+                            const headerTitle = document.querySelector('.skinHeader .pageTitle');
+                            if (headerTitle && headerTitle.textContent !== 'JellyEmu Settings') {
+                                headerTitle.textContent = 'JellyEmu Settings';
+                            }
+                            return;
+                        }
+
+                        activePage.setAttribute('data-jellyemu-settings-hijacked', '1');
+                        activePage.className = 'page libraryPage noSecondaryNavPage mainAnimatedPage';
+                        activePage.setAttribute('data-title', 'JellyEmu Settings');
+                        activePage.setAttribute('data-backbutton', 'true');
+
+                        document.title = 'JellyEmu Settings';
+                        const headerTitle = document.querySelector('.skinHeader .pageTitle');
+                        if (headerTitle) headerTitle.textContent = 'JellyEmu Settings';
+
+                        const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                        const token  = window.ApiClient ? window.ApiClient.accessToken() : '';
+
+                        activePage.innerHTML = `
+                            <style>
+                                .je-settings-container {
+                                    max-width: 600px;
+                                    margin: 0 auto;
+                                    padding: 40px 24px;
+                                    color: #fff;
+                                }
+                                .je-settings-section {
+                                    background: rgba(255,255,255,0.05);
+                                    border: 1px solid rgba(255,255,255,0.08);
+                                    border-radius: 12px;
+                                    padding: 24px;
+                                    margin-bottom: 24px;
+                                }
+                                .je-settings-title {
+                                    font-size: 1.4rem;
+                                    font-weight: 600;
+                                    margin-bottom: 16px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 10px;
+                                }
+                                .je-settings-field {
+                                    margin-bottom: 20px;
+                                }
+                                .je-settings-label {
+                                    display: block;
+                                    font-size: 0.9rem;
+                                    color: rgba(255,255,255,0.6);
+                                    margin-bottom: 8px;
+                                }
+                                .je-settings-input {
+                                    width: 100%;
+                                    background: rgba(0,0,0,0.3);
+                                    border: 1px solid rgba(255,255,255,0.1);
+                                    border-radius: 6px;
+                                    padding: 10px 12px;
+                                    color: #fff;
+                                    font-size: 1rem;
+                                    outline: none;
+                                    transition: border-color 0.2s;
+                                }
+                                .je-settings-input:focus {
+                                    border-color: #00a4dc;
+                                }
+                                .je-settings-btn-save {
+                                    background: #00a4dc;
+                                    color: #fff;
+                                    border: none;
+                                    border-radius: 6px;
+                                    padding: 12px 24px;
+                                    font-size: 1rem;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                    transition: background 0.2s;
+                                    width: 100%;
+                                }
+                                .je-settings-btn-save:hover {
+                                    background: #00b4ec;
+                                }
+                                .je-settings-btn-save:disabled {
+                                    background: rgba(255,255,255,0.1);
+                                    cursor: not-allowed;
+                                }
+                                .je-settings-footer {
+                                    font-size: 0.8rem;
+                                    color: rgba(255,255,255,0.4);
+                                    text-align: center;
+                                    margin-top: 16px;
+                                }
+                            </style>
+                            <div class="je-settings-container">
+                                <div class="je-settings-section">
+                                    <div class="je-settings-title">
+                                        <span class="material-icons" style="color:#f0c040">emoji_events</span>
+                                        RetroAchievements
+                                    </div>
+                                    <div class="je-settings-field">
+                                        <label class="je-settings-label">Username</label>
+                                        <input type="text" id="je-ra-user" class="je-settings-input" placeholder="Enter RA Username">
+                                    </div>
+                                    <div class="je-settings-field">
+                                        <label class="je-settings-label">Web API Key</label>
+                                        <input type="password" id="je-ra-key" class="je-settings-input" placeholder="Enter RA API Key">
+                                        <div class="je-settings-footer">Get your key from <a href="https://retroachievements.org/settings" target="_blank" style="color:#00a4dc">retroachievements.org/settings</a></div>
+                                    </div>
+                                    <button id="je-settings-save" class="je-settings-btn-save">Save Credentials</button>
+                                </div>
+                            </div>`;
+
+                        if (!userId) {
+                            activePage.querySelector('.je-settings-container').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">Please sign in to manage settings.</div>';
+                            return;
+                        }
+
+                        const userInp = activePage.querySelector('#je-ra-user');
+                        const keyInp  = activePage.querySelector('#je-ra-key');
+                        const saveBtn = activePage.querySelector('#je-settings-save');
+
+                        // Fetch current
+                        fetch('/jellyemu/retroachievements/' + userId, {
+                            headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
+                        })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(data => {
+                            if (data) {
+                                userInp.value = data.raUsername || '';
+                                keyInp.value  = data.raApiKey   || '';
+                            }
+                        });
+
+                        saveBtn.addEventListener('click', function() {
+                            saveBtn.disabled = true;
+                            saveBtn.textContent = 'Saving...';
+
+                            fetch('/jellyemu/retroachievements/' + userId, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'MediaBrowser Token="' + token + '"'
+                                },
+                                body: JSON.stringify({
+                                    raUsername: userInp.value,
+                                    raApiKey: keyInp.value
+                                })
+                            })
+                            .then(r => r.ok ? r.json() : Promise.reject())
+                            .then(() => {
+                                saveBtn.textContent = 'Saved!';
+                                setTimeout(() => {
+                                    saveBtn.disabled = false;
+                                    saveBtn.textContent = 'Save Credentials';
+                                }, 2000);
+                            })
+                            .catch(() => {
+                                alert('Failed to save credentials.');
+                                saveBtn.disabled = false;
+                                saveBtn.textContent = 'Save Credentials';
+                            });
+                        });
                     }
 
 
