@@ -4,6 +4,8 @@ using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MediaBrowser.Model.Entities;
+using System.Security.Cryptography;
+using System.IO;
 
 namespace JellyEmu.Controllers
 {
@@ -51,10 +53,12 @@ namespace JellyEmu.Controllers
             string Shader,
             int VideoRotation,
             string Controls,
-            string ControllerControls);
+            string ControllerControls,
+            string RaUsername,
+            string RaApiKey);
 
         protected static readonly UserFullPrefs DefaultFullPrefs =
-            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty);
+            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty);
 
         /// <summary>
         /// Maps Jellyfin console tag names to EmulatorJS core identifiers.
@@ -256,7 +260,9 @@ namespace JellyEmu.Controllers
                     Shader:             Str("shader",             DefaultFullPrefs.Shader),
                     VideoRotation:      Int("videoRotation",      DefaultFullPrefs.VideoRotation),
                     Controls:           Str("controls",           DefaultFullPrefs.Controls),
-                    ControllerControls: Str("controllerControls", DefaultFullPrefs.ControllerControls));
+                    ControllerControls: Str("controllerControls", DefaultFullPrefs.ControllerControls),
+                    RaUsername:         Str("raUsername",         DefaultFullPrefs.RaUsername),
+                    RaApiKey:           Str("raApiKey",           DefaultFullPrefs.RaApiKey));
             }
             catch (Exception ex)
             {
@@ -264,7 +270,7 @@ namespace JellyEmu.Controllers
                 return DefaultFullPrefs;
             }
         }
-
+ 
         protected void WriteFullPrefs(string userId, UserFullPrefs prefs)
         {
             var path = GetPrefsFilePath(userId);
@@ -279,6 +285,8 @@ namespace JellyEmu.Controllers
                 videoRotation      = prefs.VideoRotation,
                 controls           = prefs.Controls,
                 controllerControls = prefs.ControllerControls,
+                raUsername         = prefs.RaUsername,
+                raApiKey           = prefs.RaApiKey
             }));
         }
 
@@ -399,6 +407,11 @@ namespace JellyEmu.Controllers
                 return item?.GetProviderId("Romm");
             }
             catch { return null; }
+        }
+
+        protected string GetFileHash(string path)
+        {
+            return RomExtensions.GetFileHash(path);
         }
     }
 }

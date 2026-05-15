@@ -12,33 +12,42 @@ namespace JellyEmu
             new(StringComparer.OrdinalIgnoreCase)
             {
                 { "usa", "USA" }, { "us", "USA" }, { "ntsc-u", "USA" }, { "u", "USA" }, { "america", "USA" }, { "north america", "USA" },
-                { "europe", "Europe" }, { "eur", "Europe" }, { "pal", "Europe" }, { "e", "Europe" },
+                { "europe", "Europe" }, { "eur", "Europe" }, { "pal", "Europe" }, { "e", "Europe" }, { "eu", "Europe" }, { "uk", "Europe" },
                 { "japan", "Japan" }, { "jpn", "Japan" }, { "jp", "Japan" }, { "j", "Japan" }, { "ntsc-j", "Japan" },
                 { "world", "World" }, { "w", "World" },
-                { "australia", "Australia" }, { "aus", "Australia" }, { "brazil", "Brazil" }, { "bra", "Brazil" },
-                { "canada", "Canada" }, { "can", "Canada" }, { "china", "China" }, { "chn", "China" },
-                { "france", "France" }, { "fra", "France" }, { "f", "France" }, { "germany", "Germany" },
-                { "ger", "Germany" }, { "deu", "Germany" }, { "italy", "Italy" }, { "ita", "Italy" },
-                { "korea", "Korea" }, { "kor", "Korea" }, { "k", "Korea" }, { "netherlands", "Netherlands" },
-                { "ned", "Netherlands" }, { "russia", "Russia" }, { "rus", "Russia" }, { "spain", "Spain" },
-                { "spa", "Spain" }, { "esp", "Spain" }, { "sweden", "Sweden" }, { "swe", "Sweden" },
+                { "australia", "Australia" }, { "aus", "Australia" }, { "brazil", "Brazil" }, { "bra", "Brazil" }, { "br", "Brazil" },
+                { "canada", "Canada" }, { "can", "Canada" }, { "china", "China" }, { "chn", "China" }, { "cn", "China" },
+                { "france", "France" }, { "fra", "France" }, { "f", "France" }, { "fr", "France" }, { "germany", "Germany" },
+                { "ger", "Germany" }, { "deu", "Germany" }, { "de", "Germany" }, { "italy", "Italy" }, { "ita", "Italy" }, { "it", "Italy" },
+                { "korea", "Korea" }, { "kor", "Korea" }, { "k", "Korea" }, { "kr", "Korea" }, { "netherlands", "Netherlands" },
+                { "ned", "Netherlands" }, { "nl", "Netherlands" }, { "russia", "Russia" }, { "rus", "Russia" }, { "ru", "Russia" }, { "spain", "Spain" },
+                { "spa", "Spain" }, { "esp", "Spain" }, { "es", "Spain" }, { "sweden", "Sweden" }, { "swe", "Sweden" },
                 { "asia", "Asia" }, { "scandinavia", "Scandinavia" },
                 { "unlicensed", "Unlicensed" }, { "unl", "Unlicensed" }, { "proto", "Prototype" },
                 { "prototype", "Prototype" }, { "demo", "Demo" }, { "sample", "Sample" },
             };
 
-        public static string? ResolveRegion(string? path)
+        public static IEnumerable<string> ResolveRegions(string? path)
         {
-            if (string.IsNullOrEmpty(path)) return null;
+            var regions = new List<string>();
+            if (string.IsNullOrEmpty(path)) return regions;
             var fileName = Path.GetFileNameWithoutExtension(path) ?? string.Empty;
             foreach (Match m in TokenRegex.Matches(fileName))
             {
                 var inner = m.Groups[1].Value.Trim();
                 foreach (var part in inner.Split(',', StringSplitOptions.TrimEntries))
-                    if (RegionAliases.TryGetValue(part, out var region)) return region;
+                {
+                    if (RegionAliases.TryGetValue(part, out var region))
+                    {
+                        if (!regions.Contains(region)) regions.Add(region);
+                    }
+                }
             }
-            return null;
+            return regions;
         }
+
+        [Obsolete("Use ResolveRegions instead")]
+        public static string? ResolveRegion(string? path) => ResolveRegions(path).FirstOrDefault();
 
         private static readonly Regex DiscTokenRegex = new(
             @"(?:[\[\(]\s*dis[ck]\s*([1-9IVX]{1,4})\s*[\]\)]|(?<![a-zA-Z])dis[ck]\s*([1-9IVX]{1,4})(?![a-zA-Z0-9]))",

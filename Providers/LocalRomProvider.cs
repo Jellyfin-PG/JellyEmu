@@ -34,9 +34,8 @@ namespace JellyEmu.Providers
                 if (File.Exists(nfoPath))
                 {
                     var nfoTags = new List<string> { "JellyEmu", "Game", _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path)) };
-                    var nfoRegion = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                    nfoTags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
                     var nfoDisc = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
-                    if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
                     if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
 
                     var item = new Book { Tags = nfoTags.ToArray() };
@@ -100,6 +99,22 @@ namespace JellyEmu.Providers
                 }
             }
 
+            if (!string.IsNullOrEmpty(info.Path) && RomExtensions.IsRomPath(info.Path))
+            {
+                try
+                {
+                    var hash = RomExtensions.GetFileHash(info.Path);
+                    if (result.Item == null) result.Item = new Book();
+                    result.Item.SetProviderId("MD5", hash);
+                    _logger.LogInformation("[JellyEmu] MD5 for {Path}: {Hash}", info.Path, hash);
+                    result.HasMetadata = true;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[JellyEmu] Failed to calculate MD5 for {Path}", info.Path);
+                }
+            }
+
             return Task.FromResult(result);
         }
 
@@ -144,5 +159,14 @@ namespace JellyEmu.Providers
             }
             return Task.FromResult<HttpResponseMessage>(null!);
         }
+    }
+
+    public class LocalRomExternalId : IExternalId
+    {
+        public string ProviderName => "MD5";
+        public string Key => "MD5";
+        public ExternalIdMediaType? Type => null;
+        public bool Supports(IHasProviderIds item) 
+            => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
     }
 }

@@ -27,7 +27,7 @@ namespace JellyEmu
         public override Guid Id => Guid.Parse("9bab105e-9af0-4e25-a87d-876713b60962");
 
         public static Plugin? Instance { get; private set; }
-
+ 
         public IEnumerable<PluginPageInfo> GetPages() => new[]
         {
             new PluginPageInfo
@@ -59,6 +59,11 @@ namespace JellyEmu
         /// RAWG API Key. Get yours at https://rawg.io/apidocs
         /// </summary>
         public string RawgApiKey { get; set; } = string.Empty;
+
+        /// <summary>
+        /// SteamGridDB API Key. Get yours at https://www.steamgriddb.com/profile/api
+        /// </summary>
+        public string SteamGridDbApiKey { get; set; } = string.Empty;
 
         public string NetplayServer { get; set; } = string.Empty;
 

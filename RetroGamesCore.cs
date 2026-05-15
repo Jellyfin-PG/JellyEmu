@@ -30,7 +30,7 @@ namespace JellyEmu
                         var cuePath     = cueFiles[0];
                         var binPath     = CueParser.GetFirstBinPath(cueFiles[0]);
                         var consoleTag  = _platformResolver.Resolve(cuePath);
-                        var regionTag   = PlatformResolver.ResolveRegion(cuePath);
+                        var regionTag   = PlatformResolver.ResolveRegions(cuePath).FirstOrDefault();
                         
                         var displayName = PlatformResolver.CleanDisplayName(
                             Path.GetFileName(args.Path));
@@ -75,7 +75,7 @@ namespace JellyEmu
                 }
 
                 var consoleTag  = _platformResolver.Resolve(args.Path);
-                var regionTag   = PlatformResolver.ResolveRegion(args.Path);
+                var regionTag   = PlatformResolver.ResolveRegions(args.Path).FirstOrDefault();
                 var displayName = PlatformResolver.CleanDisplayName(
                     Path.GetFileNameWithoutExtension(args.Path) ?? string.Empty);
 

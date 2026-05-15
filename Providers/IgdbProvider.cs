@@ -131,7 +131,6 @@ namespace JellyEmu.Providers
             var results = new List<RemoteSearchResult>();
             if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
 
-            // If the user supplied an IGDB id directly, do a direct lookup instead of name search
             searchInfo.ProviderIds.TryGetValue("IGDB", out var directId);
             if (string.IsNullOrEmpty(directId))
                 directId = TryExtractEmbeddedIgdbId(searchInfo.Path);
@@ -179,7 +178,7 @@ namespace JellyEmu.Providers
                     }
                 }
                 catch { }
-                return results; // empty, direct lookup failed
+                return results;
             }
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
@@ -277,11 +276,10 @@ namespace JellyEmu.Providers
                             slug = slugEl.GetString() ?? slug;
 
                         var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
-                        var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
                         var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                         var tags = new List<string> { "JellyEmu", "Game", consoleTag };
-                        if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                        tags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
                         if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
 
                         var item = new Book

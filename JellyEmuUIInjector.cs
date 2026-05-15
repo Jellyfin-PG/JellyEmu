@@ -360,7 +360,7 @@ namespace JellyEmu.Services
 
                         perf.mark('inject-misc-start');
 
-                        const systemTags = cachedTags.filter(t => t !== 'Game' && !knownRegions.has(t) && !isDiscTag(t));
+                        const systemTags = cachedTags.filter(t => t !== 'Game' && t !== 'JellyEmu' && !knownRegions.has(t) && !isDiscTag(t));
                         const regionTags = cachedTags.filter(t => knownRegions.has(t));
                         const discTags   = cachedTags.filter(t => isDiscTag(t));
                         const allTags    = [...systemTags, ...regionTags, ...discTags];
@@ -448,6 +448,54 @@ namespace JellyEmu.Services
                                 .catch(() => {});
                         }
 
+                        // RetroAchievements progress pill
+                        if (userId && itemId && !wrap.querySelector('.jellyemu-ra-pill')) {
+                            fetch('/jellyemu/meta/achievements/' + itemId + '/' + userId)
+                                .then(r => {
+                                    if (r.status === 401) return { error: 'unauthorized' };
+                                    return r.ok ? r.json() : null;
+                                })
+                                .then(data => {
+                                    if (!data) return;
+                                    const pill = document.createElement('div');
+                                    pill.className = 'mediaInfoItem jellyemu-ra-pill';
+                                    pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;';
+                                    
+                                    if (data.error === 'unauthorized') {
+                                        pill.title = 'Click to connect RetroAchievements';
+                                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:rgba(255,255,255,0.4);">emoji_events</span>Connect RA';
+                                        pill.onclick = (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const user = prompt('Enter RetroAchievements Username:');
+                                            if (!user) return;
+                                            const key = prompt('Enter RetroAchievements API Key (Get it from retroachievements.org settings):');
+                                            if (!key) return;
+                                            fetch('/jellyemu/prefs/' + userId, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ raUsername: user, raApiKey: key })
+                                            }).then(() => location.reload());
+                                        };
+                                    } else {
+                                        pill.title = 'RetroAchievements: ' + data.numUnlocked + ' / ' + data.numTotal + ' unlocked';
+                                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#f0c040;">emoji_events</span>' + 
+                                            data.numUnlocked + '/' + data.numTotal;
+                                        pill.onclick = () => window.open(data.raGameUrl, '_blank');
+                                        
+                                        // Add a percentage bar if there are achievements
+                                        if (data.numTotal > 0) {
+                                            const bar = document.createElement('div');
+                                            bar.style.cssText = 'width:32px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;margin-left:2px;';
+                                            bar.innerHTML = '<div style="width:' + data.progressPercent + '%;height:100%;background:#f0c040;"></div>';
+                                            pill.appendChild(bar);
+                                        }
+                                    }
+                                    wrap.appendChild(pill);
+                                })
+                                .catch(() => {});
+                        }
+
                         // Unsupported / Unknown platform pill
                         if (!wrap.querySelector('.jellyemu-platform-status-pill')) {
                             const unknownTag  = cachedTags.includes('Unknown');
@@ -466,6 +514,7 @@ namespace JellyEmu.Services
                                 wrap.appendChild(pill);
                             }
                         }
+
                         perf.mark('inject-misc-end');
                         perf.measure('inject-misc', 'inject-misc-start', 'inject-misc-end');
                     }
@@ -784,7 +833,7 @@ namespace JellyEmu.Services
                                         const badgeWrap = document.createElement('div');
                                         badgeWrap.className = 'jellyemu-card-badge-wrap';
                                         badgeWrap.style.cssText = 'position:absolute;bottom:4px;left:4px;display:flex;gap:3px;flex-wrap:wrap;z-index:2;pointer-events:none;';
-                                        item.Tags.filter(t => t !== 'JellyEmu').forEach(function(tag) {
+                                        item.Tags.filter(t => t !== 'JellyEmu' && t !== 'Game').forEach(function(tag) {
                                             const badge = document.createElement('span');
                                             const isRegion      = knownRegions.has(tag);
                                             const isDisc        = isDiscTag(tag);
