@@ -4,6 +4,7 @@ using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
 using Microsoft.Extensions.Logging;
+using JellyEmu.Services;
 
 namespace JellyEmu.Providers
 {
@@ -12,15 +13,18 @@ namespace JellyEmu.Providers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<HasheousProvider> _logger;
         private readonly PlatformResolver _platformResolver;
+        private readonly IgdbClientService _igdbClientService;
 
         public HasheousProvider(
             IHttpClientFactory httpClientFactory, 
             ILogger<HasheousProvider> logger,
-            PlatformResolver platformResolver)
+            PlatformResolver platformResolver,
+            IgdbClientService igdbClientService)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
             _platformResolver = platformResolver;
+            _igdbClientService = igdbClientService;
         }
 
         private static string? TryExtractEmbeddedHasheousId(string? path)
@@ -202,7 +206,44 @@ namespace JellyEmu.Providers
                             if (!string.IsNullOrEmpty(source) && !string.IsNullOrEmpty(val))
                             {
                                 if (source.Equals("IGDB", StringComparison.OrdinalIgnoreCase))
+                                {
                                     result.Item.SetProviderId("IGDB", val);
+
+                                    try
+                                    {
+                                        var igdbClient = await _igdbClientService.GetIgdbClientAsync(cancellationToken).ConfigureAwait(false);
+                                        var ttbContent = new StringContent($"where game_id = {val}; fields normally,hastily,completely; limit 1;", System.Text.Encoding.UTF8, "text/plain");
+                                        var ttbResponse = await igdbClient.PostAsync("https://api.igdb.com/v4/game_time_to_beats", ttbContent, cancellationToken).ConfigureAwait(false);
+                                        
+                                        if (ttbResponse.IsSuccessStatusCode)
+                                        {
+                                            using var ttbDoc = JsonDocument.Parse(await ttbResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                                            if (ttbDoc.RootElement.GetArrayLength() > 0)
+                                            {
+                                                var ttb = ttbDoc.RootElement[0];
+                                                var codes = new List<string>();
+                                                
+                                                if (ttb.TryGetProperty("normally", out var norm) && norm.ValueKind == JsonValueKind.Number && norm.GetInt32() > 0)
+                                                    codes.Add($"M{norm.GetInt32() / 3600}");
+                                                
+                                                if (ttb.TryGetProperty("hastily", out var haste) && haste.ValueKind == JsonValueKind.Number && haste.GetInt32() > 0)
+                                                    codes.Add($"H{haste.GetInt32() / 3600}");
+                                                
+                                                if (ttb.TryGetProperty("completely", out var comp) && comp.ValueKind == JsonValueKind.Number && comp.GetInt32() > 0)
+                                                    codes.Add($"C{comp.GetInt32() / 3600}");
+
+                                                if (codes.Count > 0)
+                                                {
+                                                    result.Item.SetProviderId("IgdbTTB", string.Join(",", codes));
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.LogWarning(ex, "[JellyEmu] Failed to fetch IGDB Time to Beat for Hasheous item {Id}", val);
+                                    }
+                                }
                                 else if (source.Equals("TheGamesDb", StringComparison.OrdinalIgnoreCase))
                                     result.Item.SetProviderId("TheGamesDb", val);
                                 else if (source.Equals("RetroAchievements", StringComparison.OrdinalIgnoreCase))

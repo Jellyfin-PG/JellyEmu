@@ -403,6 +403,7 @@ namespace JellyEmu.Services
                     }
 
                     let cachedTags = [];
+                    let cachedProviderIds = {};
 
                     function injectMiscInfo(page) {
                         page = page || getVisibleDetailPage();
@@ -431,6 +432,30 @@ namespace JellyEmu.Services
                             div.textContent = tag;
                             wrap.appendChild(div);
                         });
+
+                        // Time to Beat premium pill
+                        const ttbRaw = cachedProviderIds.IgdbTTB;
+                        if (ttbRaw && !wrap.querySelector('.jellyemu-ttb-pill')) {
+                            const data = ttbRaw.split(',');
+                            const map = {};
+                            data.forEach(d => map[d[0]] = d.substring(1));
+                            
+                            const pill = document.createElement('div');
+                            pill.className = 'mediaInfoItem jellyemu-ttb-pill';
+                            pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
+                            
+                            let title = 'Time to Beat: ';
+                            let labels = [];
+                            if (map.M) { labels.push(map.M + 'h'); title += 'Main: ' + map.M + 'h '; }
+                            if (map.H) { labels.push(map.H + 'h'); title += 'Main+Extras: ' + map.H + 'h '; }
+                            if (map.C) { labels.push(map.C + 'h'); title += 'Completionist: ' + map.C + 'h '; }
+                            
+                            pill.title = title.trim();
+                            pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:rgba(255,255,255,0.7);">hourglass_full</span>' + 
+                                labels.join(' \u2022 ');
+                            
+                            wrap.appendChild(pill);
+                        }
 
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
                         const itemId = currentItemId;
@@ -630,9 +655,8 @@ namespace JellyEmu.Services
                         perf.mark('details-start:' + id);
                         currentItemIsGame = false;
                         cachedTags        = [];
+                        cachedProviderIds = {};
 
-                        // page is passed from viewshow — use it directly rather than
-                        // querying getVisibleDetailPage() which may not find it yet
                         const visiblePage = page || getVisibleDetailPage();
                         const allDetailPages = document.querySelectorAll('.itemDetailPage');
                         allDetailPages.forEach(p => p.classList.remove('jellyemu-game-page'));
@@ -645,6 +669,7 @@ namespace JellyEmu.Services
                                 perf.mark('details-fast-path:' + id);
                                 currentItemIsGame = true;
                                 cachedTags        = tags;
+                                cachedProviderIds = {};
                                 injectAll(visiblePage);
                             }
                         }
@@ -656,11 +681,9 @@ namespace JellyEmu.Services
                             if (item && item.Tags && item.Tags.includes('JellyEmu')) {
                                 currentItemIsGame = true;
                                 cachedTags        = item.Tags;
-                                // Poll until .itemMiscInfo-primary exists, then inject once.
-                                // This resolves all timing races between getItem and DOM render.
+                                cachedProviderIds = item.ProviderIds || {};
                                 var _pollAttempts = 0;
                                 var _pollId = setInterval(function() {
-                                    // Stop if we've navigated to a different item
                                     if (currentItemId !== id) { clearInterval(_pollId); return; }
                                     var p = visiblePage || getVisibleDetailPage();
                                     if (!p) { if (++_pollAttempts > 20) clearInterval(_pollId); return; }
@@ -672,6 +695,7 @@ namespace JellyEmu.Services
                             } else {
                                 currentItemIsGame = false;
                                 cachedTags        = [];
+                                cachedProviderIds = {};
                                 if (visiblePage) visiblePage.classList.remove('jellyemu-game-page');
                             }
                             perf.mark('details-end:' + id);
@@ -741,6 +765,7 @@ namespace JellyEmu.Services
                             if (currentItemId === id) return;
                             currentItemId     = id;
                             currentItemIsGame = false;
+                            cachedProviderIds = {};
                             processItemDetails(id, page);
                             return;
                         }
@@ -750,6 +775,7 @@ namespace JellyEmu.Services
                         _detailObserverDisconnect();
                         currentItemId     = null;
                         currentItemIsGame = false;
+                        cachedProviderIds = {};
                         page.querySelectorAll('.card').forEach(scheduleCardProcess);
                     }
 
@@ -1003,6 +1029,9 @@ namespace JellyEmu.Services
                             if (cardId && window.ApiClient) {
                                 queueGetItem(cardId, function(item) {
                                     if (item && item.Tags && item.Tags.includes('JellyEmu')) {
+                                        currentItemIsGame = true;
+                                        cachedTags        = item.Tags;
+                                        cachedProviderIds = item.ProviderIds || {};
                                         applyGameCardTreatment(card);
                                     }
                                 });
