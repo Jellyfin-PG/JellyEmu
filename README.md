@@ -62,12 +62,13 @@ This guide details the process for integrating an emulation collection into Jell
 ---
 
 ## 1. Plugin Configuration
-Before adding your media, you must configure the plugin to communicate with external game databases.
+Before adding your media, you should configure the plugin to communicate with external game databases.
 
 * Navigate to **Dashboard** and select **Plugins**.
 * Locate and select the **Emulator Library** configuration page.
 * Input your **IGDB API Key** (Client ID and Client Secret).
 * Input your **RAWG API Key**.
+* Input your **SteamDBGrid API Key**.
 * Save your changes. This ensures the metadata providers are authenticated and ready to fetch game data.
 
 ---
@@ -258,6 +259,8 @@ You can force JellyEmu to link the ROM to a specific database entry by adding a 
 | **IGDB** | [igdb-9102] |
 | **Wikipedia** | [wiki-8482] |
 | **LexalOffle** | [loid-819821] |
+| **Hasheous** | [hash-235694] |
+| **SteamDBGrid** | [sdbg-34084] |
 
 **Examples:**
 * `Doom [igdb-1039].iso` ➔ Forces the IGDB entry for the 1993 original, rather than the 2016 reboot.
