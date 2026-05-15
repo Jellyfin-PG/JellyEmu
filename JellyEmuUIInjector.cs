@@ -29,7 +29,8 @@ namespace JellyEmu.Services
                 var injection = """
                 <style data-jellyemu-mods="1">
 
-                  #jellyemu-play-btn {
+                  #jellyemu-play-btn,
+                  #jellyemu-vantage-btn {
                       display: flex !important;
                       align-items: center !important;
                       justify-content: center !important;
@@ -45,12 +46,14 @@ namespace JellyEmu.Services
                       transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease !important;
                       transform: scale(1);
                   }
-                  #jellyemu-play-btn:hover {
+                  #jellyemu-play-btn:hover,
+                  #jellyemu-vantage-btn:hover {
                       transform: scale(1.18) !important;
                       background: rgba(255,255,255,0.25) !important;
                       color: #00a4dc !important;
                   }
-                  #jellyemu-play-btn .detailButton-content {
+                  #jellyemu-play-btn .detailButton-content,
+                  #jellyemu-vantage-btn .detailButton-content {
                       display: flex !important;
                       align-items: center !important;
                       justify-content: center !important;
@@ -246,8 +249,14 @@ namespace JellyEmu.Services
                     }
 
                     function dismissActionSheet(sheetRoot) {
+                        const container = document.querySelector('.dialogContainer');
+                        const backdrop = document.querySelector('.dialogBackdrop');
+                        
+                        if (container) container.remove();
+                        if (backdrop) backdrop.remove();
+
                         var dialog = sheetRoot.closest('.dialog') || sheetRoot.closest('[data-history]') || sheetRoot.parentElement;
-                        if (dialog) dialog.remove();
+                        if (dialog && dialog.parentNode) dialog.remove();
                     }
 
                     window.addEventListener('message', function(e) {
@@ -339,6 +348,57 @@ namespace JellyEmu.Services
                         const playFromHereBtn = sheetRoot.querySelector('button[data-id="playallfromhere"]');
                         if (playFromHereBtn) {
                             playFromHereBtn.style.display = 'none';
+                        }
+
+                        if (!sheetRoot.querySelector('button[data-jellyemu-vantage]')) {
+                            const sourceCard = document.querySelector('.card[data-id="' + itemId + '"]');
+                            const tags = sourceCard && sourceCard.getAttribute('data-jellyemu-tags')
+                                ? sourceCard.getAttribute('data-jellyemu-tags').split(',')
+                                : null;
+
+                            if (tags && tags.includes('JellyEmu')) {
+                                const vantageBtn = document.createElement('button');
+                                vantageBtn.type = 'button';
+                                vantageBtn.setAttribute('data-jellyemu-vantage', '1');
+                                
+                                const playBtn = sheetRoot.querySelector('button[data-id="resume"]');
+                                if (playBtn) {
+                                    vantageBtn.className = playBtn.className;
+                                } else {
+                                    vantageBtn.className = 'actionSheetMenuItem emby-button';
+                                }
+
+                                vantageBtn.innerHTML = playBtn ? playBtn.innerHTML : '<i class="md-icon actionSheetItemIcon">open_in_new</i><div class="actionSheetItemText">Open in Vantage</div>';
+                                
+                                const icon = vantageBtn.querySelector('.actionSheetItemIcon');
+                                if (icon) {
+                                    icon.textContent = 'open_in_new';
+                                    icon.style.color = '';
+                                }
+                                
+                                const text = vantageBtn.querySelector('.actionSheetItemText');
+                                if (text) {
+                                    text.textContent = 'Open in Vantage';
+                                }
+                                vantageBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopImmediatePropagation();
+                                    
+                                    dismissActionSheet(sheetRoot);
+                                    
+                                    window.location.href = 'vantage://launch?itemId=' + itemId;
+                                }, true);
+                                
+                                const scroller = sheetRoot.querySelector('.actionSheetScroller');
+                                
+                                if (playBtn && playBtn.nextSibling) {
+                                    playBtn.parentNode.insertBefore(vantageBtn, playBtn.nextSibling);
+                                } else if (scroller) {
+                                    scroller.insertBefore(vantageBtn, scroller.firstChild);
+                                } else {
+                                    sheetRoot.appendChild(vantageBtn);
+                                }
+                            }
                         }
                     }
 
@@ -536,6 +596,23 @@ namespace JellyEmu.Services
                         });
 
                         detailButtonsContainer.insertBefore(btn, detailButtonsContainer.firstChild);
+
+                        if (currentItemId && !detailButtonsContainer.querySelector('#jellyemu-vantage-btn')) {
+                            const vBtn = document.createElement('button');
+                            vBtn.type      = 'button';
+                            vBtn.id        = 'jellyemu-vantage-btn';
+                            vBtn.className = 'jellyemu-play-btn-detail';
+                            vBtn.title     = 'Open in Vantage';
+                            vBtn.style.marginLeft = '.5em';
+                            vBtn.innerHTML = '<div class="detailButton-content"><span class="material-icons detailButton-icon" aria-hidden="true">open_in_new</span></div>';
+                            vBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.location.href = 'vantage://launch?itemId=' + currentItemId;
+                            });
+                            detailButtonsContainer.insertBefore(vBtn, btn.nextSibling);
+                        }
+
                         perf.mark('inject-play-end');
                         perf.measure('inject-play', 'inject-play-start', 'inject-play-end');
                     }
