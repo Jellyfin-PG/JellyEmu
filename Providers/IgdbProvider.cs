@@ -276,11 +276,10 @@ namespace JellyEmu.Providers
                             slug = slugEl.GetString() ?? slug;
 
                         var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
-                        var regionTag = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
                         var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                         var tags = new List<string> { "JellyEmu", "Game", consoleTag };
-                        if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                        tags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
                         if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
 
                         var item = new Book

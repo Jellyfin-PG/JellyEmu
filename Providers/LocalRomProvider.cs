@@ -34,9 +34,8 @@ namespace JellyEmu.Providers
                 if (File.Exists(nfoPath))
                 {
                     var nfoTags = new List<string> { "JellyEmu", "Game", _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path)) };
-                    var nfoRegion = PlatformResolver.ResolveRegion(RomExtensions.EffectiveRomPath(info.Path));
+                    nfoTags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
                     var nfoDisc = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
-                    if (!string.IsNullOrEmpty(nfoRegion)) nfoTags.Add(nfoRegion);
                     if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
 
                     var item = new Book { Tags = nfoTags.ToArray() };
