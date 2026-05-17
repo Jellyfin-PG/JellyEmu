@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,7 @@ namespace JellyEmu.Controllers
     /// </summary>
     public class JellyEmuRomController : JellyEmuBaseController
     {
+        private readonly PlatformResolver _platformResolver;
 
         public JellyEmuRomController(
             ILibraryManager libraryManager,
@@ -22,9 +24,11 @@ namespace JellyEmu.Controllers
             ILogger<JellyEmuRomController> logger,
             JellyEmuEjsManager ejsManager,
             JellyEmuSessionService sessionService,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            PlatformResolver platformResolver)
             : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory)
         {
+            _platformResolver = platformResolver;
         }
 
         [HttpGet("/jellyemu/rom/{itemId}/{filename?}")]
@@ -77,6 +81,94 @@ namespace JellyEmu.Controllers
 
             var info = ResolveCoreInfo(item);
             return Ok(new { core = info.Core, needsThreads = info.NeedsThreads, launcher = info.Launcher });
+        }
+
+        /// <summary>
+        /// Returns the total number of scanned ROMs in the library (items with the tag JellyEmu).
+        /// Path: GET /jellyemu/roms/count/{userId}
+        /// </summary>
+        [HttpGet("/jellyemu/roms/count/{userId}")]
+        [Authorize]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public IActionResult GetRomCount(string userId)
+        {
+            if (!VerifyUser(userId)) return Forbid();
+
+            var query = new MediaBrowser.Controller.Entities.InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { Jellyfin.Data.Enums.BaseItemKind.Book },
+                Recursive = true,
+            };
+
+            var count = LibraryManager.GetItemList(query)
+                .Count(i => i.Tags != null && i.Tags.Contains("JellyEmu", StringComparer.OrdinalIgnoreCase));
+
+            return Ok(new { total = count, count = count, total_roms = count });
+        }
+
+        /// <summary>
+        /// Returns the list of system tags of all scanned ROMs, merged, with 1 entry per system.
+        /// Dynamically returns the total number of systems currently uploaded.
+        /// Path: GET /jellyemu/roms/systems/{userId}
+        /// </summary>
+        [HttpGet("/jellyemu/roms/systems/{userId}")]
+        [Authorize]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public IActionResult GetRomSystems(string userId)
+        {
+            if (!VerifyUser(userId)) return Forbid();
+
+            var query = new MediaBrowser.Controller.Entities.InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { Jellyfin.Data.Enums.BaseItemKind.Book },
+                Recursive = true,
+            };
+
+            var items = LibraryManager.GetItemList(query)
+                .Where(i => i.Tags != null && i.Tags.Contains("JellyEmu", StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            var knownSystems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var val in PlatformResolver.Aliases.Values)
+                knownSystems.Add(val);
+            foreach (var val in PlatformResolver.LibraryOnlyAliases.Values)
+                knownSystems.Add(val);
+            foreach (var key in CoreMap.Keys)
+                knownSystems.Add(key);
+
+            var systemsList = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items)
+            {
+                var resolved = _platformResolver.Resolve(item.Path);
+                if (!string.IsNullOrEmpty(resolved) && !string.Equals(resolved, "Unknown", StringComparison.OrdinalIgnoreCase))
+                {
+                    systemsList.Add(resolved);
+                }
+
+                if (item.Tags != null)
+                {
+                    foreach (var tag in item.Tags)
+                    {
+                        if (knownSystems.Contains(tag))
+                        {
+                            systemsList.Add(tag);
+                        }
+                    }
+                }
+            }
+
+            var sortedSystems = systemsList.OrderBy(s => s).ToList();
+
+            return Ok(new
+            {
+                systems = sortedSystems,
+                totalSystems = sortedSystems.Count,
+                count = sortedSystems.Count
+            });
         }
     }
 }

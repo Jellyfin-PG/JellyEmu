@@ -487,17 +487,23 @@ namespace JellyEmu.Services
                         }
 
                         if (userId && itemId && !wrap.querySelector('.jellyemu-playtime-pill')) {
-                            fetch('/jellyemu/playtime/' + itemId + '/' + userId)
+                            const token = window.ApiClient ? window.ApiClient.accessToken() : '';
+                            fetch('/jellyemu/playtime/' + itemId + '/' + userId, {
+                                headers: {
+                                    'Authorization': 'MediaBrowser Token="' + token + '"',
+                                    'Accept': 'application/json'
+                                }
+                            })
                                 .then(r => r.ok ? r.json() : null)
                                 .then(data => {
-                                    if (!data || !data.seconds) return;
+                                    if (!data || data.seconds === undefined) return;
                                     const pill = document.createElement('div');
                                     pill.className = 'mediaInfoItem jellyemu-playtime-pill';
                                     pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
                                     pill.title = data.seconds + ' seconds played';
                                     const h = Math.floor(data.seconds / 3600);
                                     const min = Math.floor((data.seconds % 3600) / 60);
-                                    const label = h > 0 ? h + 'h ' + min + 'm' : min > 0 ? min + 'm' : '<1m';
+                                    const label = data.seconds === 0 ? '0m' : h > 0 ? h + 'h ' + min + 'm' : min > 0 ? min + 'm' : '<1m';
                                     pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">schedule</span>' + label + ' played';
                                     wrap.appendChild(pill);
                                 })
@@ -535,7 +541,10 @@ namespace JellyEmu.Services
 
                         // RetroAchievements progress pill
                         if (userId && itemId && !wrap.querySelector('.jellyemu-ra-pill')) {
-                            fetch('/jellyemu/meta/achievements/' + itemId + '/' + userId)
+                            const token = window.ApiClient ? window.ApiClient.accessToken() : '';
+                            fetch('/jellyemu/retroachievements/progress/' + itemId + '/' + userId, {
+                                headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
+                            })
                                 .then(r => {
                                     if (r.status === 401) return { error: 'unauthorized' };
                                     return r.ok ? r.json() : null;
@@ -1393,6 +1402,7 @@ namespace JellyEmu.Services
                         if (headerTitle) headerTitle.textContent = 'Save State Browser';
 
                         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
+                        const token = window.ApiClient ? window.ApiClient.accessToken() : '';
 
                         activePage.innerHTML = `
                             <style>
@@ -1794,7 +1804,9 @@ namespace JellyEmu.Services
                         }
 
                         function reloadGrid() {
-                            fetch('/jellyemu/saves/' + userId)
+                            fetch('/jellyemu/saves/' + userId, {
+                                headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
+                            })
                             .then(r => r.ok ? r.json() : [])
                             .then(saves => {
                                 allSaves = saves;

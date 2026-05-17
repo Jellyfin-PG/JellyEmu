@@ -7,6 +7,7 @@ using MediaBrowser.Model.Entities;
 using System.Security.Cryptography;
 using System.IO;
 using System.Security.Claims;
+using Microsoft.Data.Sqlite;
 
 namespace JellyEmu.Controllers
 {
@@ -191,19 +192,128 @@ namespace JellyEmu.Controllers
             return Path.Combine(dir, "prefs.json");
         }
 
+        private static bool _dbInitialized = false;
+        private static readonly object _dbLock = new object();
+
+        protected void EnsureDatabaseCreated()
+        {
+            if (_dbInitialized) return;
+            lock (_dbLock)
+            {
+                if (_dbInitialized) return;
+
+                var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
+                var connectionString = $"Data Source={dbPath}";
+
+                try
+                {
+                    using (var connection = new SqliteConnection(connectionString))
+                    {
+                        connection.Open();
+                        using var createTableCommand = connection.CreateCommand();
+                        createTableCommand.CommandText =
+                            @"CREATE TABLE IF NOT EXISTS Playtime (
+                                UserId TEXT NOT NULL,
+                                ItemId TEXT NOT NULL,
+                                Seconds INTEGER NOT NULL,
+                                PRIMARY KEY (UserId, ItemId)
+                            );";
+                        createTableCommand.ExecuteNonQuery();
+                    }
+
+                    // Run migration for existing playtime.json files
+                    MigrateLegacyPlaytime(dbPath);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "[JellyEmu] Failed to initialize SQLite database or migrate legacy playtime.");
+                }
+
+                _dbInitialized = true;
+            }
+        }
+
+        private void MigrateLegacyPlaytime(string dbPath)
+        {
+            var savesDir = Path.Combine(AppPaths.DataPath, "jellyemu-saves");
+            if (!Directory.Exists(savesDir)) return;
+
+            var userDirs = Directory.GetDirectories(savesDir);
+            var connectionString = $"Data Source={dbPath}";
+
+            using var connection = new SqliteConnection(connectionString);
+            connection.Open();
+
+            foreach (var userDir in userDirs)
+            {
+                var userId = Path.GetFileName(userDir);
+                if (!Guid.TryParse(userId, out _)) continue;
+
+                var jsonPath = Path.Combine(userDir, "playtime.json");
+                if (System.IO.File.Exists(jsonPath))
+                {
+                    try
+                    {
+                        var json = System.IO.File.ReadAllText(jsonPath);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        
+                        using var transaction = connection.BeginTransaction();
+                        foreach (var prop in doc.RootElement.EnumerateObject())
+                        {
+                            var itemId = prop.Name;
+                            var seconds = prop.Value.GetInt64();
+
+                            using var insertCommand = connection.CreateCommand();
+                            insertCommand.Transaction = transaction;
+                            insertCommand.CommandText =
+                                @"INSERT INTO Playtime (UserId, ItemId, Seconds)
+                                  VALUES ($userId, $itemId, $seconds)
+                                  ON CONFLICT(UserId, ItemId) DO UPDATE SET
+                                    Seconds = Seconds + excluded.Seconds;";
+                            insertCommand.Parameters.AddWithValue("$userId", userId);
+                            insertCommand.Parameters.AddWithValue("$itemId", itemId);
+                            insertCommand.Parameters.AddWithValue("$seconds", seconds);
+                            insertCommand.ExecuteNonQuery();
+                        }
+                        transaction.Commit();
+
+                        // Rename legacy file to prevent re-migration
+                        var migratedPath = Path.Combine(userDir, "playtime.json.migrated");
+                        if (System.IO.File.Exists(migratedPath)) System.IO.File.Delete(migratedPath);
+                        System.IO.File.Move(jsonPath, migratedPath);
+
+                        Logger.LogInformation("[JellyEmu] Successfully migrated playtime.json to SQLite for user {UserId}", userId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "[JellyEmu] Failed to migrate playtime.json for user {UserId}", userId);
+                    }
+                }
+            }
+        }
+
         protected long ReadPlaytimeSeconds(string userId, string itemId)
         {
-            var path = GetPlaytimePath(userId);
-            if (!System.IO.File.Exists(path)) return 0;
+            EnsureDatabaseCreated();
+            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
+            var connectionString = $"Data Source={dbPath}";
+
             try
             {
-                var json = System.IO.File.ReadAllText(path);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                return doc.RootElement.TryGetProperty(itemId, out var v) ? v.GetInt64() : 0;
+                using var connection = new SqliteConnection(connectionString);
+                connection.Open();
+
+                using var selectCommand = connection.CreateCommand();
+                selectCommand.CommandText = "SELECT Seconds FROM Playtime WHERE UserId = $userId AND ItemId = $itemId LIMIT 1;";
+                selectCommand.Parameters.AddWithValue("$userId", userId);
+                selectCommand.Parameters.AddWithValue("$itemId", itemId);
+
+                var result = selectCommand.ExecuteScalar();
+                return result != null ? (long)result : 0;
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[JellyEmu] Failed to parse playtime for user {UserId}, defaulting to 0", userId);
+                Logger.LogError(ex, "[JellyEmu] Failed to read playtime from SQLite for user {UserId}, itemId {ItemId}", userId, itemId);
                 return 0;
             }
         }
@@ -211,24 +321,31 @@ namespace JellyEmu.Controllers
         protected void AddPlaytimeSeconds(string userId, string itemId, long seconds)
         {
             if (seconds <= 0) return;
-            var path = GetPlaytimePath(userId);
-            var dict = new Dictionary<string, long>(StringComparer.Ordinal);
-            if (System.IO.File.Exists(path))
+            EnsureDatabaseCreated();
+            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
+            var connectionString = $"Data Source={dbPath}";
+
+            try
             {
-                try
-                {
-                    var existing = System.IO.File.ReadAllText(path);
-                    using var doc = System.Text.Json.JsonDocument.Parse(existing);
-                    foreach (var prop in doc.RootElement.EnumerateObject())
-                        dict[prop.Name] = prop.Value.GetInt64();
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "[JellyEmu] Playtime file corrupt for user {UserId}. Starting fresh.", userId);
-                }
+                using var connection = new SqliteConnection(connectionString);
+                connection.Open();
+
+                using var insertCommand = connection.CreateCommand();
+                insertCommand.CommandText =
+                    @"INSERT INTO Playtime (UserId, ItemId, Seconds)
+                      VALUES ($userId, $itemId, $seconds)
+                      ON CONFLICT(UserId, ItemId) DO UPDATE SET
+                        Seconds = Seconds + excluded.Seconds;";
+                insertCommand.Parameters.AddWithValue("$userId", userId);
+                insertCommand.Parameters.AddWithValue("$itemId", itemId);
+                insertCommand.Parameters.AddWithValue("$seconds", seconds);
+
+                insertCommand.ExecuteNonQuery();
             }
-            dict[itemId] = (dict.TryGetValue(itemId, out var current) ? current : 0) + seconds;
-            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(dict));
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[JellyEmu] Failed to save/update playtime in SQLite for user {UserId}, itemId {ItemId}", userId, itemId);
+            }
         }
 
         protected UserPrefs ReadUserPrefs(string userId)

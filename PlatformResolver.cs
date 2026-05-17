@@ -106,7 +106,7 @@ namespace JellyEmu
                 // Sega Saturn
                 { "ss", "Sega Saturn"}, { "saturn", "Sega Saturn" }, { "sega saturn", "Sega Saturn" }, { "segasaturn", "Sega Saturn" },
                 // PlayStation
-                { "psx", "PlayStation" }, { "ps1", "PlayStation" }, { "playstation", "PlayStation" }, { "playstation 1", "PlayStation" }, { "ps one", "PlayStation" }, { "playstation1", "PlayStation" },
+                { "psx", "PlayStation" }, { "ps1", "PlayStation" }, { "playstation", "PlayStation" }, { "playstation 1", "PlayStation" }, { "ps one", "PlayStation" }, { "playstation1", "PlayStation" }, { "play station", "PlayStation" }, { "play station 1", "PlayStation" },
                 // Atari
                 { "atari 2600", "Atari 2600" }, { "2600", "Atari 2600" }, { "atari 7800", "Atari 7800" }, { "7800", "Atari 7800" },
                 { "lynx", "Atari Lynx" }, { "atari lynx", "Atari Lynx" }, { "jaguar", "Atari Jaguar" }, { "atari jaguar", "Atari Jaguar" },
@@ -124,7 +124,7 @@ namespace JellyEmu
                 { "arcade", "Arcade" }, { "fbneo", "Arcade" }, { "finalburn neo", "Arcade" }, { "neogeo", "Arcade" }, { "neo geo", "Arcade" },
                 { "mame", "MAME 2003" }, { "mame 2003", "MAME 2003" }, { "mame2003", "MAME 2003" },
                 // PSP
-                { "psp", "PSP" }, { "playstation portable", "PSP" },
+                { "psp", "PSP" }, { "playstation portable", "PSP" }, { "play station portable", "PSP" },
                 // 3DO
                 { "3do", "3DO" }, { "3do interactive multiplayer", "3DO" }, { "panasonic 3do", "3DO" },
                 // Atari 5200
@@ -157,14 +157,14 @@ namespace JellyEmu
             new(StringComparer.OrdinalIgnoreCase)
             {
                 { "dreamcast", "Dreamcast" }, { "dc", "Dreamcast" }, { "sega dreamcast", "Dreamcast" },
-                { "ps2", "PlayStation 2" }, { "playstation 2", "PlayStation 2" },
-                { "ps3", "PlayStation 3" }, { "playstation 3", "PlayStation 3" },
+                { "ps2", "PlayStation 2" }, { "playstation 2", "PlayStation 2" }, { "play station 2", "PlayStation 2" },
+                { "ps3", "PlayStation 3" }, { "playstation 3", "PlayStation 3" }, { "play station 3", "PlayStation 3" },
                 { "xbox", "Xbox" }, { "xbox 360", "Xbox 360" }, { "x360", "Xbox 360" },
                 { "gamecube", "GameCube" }, { "nintendo gamecube", "GameCube" }, { "gc", "GameCube" },
                 { "wii", "Wii" }, { "nintendo wii", "Wii" }, { "wii u", "Wii U" }, { "wiiu", "Wii U" },
                 { "switch", "Nintendo Switch" }, { "nintendo switch", "Nintendo Switch" },
                 { "3ds", "Nintendo 3DS" }, { "nintendo 3ds", "Nintendo 3DS" },
-                { "psvita", "PlayStation Vita" }, { "ps vita", "PlayStation Vita" },
+                { "psvita", "PlayStation Vita" }, { "ps vita", "PlayStation Vita" }, { "playstation vita", "PlayStation Vita" }, { "play station vita", "PlayStation Vita" },
             };
 
         private static readonly Dictionary<string, string> LibraryOnlyExtensions =
@@ -279,19 +279,40 @@ namespace JellyEmu
             if (string.IsNullOrEmpty(dirPath)) return null;
             var dir = new DirectoryInfo(dirPath);
 
+            var brandPrefixRegex = new Regex(@"^(?:sony|nintendo|sega|atari|nec|commodore|snk)\s+(?=\S)|^(?:sony|nintendo|sega|atari|nec|commodore|snk)\s*-\s*(?=\S)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
             for (int depth = 0; depth < 3 && dir != null; depth++, dir = dir.Parent)
             {
                 var folderName = dir.Name;
 
-                if (Aliases.TryGetValue(folderName, out var tag)) return tag;
-                if (LibraryOnlyAliases.TryGetValue(folderName, out var libTag)) return libTag;
+                var folderClean = brandPrefixRegex.Replace(folderName, "").Trim();
 
-                var folderCollapsed = Regex.Replace(folderName, @"\s+", "", RegexOptions.None);
+                if (Aliases.TryGetValue(folderClean, out var tag)) return tag;
+                if (LibraryOnlyAliases.TryGetValue(folderClean, out var libTag)) return libTag;
+
+                var folderCollapsed = Regex.Replace(folderClean, @"\s+", "", RegexOptions.None);
 
                 static string CollapseSpaces(string s) => Regex.Replace(s, @"\s+", "");
 
                 bool KeywordMatch(string folder, string folderCol, string aliasKey)
                 {
+                    if (string.Equals(aliasKey, "nintendo", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var specificNintendoKeys = new[] {
+                            "game boy", "gameboy", "gb", "gbc", "gba", "ds", "nds", "n64",
+                            "snes", "super nintendo", "super famicom", "virtual boy", "vb",
+                            "gamecube", "wii", "3ds", "switch"
+                        };
+                        foreach (var key in specificNintendoKeys)
+                        {
+                            if (folder.Contains(key, StringComparison.OrdinalIgnoreCase) ||
+                                folderCol.Contains(CollapseSpaces(key), StringComparison.OrdinalIgnoreCase))
+                            {
+                                return false;
+                            }
+                        }
+                    }
+
                     var idx = folder.IndexOf(aliasKey, StringComparison.OrdinalIgnoreCase);
                     if (idx >= 0)
                     {
@@ -316,13 +337,13 @@ namespace JellyEmu
                 foreach (var kvp in Aliases.OrderByDescending(k => k.Key.Length))
                 {
                     if (kvp.Key.Length <= 2) continue;
-                    if (KeywordMatch(folderName, folderCollapsed, kvp.Key)) return kvp.Value;
+                    if (KeywordMatch(folderClean, folderCollapsed, kvp.Key)) return kvp.Value;
                 }
 
                 foreach (var kvp in LibraryOnlyAliases.OrderByDescending(k => k.Key.Length))
                 {
                     if (kvp.Key.Length <= 2) continue;
-                    if (KeywordMatch(folderName, folderCollapsed, kvp.Key)) return kvp.Value;
+                    if (KeywordMatch(folderClean, folderCollapsed, kvp.Key)) return kvp.Value;
                 }
             }
             return null;

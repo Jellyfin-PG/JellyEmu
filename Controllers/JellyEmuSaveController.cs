@@ -79,11 +79,14 @@ namespace JellyEmu.Controllers
         /// Body: Raw binary save data.
         /// </summary>
         [HttpPost("/jellyemu/save/{itemId}/{userId}")]
+        [Authorize]
         [DisableRequestSizeLimit]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> PostSave(string itemId, string userId, [FromQuery] int? slot)
         {
+            if (!VerifyUser(userId)) return Forbid();
             if (Request.ContentLength is 0)
                 return BadRequest("Empty save body.");
 
@@ -130,12 +133,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public IActionResult DeleteSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            var authenticatedUserId = User.FindFirstValue("Jellyfin-UserId")
-                                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (!Guid.TryParse(authenticatedUserId, out var authGuid) ||
-                !Guid.TryParse(userId, out var targetGuid) ||
-                authGuid != targetGuid)
+            if (!VerifyUser(userId))
             {
                 Logger.LogWarning("[JellyEmu] Unauthorized delete attempt.");
                 return Forbid();
@@ -181,11 +179,14 @@ namespace JellyEmu.Controllers
         /// Path: POST /jellyemu/slot/{userId}?slot={n}
         /// </summary>
         [HttpPost("/jellyemu/slot/{userId}")]
+        [Authorize]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public IActionResult SetSlot(string userId, [FromQuery] int slot)
         {
+            if (!VerifyUser(userId)) return Forbid();
             if (slot < 1 || slot > 99)
                 return BadRequest("Slot must be between 1 and 99.");
 
@@ -203,10 +204,13 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/saves/{userId}
         /// </summary>
         [HttpGet("/jellyemu/saves/{userId}")]
+        [Authorize]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public IActionResult ListSaves(string userId)
         {
+            if (!VerifyUser(userId)) return Forbid();
             var userDir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
             if (!Directory.Exists(userDir))
                 return Ok(Array.Empty<object>());
@@ -306,10 +310,13 @@ namespace JellyEmu.Controllers
         /// Path: POST /jellyemu/save-screenshot/{itemId}/{userId}/{slot}
         /// </summary>
         [HttpPost("/jellyemu/save-screenshot/{itemId}/{userId}/{slot}")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> PostSaveScreenshot(string itemId, string userId, int slot)
         {
+            if (!VerifyUser(userId)) return Forbid();
             try
             {
                 var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync().ConfigureAwait(false);
