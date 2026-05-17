@@ -541,7 +541,10 @@ namespace JellyEmu.Services
 
                         // RetroAchievements progress pill
                         if (userId && itemId && !wrap.querySelector('.jellyemu-ra-pill')) {
-                            fetch('/jellyemu/meta/achievements/' + itemId + '/' + userId)
+                            const token = window.ApiClient ? window.ApiClient.accessToken() : '';
+                            fetch('/jellyemu/retroachievements/progress/' + itemId + '/' + userId, {
+                                headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
+                            })
                                 .then(r => {
                                     if (r.status === 401) return { error: 'unauthorized' };
                                     return r.ok ? r.json() : null;
