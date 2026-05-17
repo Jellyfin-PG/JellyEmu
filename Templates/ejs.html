@@ -2057,7 +2057,10 @@
             (afterPromise || Promise.resolve()).then(function () {
                 fetch('/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/' + slot, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'MediaBrowser Token="' + (_jellyToken || '') + '"'
+                    },
                     body: JSON.stringify({ dataUrl: dataUrl })
                 }).catch(function () { });
             });
@@ -2072,7 +2075,10 @@
             console.log('[JellyEmu] Pipeline STAGE 1 (Client AutoGen): Payload size ->', state.size || state.byteLength, 'bytes');
             var savePromise = fetch('{{ save_post_url }}', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/octet-stream' },
+                headers: { 
+                    'Content-Type': 'application/octet-stream',
+                    'Authorization': 'MediaBrowser Token="' + (_jellyToken || '') + '"'
+                },
                 body: state
             }).then(function (r) {
                 if (!r.ok) throw new Error('Server rejected save');
@@ -2103,7 +2109,10 @@
             var playtimeFlush = sessionSeconds > 0
                 ? fetch('/jellyemu/playtime/{{ item_id }}/{{ user_id }}', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
+                    headers: { 
+                        'Content-Type': 'text/plain',
+                        'Authorization': 'MediaBrowser Token="' + (_jellyToken || '') + '"'
+                    },
                     body: String(sessionSeconds)
                 }).catch(function () { })
                 : Promise.resolve();
