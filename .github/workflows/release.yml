@@ -37,9 +37,10 @@ jobs:
 
       - name: Zip release artifacts
         run: |
+          jq '.version = "${{ steps.version.outputs.VERSION }}"' manifest.json > publish/manifest.json
           cd publish
           zip -j ../JellyEmu_${{ steps.version.outputs.VERSION }}.zip \
-            JellyEmu.dll Scriban.dll
+            JellyEmu.dll Scriban.dll manifest.json
 
       - name: Compute MD5 checksum
         id: checksum
