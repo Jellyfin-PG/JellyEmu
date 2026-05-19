@@ -37,14 +37,16 @@ jobs:
 
       - name: Zip release artifacts
         run: |
+          jq '.version = "${{ steps.version.outputs.VERSION }}"' manifest.json > publish/manifest.json
           cd publish
           zip -j ../JellyEmu_${{ steps.version.outputs.VERSION }}.zip \
-            JellyEmu.dll Scriban.dll
+            JellyEmu.dll Scriban.dll manifest.json
 
-      - name: Compute MD5 checksum
+      - name: Compute checksums
         id: checksum
         run: |
           echo "MD5=$(md5sum JellyEmu_${{ steps.version.outputs.VERSION }}.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "SHA256=$(sha256sum JellyEmu_${{ steps.version.outputs.VERSION }}.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
 
       - name: Get previous tag
         id: previoustag
@@ -76,6 +78,7 @@ jobs:
             Download `JellyEmu_${{ steps.version.outputs.VERSION }}.zip`, extract, and copy both DLLs to your Jellyfin plugins folder.
 
             **MD5:** `${{ steps.checksum.outputs.MD5 }}`
+            **SHA256:** `${{ steps.checksum.outputs.SHA256 }}`
 
-            Update this value in `manifest.json` for the plugin catalogue.
+            Update these values in `manifest.json` and `catalog.json` for the plugin repositories.
           files: JellyEmu_${{ steps.version.outputs.VERSION }}.zip
