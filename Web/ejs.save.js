@@ -16,6 +16,7 @@
     var cfg    = window.JellyEmuConfig || {};
     var itemId = cfg.itemId || '';
     var userId = cfg.userId || '';
+    var token  = cfg.token || '';
 
     function gm() {
         var e = window.EJS_emulator;
@@ -50,7 +51,11 @@
             body.appendChild(slot);
 
             (function (s) {
-                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, { method: 'HEAD' })
+                var fetchOpts = { method: 'HEAD' };
+                if (token) {
+                    fetchOpts.headers = { 'Authorization': 'MediaBrowser Token="' + token + '"' };
+                }
+                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, fetchOpts)
                     .then(function (r) {
                         var el = document.getElementById('je-slot-status-' + s);
                         if (el) el.textContent = r.ok ? 'Has save data' : 'Empty';
@@ -73,9 +78,14 @@
                     if (!state) return;
                     console.log('[JellyEmu] Pipeline STAGE 1 (Client Gen): Payload size ->', state.size || state.byteLength, 'bytes');
 
+                    var headers = { 'Content-Type': 'application/octet-stream' };
+                    if (token) {
+                        headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+                    }
+
                     fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/octet-stream' },
+                        headers: headers,
                         body: state
                     }).then(function (r) {
                         if (!r.ok) throw new Error('Save rejected by server');
@@ -96,7 +106,12 @@
             btn.addEventListener('click', function () {
                 var s = parseInt(btn.getAttribute('data-load'));
 
-                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s)
+                var fetchOpts = {};
+                if (token) {
+                    fetchOpts.headers = { 'Authorization': 'MediaBrowser Token="' + token + '"' };
+                }
+
+                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, fetchOpts)
                     .then(function (r) {
                         if (!r.ok) throw new Error('No save');
                         return r.arrayBuffer();

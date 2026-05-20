@@ -2,12 +2,13 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Publish Jellyfin Plugin (Release)",
-            "type": "shell",
+            "label": "Publish Jellyfin Plugin (Debug)",
+            "type": "process",
             "command": "powershell",
             "args": [
+                "-NoProfile",
                 "-Command",
-                "if ((Get-Content JellyEmu.csproj -Raw) -match '<Version>(?<v>[^<]+)</Version>') { $ver = $Matches['v']; $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json; $manifest.version = $ver; $manifest | ConvertTo-Json -Depth 10 | Set-Content manifest.json -Encoding utf8; Write-Host 'Synchronized manifest.json version to '$ver }; dotnet build -c Release"
+                "if ((Get-Content JellyEmu.csproj -Raw) -match '<Version>(?<v>[^<]+)</Version>') { $ver = $Matches['v']; $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json; $manifest.version = $ver; $manifest | ConvertTo-Json -Depth 10 | Set-Content manifest.json -Encoding utf8; Write-Host 'Synchronized manifest.json version to ' $ver }; dotnet build -c Debug"
             ],
             "problemMatcher": "$msCompile",
             "group": {

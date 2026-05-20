@@ -31,9 +31,11 @@ jobs:
       - name: Publish
         run: dotnet publish --configuration Release --no-build --output ./publish
 
-      - name: Get version from tag
+      - name: Get version from csproj
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' JellyEmu.csproj | xargs)
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Zip release artifacts
         run: |
