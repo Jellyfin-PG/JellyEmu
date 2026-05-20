@@ -2159,7 +2159,8 @@
             itemId: '{{ item_id }}',
             userId: '{{ user_id }}',
             savePostUrl: '{{ save_post_url }}',
-            activeSlot: {{ active_slot }}
+            activeSlot: {{ active_slot }},
+            token: typeof _jellyToken !== 'undefined' ? _jellyToken : ''
         };
     </script>
     <script src="/jellyemu/assets/ejs.input.js"></script>
