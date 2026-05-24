@@ -166,6 +166,7 @@ namespace JellyEmu.Controllers
             try
             {
                 var url = $"https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php?z={prefs.RaUsername}&y={prefs.RaApiKey}&g={raGameId}&u={prefs.RaUsername}&a=1";
+                var client = HttpClientFactory.CreateClient();
                 client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
 
                 var response = await client.GetAsync(url).ConfigureAwait(false);
