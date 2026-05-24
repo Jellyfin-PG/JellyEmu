@@ -1,10 +1,10 @@
 /**
- * JellyEmu Save States + Import/Export Module
+ * JellyEmu Save States + SRAM Cloud Backup Manager
  *
- * Handles the Save States popup and Import/Export popup.
+ * Handles the unified Saves & States popup (Cloud & Local) with responsive tabs.
  *
  * Depends on:
- *   - window.JellyEmuConfig      { itemId, userId }
+ *   - window.JellyEmuConfig      { itemId, userId, token }
  *   - window._jeEnsureBinary     exposed by the main template IIFE
  *   - window._jeOpenPopup        exposed by the main template IIFE
  *   - window._jeClosePopup       exposed by the main template IIFE
@@ -31,10 +31,78 @@
         if (window._jeUploadScreenshot) window._jeUploadScreenshot(slot, afterPromise);
     }
 
-    // ── Save States ────────────────────────────────────────────────
+    // Helper for authenticated requests
+    function jeFetch(url, options) {
+        options = options || {};
+        if (token) {
+            options.headers = options.headers || {};
+            options.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+        }
+        return fetch(url, options);
+    }
+
+    // Tab Management
+
+    var tabBtnStates = document.getElementById('je-tab-btn-states');
+    var tabBtnSram   = document.getElementById('je-tab-btn-sram');
+    var panelStates  = document.getElementById('je-panel-states');
+    var panelSram    = document.getElementById('je-panel-sram');
+
+    function setActiveTab(tab) {
+        if (tab === 'states') {
+            tabBtnStates.classList.add('je-tab-active');
+            tabBtnSram.classList.remove('je-tab-active');
+            panelStates.style.display = 'flex';
+            panelSram.style.display = 'none';
+        } else {
+            tabBtnSram.classList.add('je-tab-active');
+            tabBtnStates.classList.remove('je-tab-active');
+            panelSram.style.display = 'flex';
+            panelStates.style.display = 'none';
+        }
+    }
+
+    if (tabBtnStates && tabBtnSram) {
+        tabBtnStates.addEventListener('click', function () { setActiveTab('states'); });
+        tabBtnSram.addEventListener('click', function () { setActiveTab('sram'); });
+    }
+
+    // Screenshots
+
+    function loadSlotScreenshot(s, thumbEl) {
+        jeFetch('/jellyemu/save-screenshot/' + itemId + '/' + userId + '/' + s)
+            .then(function (r) {
+                if (r.ok) return r.json();
+                throw new Error();
+            })
+            .then(function (data) {
+                if (data && data.dataUrl) {
+                    thumbEl.innerHTML = '<img src="' + data.dataUrl + '" style="width:100%;height:100%;object-fit:cover">';
+                    thumbEl.style.opacity = '1';
+                } else {
+                    showPlaceholder();
+                }
+            })
+            .catch(function () {
+                showPlaceholder();
+            });
+
+        function showPlaceholder() {
+            thumbEl.innerHTML = '<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:rgba(255,255,255,.3)"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+            thumbEl.style.opacity = '0.5';
+        }
+    }
+
+    function loadSramPlaceholder(thumbEl) {
+        thumbEl.innerHTML = '<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:rgba(255,255,255,.3)"><path d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>';
+        thumbEl.style.opacity = '0.5';
+    }
+
+    // Save States (Cloud)
 
     function buildSaveSlots() {
         var body = document.getElementById('je-saves-body');
+        if (!body) return;
         body.innerHTML = '';
 
         for (var i = 1; i <= 5; i++) {
@@ -42,6 +110,7 @@
             slot.className = 'je-slot';
             slot.innerHTML =
                 '<div class="je-slot-num">' + i + '</div>' +
+                '<div class="je-slot-thumb" id="je-state-thumb-' + i + '"></div>' +
                 '<div class="je-slot-info"><div>Slot ' + i + '</div>' +
                 '<small id="je-slot-status-' + i + '">Checking…</small></div>' +
                 '<div class="je-slot-actions">' +
@@ -50,12 +119,11 @@
                 '</div>';
             body.appendChild(slot);
 
+            var thumbEl = document.getElementById('je-state-thumb-' + i);
+            loadSlotScreenshot(i, thumbEl);
+
             (function (s) {
-                var fetchOpts = { method: 'HEAD' };
-                if (token) {
-                    fetchOpts.headers = { 'Authorization': 'MediaBrowser Token="' + token + '"' };
-                }
-                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, fetchOpts)
+                jeFetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, { method: 'HEAD' })
                     .then(function (r) {
                         var el = document.getElementById('je-slot-status-' + s);
                         if (el) el.textContent = r.ok ? 'Has save data' : 'Empty';
@@ -76,22 +144,23 @@
                 Promise.resolve(g.getState()).then(function (rawState) {
                     var state = ensureBinary(rawState);
                     if (!state) return;
-                    console.log('[JellyEmu] Pipeline STAGE 1 (Client Gen): Payload size ->', state.size || state.byteLength, 'bytes');
 
                     var headers = { 'Content-Type': 'application/octet-stream' };
-                    if (token) {
-                        headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
-                    }
-
-                    fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, {
+                    jeFetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, {
                         method: 'POST',
                         headers: headers,
                         body: state
                     }).then(function (r) {
-                        if (!r.ok) throw new Error('Save rejected by server');
+                        if (!r.ok) throw new Error('Save rejected');
                         var el = document.getElementById('je-slot-status-' + s);
                         if (el) el.textContent = 'Saved!';
-                        uploadScreenshot(s);
+                        var thumbEl = document.getElementById('je-state-thumb-' + s);
+                        uploadScreenshot(s, new Promise(function(resolve) {
+                            setTimeout(function() {
+                                if (thumbEl) loadSlotScreenshot(s, thumbEl);
+                                resolve();
+                            }, 500);
+                        }));
                     }).catch(function (err) {
                         console.error('[JellyEmu] Save failed:', err);
                         var el = document.getElementById('je-slot-status-' + s);
@@ -106,19 +175,13 @@
             btn.addEventListener('click', function () {
                 var s = parseInt(btn.getAttribute('data-load'));
 
-                var fetchOpts = {};
-                if (token) {
-                    fetchOpts.headers = { 'Authorization': 'MediaBrowser Token="' + token + '"' };
-                }
-
-                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s, fetchOpts)
+                jeFetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + s)
                     .then(function (r) {
                         if (!r.ok) throw new Error('No save');
                         return r.arrayBuffer();
                     })
                     .then(function (buf) {
                         var g = gm(); if (!g) return;
-                        console.log('[JellyEmu] Pipeline STAGE 4 (Client Receive): Downloaded bytes ->', buf.byteLength);
                         window._jeClosePopup('je-pop-saves');
                         setTimeout(function () {
                             g.loadState(new Uint8Array(buf));
@@ -132,16 +195,114 @@
         });
     }
 
+    // SRAM (Cloud Backups)
+
+    function buildSramSlots() {
+        var body = document.getElementById('je-sram-body');
+        if (!body) return;
+        body.innerHTML = '';
+
+        for (var i = 1; i <= 5; i++) {
+            var slot = document.createElement('div');
+            slot.className = 'je-slot';
+            slot.innerHTML =
+                '<div class="je-slot-num">' + i + '</div>' +
+                '<div class="je-slot-thumb" id="je-sram-thumb-' + i + '"></div>' +
+                '<div class="je-slot-info"><div>Slot ' + i + '</div>' +
+                '<small id="je-sram-status-' + i + '">Checking…</small></div>' +
+                '<div class="je-slot-actions">' +
+                '<button class="je-btn" data-save-sram="' + i + '">Backup</button>' +
+                '<button class="je-btn je-btn-primary" data-load-sram="' + i + '">Restore</button>' +
+                '</div>';
+            body.appendChild(slot);
+
+            var thumbEl = document.getElementById('je-sram-thumb-' + i);
+            loadSramPlaceholder(thumbEl);
+
+            (function (s) {
+                jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=' + s, { method: 'HEAD' })
+                    .then(function (r) {
+                        var el = document.getElementById('je-sram-status-' + s);
+                        if (el) el.textContent = r.ok ? 'Has backup' : 'Empty';
+                    })
+                    .catch(function () {
+                        var el = document.getElementById('je-sram-status-' + s);
+                        if (el) el.textContent = 'Empty';
+                    });
+            })(i);
+        }
+
+        // Backup buttons
+        body.querySelectorAll('[data-save-sram]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var s = parseInt(btn.getAttribute('data-save-sram'));
+                var g = gm(); if (!g) return;
+
+                var rawSave = g.getSaveFile();
+                if (!rawSave) return alert('No in-game SRAM data available. Make sure you saved in-game first!');
+
+                var saveBlob = ensureBinary(rawSave);
+                var headers = { 'Content-Type': 'application/octet-stream' };
+
+                jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=' + s, {
+                    method: 'POST',
+                    headers: headers,
+                    body: saveBlob
+                }).then(function (r) {
+                    if (!r.ok) throw new Error('SRAM backup rejected');
+                    var el = document.getElementById('je-sram-status-' + s);
+                    if (el) el.textContent = 'Backed up!';
+                }).catch(function (err) {
+                    console.error('[JellyEmu] SRAM backup failed:', err);
+                    var el = document.getElementById('je-sram-status-' + s);
+                    if (el) el.textContent = 'Backup Failed';
+                });
+            });
+        });
+
+        // Restore buttons
+        body.querySelectorAll('[data-load-sram]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var s = parseInt(btn.getAttribute('data-load-sram'));
+                var g = gm(); if (!g) return;
+
+                if (!confirm('Restoring this SRAM backup will restart the game and overwrite any unsaved progress. Continue?')) return;
+
+                jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=' + s)
+                    .then(function (r) {
+                        if (!r.ok) throw new Error('No SRAM backup');
+                        return r.arrayBuffer();
+                    })
+                    .then(function (buf) {
+                        var sramPath = g.getSaveFilePath();
+                        if (!sramPath) return alert('SRAM not supported by this core.');
+                        var uint8 = new Uint8Array(buf);
+
+                        try { g.FS.unlink(sramPath); } catch (err) {}
+                        g.FS.writeFile(sramPath, uint8);
+                        g.loadSaveFiles();
+                        
+                        window._jeClosePopup('je-pop-saves');
+                        alert('SRAM backup restored! Restarting...');
+                        g.restart();
+                    })
+                    .catch(function () {
+                        var el = document.getElementById('je-sram-status-' + s);
+                        if (el) el.textContent = 'No backup to restore';
+                    });
+            });
+        });
+    }
+
+    // Dock Save States button triggers our unified modal
     document.getElementById('je-btn-saves').addEventListener('click', function () {
+        setActiveTab('states');
         buildSaveSlots();
+        buildSramSlots();
         window._jeOpenPopup('je-pop-saves');
     });
 
-    // ── Import / Export ────────────────────────────────────────────
-
-    document.getElementById('je-btn-io').addEventListener('click', function () {
-        window._jeOpenPopup('je-pop-io');
-    });
+    // Local Import / Export
 
     // Export Save State (.state)
     document.getElementById('je-io-exp-state').addEventListener('click', function () {
@@ -175,46 +336,52 @@
         URL.revokeObjectURL(url);
     });
 
-    // Import drag/drop & file select
-    var ioDrop = document.getElementById('je-io-dropzone');
-    var ioFile = document.getElementById('je-io-file');
+    // Wire up State drag/drop and file click
+    setupDropzone('je-state-dropzone', 'je-state-file', false);
+    // Wire up SRAM drag/drop and file click
+    setupDropzone('je-sram-dropzone', 'je-sram-file', true);
 
-    ioDrop.addEventListener('click', function () { ioFile.click(); });
+    function setupDropzone(dropzoneId, fileInputId, isSram) {
+        var dropzone = document.getElementById(dropzoneId);
+        var fileInput = document.getElementById(fileInputId);
+        if (!dropzone || !fileInput) return;
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (evt) {
-        ioDrop.addEventListener(evt, function (e) { e.preventDefault(); e.stopPropagation(); }, false);
-    });
+        dropzone.addEventListener('click', function () { fileInput.click(); });
 
-    ['dragenter', 'dragover'].forEach(function (evt) {
-        ioDrop.addEventListener(evt, function () {
-            ioDrop.style.borderColor = 'rgba(100,200,255,.8)';
-            ioDrop.style.background  = 'rgba(100,200,255,.1)';
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function (e) { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function () {
+                dropzone.style.borderColor = 'rgba(100,200,255,.8)';
+                dropzone.style.background  = 'rgba(100,200,255,.1)';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function () {
+                dropzone.style.borderColor = 'rgba(255,255,255,.2)';
+                dropzone.style.background  = 'transparent';
+            }, false);
+        });
+
+        dropzone.addEventListener('drop', function (e) {
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleImport(e.dataTransfer.files[0], isSram);
+            }
         }, false);
-    });
 
-    ['dragleave', 'drop'].forEach(function (evt) {
-        ioDrop.addEventListener(evt, function () {
-            ioDrop.style.borderColor = 'rgba(255,255,255,.2)';
-            ioDrop.style.background  = 'transparent';
-        }, false);
-    });
+        fileInput.addEventListener('change', function (e) {
+            if (e.target.files && e.target.files.length > 0) {
+                handleImport(e.target.files[0], isSram);
+                e.target.value = '';
+            }
+        });
+    }
 
-    ioDrop.addEventListener('drop', function (e) {
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            _jeHandleImport(e.dataTransfer.files[0]);
-        }
-    }, false);
-
-    ioFile.addEventListener('change', function (e) {
-        if (e.target.files && e.target.files.length > 0) {
-            _jeHandleImport(e.target.files[0]);
-            e.target.value = '';
-        }
-    });
-
-    function _jeHandleImport(file) {
+    function handleImport(file, isSram) {
         var g = gm(); if (!g) return;
-        var isSram = file.name.toLowerCase().endsWith('.sav') || file.name.toLowerCase().endsWith('.srm');
 
         var reader = new FileReader();
         reader.onload = function (e) {
@@ -230,12 +397,12 @@
                     try { g.FS.unlink(sramPath); } catch (err) {}
                     g.FS.writeFile(sramPath, uint8);
                     g.loadSaveFiles();
-                    alert('SRAM imported successfully! The emulator will now restart to load the battery data.');
+                    window._jeClosePopup('je-pop-saves');
+                    alert('SRAM imported successfully! Restarting game...');
                     g.restart();
-                    window._jeClosePopup('je-pop-io');
                 } else {
                     g.loadState(uint8);
-                    window._jeClosePopup('je-pop-io');
+                    window._jeClosePopup('je-pop-saves');
                 }
             } catch (err) {
                 console.error('[JellyEmu] Import error:', err);
