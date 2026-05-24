@@ -4,6 +4,7 @@
     var userId      = cfg.userId      || '';
     var savePostUrl = cfg.savePostUrl || '';
     var activeSlot  = cfg.activeSlot  || 1;
+    var token       = cfg.token       || '';
 
     // ── Helpers ──
     function emu() { return window.EJS_emulator; }
@@ -34,15 +35,19 @@
                 var g = gm(); if (!g) return;
                 Promise.resolve(g.getState()).then(function (rawState) {
                     var state = _jeEnsureBinary(rawState); if (!state) return;
+                    var saveHeaders = { 'Content-Type': 'application/octet-stream' };
+                    if (token) saveHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
                     fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot, {
-                        method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: state
+                        method: 'POST', headers: saveHeaders, body: state
                     }).then(function (r) {
                         if (!r.ok) throw new Error('Save rejected');
                         var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('canvas');
                         if (canvas) {
                             try {
+                                var ssHeaders = { 'Content-Type': 'application/json' };
+                                if (token) ssHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
                                 fetch('/jellyemu/save-screenshot/' + itemId + '/' + userId + '/' + _jeActiveSlot, {
-                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    method: 'POST', headers: ssHeaders,
                                     body: JSON.stringify({ dataUrl: canvas.toDataURL('image/png') })
                                 }).catch(function () {});
                             } catch (e) {}
@@ -51,7 +56,9 @@
                 });
                 break;
             case 25: // Quick Load
-                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot)
+                var loadHeaders = {};
+                if (token) loadHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
+                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot, { headers: loadHeaders })
                     .then(function (r) { if (!r.ok) throw new Error('No save'); return r.arrayBuffer(); })
                     .then(function (buf) { var g = gm(); if (g) g.loadState(new Uint8Array(buf)); })
                     .catch(function (err) { console.warn('[JellyEmu] Quick load failed:', err); });
@@ -178,6 +185,23 @@
         }
     }
     _jeLoadBindings(null);
+
+    if (userId) {
+        var prefHeaders = {};
+        if (token) prefHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
+        fetch('/jellyemu/prefs/' + userId, { headers: prefHeaders })
+            .then(function (r) { if (r.ok) return r.json(); })
+            .then(function (data) {
+                if (data && data.jeBindings) {
+                    _jeLoadBindings(data);
+                    if (document.getElementById('je-tab-kb')) {
+                        buildKeyboardBinds();
+                        buildGamepadBinds();
+                    }
+                }
+            })
+            .catch(function (err) { console.warn('[JellyEmu] Failed to load bindings:', err); });
+    }
 
     // ── simulateInput bridge ──
     function _jeSimulate(idx, pressed) {
@@ -329,9 +353,11 @@
     function _jeSyncBindingsToServer() {
         clearTimeout(_syncTimer);
         _syncTimer = setTimeout(function () {
+            var headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
             fetch('/jellyemu/prefs/' + userId, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: headers,
                 body: JSON.stringify({ jeBindings: JSON.stringify(_jeBindings) })
             }).catch(function (err) { console.warn('[JellyEmu] Bindings sync failed:', err); });
         }, 800);

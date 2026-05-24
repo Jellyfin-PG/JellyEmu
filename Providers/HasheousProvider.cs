@@ -34,7 +34,7 @@ namespace JellyEmu.Providers
             return match.Success ? match.Groups[1].Value : null;
         }
 
-        public string Name => "Hasheous";
+        public string Name => "Hasheous Metadata Provider";
         public int Order => 1;
 
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)

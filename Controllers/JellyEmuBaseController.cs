@@ -164,6 +164,13 @@ namespace JellyEmu.Controllers
             return Path.Combine(dir, $"{itemId}.state");
         }
 
+        protected string GetSramPath(string userId, string itemId, int slot)
+        {
+            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, $"{itemId}.sav");
+        }
+
         protected string GetSaveScreenshotPath(string userId, string itemId, int slot)
         {
             var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
