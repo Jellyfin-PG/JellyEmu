@@ -556,8 +556,8 @@ namespace JellyEmu.Services
                                     pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;';
                                     
                                     if (data.error === 'unauthorized') {
-                                        pill.title = 'Click to connect RetroAchievements';
-                                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:rgba(255,255,255,0.4);">emoji_events</span>Connect RA';
+                                        pill.title = 'Click to sign in to RetroAchievements';
+                                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:rgba(255,255,255,0.4);">emoji_events</span>Sign In';
                                         pill.onclick = (e) => {
                                             e.preventDefault();
                                             e.stopPropagation();

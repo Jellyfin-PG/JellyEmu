@@ -12,8 +12,8 @@ using MediaBrowser.Controller.Entities;
 namespace JellyEmu.Controllers
 {
     /// <summary>
-    /// Handles save-state CRUD, slot management, save listing, and save screenshots.
-    /// Routes: /jellyemu/save/*, /jellyemu/slot/*, /jellyemu/saves/*,
+    /// Handles save-state CRUD, SRAM CRUD, slot management, save listing, and save screenshots.
+    /// Routes: /jellyemu/save/*, /jellyemu/sram/*, /jellyemu/slot/*, /jellyemu/saves/*,
     ///         /jellyemu/save-screenshot/*
     /// </summary>
     public class JellyEmuSaveController : JellyEmuBaseController
@@ -336,6 +336,140 @@ namespace JellyEmu.Controllers
                 return Ok(new { saved = true });
             }
             catch { return BadRequest("Could not read image data."); }
+        }
+
+        /// <summary>
+        /// Returns 200 if SRAM data exists for the given user/item/slot, 404 otherwise.
+        /// Path: HEAD /jellyemu/sram/{itemId}/{userId}
+        /// </summary>
+        [HttpHead("/jellyemu/sram/{itemId}/{userId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult HeadSram(string itemId, string userId, [FromQuery] int? slot)
+        {
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSramPath(userId, itemId, slotNum);
+
+            if (System.IO.File.Exists(path))
+            {
+                var lastModified = System.IO.File.GetLastWriteTimeUtc(path);
+                Response.Headers["last-modified"] = lastModified.ToString("R");
+                return Ok();
+            }
+
+            return NotFound();
+        }
+
+        /// <summary>
+        /// Downloads the binary SRAM data for a given user/item/slot.
+        /// Path: GET /jellyemu/sram/{itemId}/{userId}
+        /// </summary>
+        [HttpGet("/jellyemu/sram/{itemId}/{userId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetSram(string itemId, string userId, [FromQuery] int? slot)
+        {
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSramPath(userId, itemId, slotNum);
+            if (!System.IO.File.Exists(path))
+            {
+                Logger.LogInformation("[JellyEmu] No SRAM found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return NotFound();
+            }
+
+            var fileInfo = new System.IO.FileInfo(path);
+            Logger.LogInformation("[JellyEmu] Pipeline: Serving SRAM for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                itemId, userId, slotNum, fileInfo.Length);
+            var stream = System.IO.File.OpenRead(path);
+            return File(stream, "application/octet-stream", $"{itemId}.sav");
+        }
+
+        /// <summary>
+        /// Uploads and stores binary SRAM data into the active (or specified) slot.
+        /// Path: POST /jellyemu/sram/{itemId}/{userId}
+        /// Body: Raw binary SRAM data.
+        /// </summary>
+        [HttpPost("/jellyemu/sram/{itemId}/{userId}")]
+        [Authorize]
+        [DisableRequestSizeLimit]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> PostSram(string itemId, string userId, [FromQuery] int? slot)
+        {
+            if (!VerifyUser(userId)) return Forbid();
+            if (Request.ContentLength is 0)
+                return BadRequest("Empty SRAM body.");
+
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSramPath(userId, itemId, slotNum);
+
+            var tempPath = path + ".tmp";
+
+            try
+            {
+                using (var fs = System.IO.File.Create(tempPath))
+                    await Request.Body.CopyToAsync(fs, HttpContext.RequestAborted);
+
+                var writtenFile = new System.IO.FileInfo(tempPath);
+                if (writtenFile.Length < 8)
+                {
+                    Logger.LogWarning("SRAM too small.");
+                    System.IO.File.Delete(tempPath);
+                    return BadRequest("SRAM was empty or corrupt.");
+                }
+
+                Logger.LogInformation("[JellyEmu] Pipeline: Saved SRAM for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                    itemId, userId, slotNum, writtenFile.Length);
+                System.IO.File.Move(tempPath, path, overwrite: true);
+            }
+            catch
+            {
+                if (System.IO.File.Exists(tempPath))
+                    System.IO.File.Delete(tempPath);
+                throw;
+            }
+            return Ok();
+        }
+
+        /// <summary>
+        /// Deletes SRAM data. Only the authenticated owner may delete their own SRAM.
+        /// Path: DELETE /jellyemu/sram/{itemId}/{userId}
+        /// </summary>
+        [HttpDelete("/jellyemu/sram/{itemId}/{userId}")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public IActionResult DeleteSram(string itemId, string userId, [FromQuery] int? slot)
+        {
+            if (!VerifyUser(userId))
+            {
+                Logger.LogWarning("[JellyEmu] Unauthorized SRAM delete attempt.");
+                return Forbid();
+            }
+
+            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var path = GetSramPath(userId, itemId, slotNum);
+
+            if (!System.IO.File.Exists(path))
+            {
+                Logger.LogInformation("[JellyEmu] Cannot delete: No SRAM found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return NotFound();
+            }
+
+            try
+            {
+                System.IO.File.Delete(path);
+                Logger.LogInformation("[JellyEmu] Successfully deleted SRAM for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[JellyEmu] Failed to delete SRAM file for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
     }
 }

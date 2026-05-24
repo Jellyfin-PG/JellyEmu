@@ -43,7 +43,8 @@ namespace JellyEmu.Controllers
                 autosave      = prefs.Autosave,
                 shader        = prefs.Shader,
                 videoRotation      = prefs.VideoRotation,
-                controls           = prefs.Controls
+                controls           = prefs.Controls,
+                jeBindings         = prefs.Controls
             });
         }
 
@@ -77,7 +78,7 @@ namespace JellyEmu.Controllers
                     Autosave:           Str("autosave",           current.Autosave),
                     Shader:             Str("shader",             current.Shader),
                     VideoRotation:      Int("videoRotation",      current.VideoRotation),
-                    Controls:           Str("controls",           current.Controls),
+                    Controls:           Str("jeBindings",         Str("controls",           current.Controls)),
                     ControllerControls: Str("controllerControls", current.ControllerControls),
                     RaUsername:         current.RaUsername,
                     RaApiKey:           current.RaApiKey);
@@ -97,7 +98,8 @@ namespace JellyEmu.Controllers
                 shader             = current.Shader,
                 videoRotation      = current.VideoRotation,
                 controls           = current.Controls,
-                controllerControls = current.ControllerControls
+                controllerControls = current.ControllerControls,
+                jeBindings         = current.Controls
             });
         }
     }
