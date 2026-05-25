@@ -35,7 +35,7 @@ namespace JellyEmu.Controllers
         [HttpHead("/jellyemu/rom/{itemId}/{filename?}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Rom(string itemId, string? filename = null)
+        public IActionResult Rom(string itemId, string? filename = null, [FromQuery] string? userId = null)
         {
             var item = LibraryManager.GetItemById(itemId);
             if (item == null || string.IsNullOrEmpty(item.Path) || !System.IO.File.Exists(item.Path))
@@ -44,17 +44,60 @@ namespace JellyEmu.Controllers
                 return NotFound();
             }
 
-            Logger.LogInformation("[JellyEmu] Serving ROM: {Path}", item.Path);
+            var romPath = item.Path;
+            if (item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase))
+            {
+                var discFiles = J3uParser.GetReferencedFiles(item.Path);
+                if (discFiles.Count == 0)
+                {
+                    Logger.LogWarning("[JellyEmu] Rom: playlist {Path} is empty", item.Path);
+                    return NotFound();
+                }
 
-            var fileInfo = new FileInfo(item.Path);
-            Response.Headers["X-Rom-Hash"] = GetFileHash(item.Path);
+                int activeDiscIndex = 1;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    var metaPath = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"{itemId}-meta.json");
+                    if (System.IO.File.Exists(metaPath))
+                    {
+                        try
+                        {
+                            var json = System.IO.File.ReadAllText(metaPath);
+                            using var doc = System.Text.Json.JsonDocument.Parse(json);
+                            if (doc.RootElement.TryGetProperty("activeDiscIndex", out var prop))
+                            {
+                                activeDiscIndex = prop.GetInt32();
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                if (activeDiscIndex < 1 || activeDiscIndex > discFiles.Count)
+                {
+                    activeDiscIndex = 1;
+                }
+
+                romPath = discFiles[activeDiscIndex - 1];
+            }
+
+            if (!System.IO.File.Exists(romPath))
+            {
+                Logger.LogWarning("[JellyEmu] Rom: resolved path {Path} not found", romPath);
+                return NotFound();
+            }
+
+            Logger.LogInformation("[JellyEmu] Serving ROM: {Path}", romPath);
+
+            var fileInfo = new FileInfo(romPath);
+            Response.Headers["X-Rom-Hash"] = GetFileHash(romPath);
             Response.Headers["X-Rom-Size"] = fileInfo.Length.ToString();
             Response.Headers["X-Rom-Extension"] = fileInfo.Extension;
-            Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(item.Path);
+            Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(romPath);
 
-            var stream = System.IO.File.OpenRead(item.Path);
-            var fileName = Path.GetFileName(item.Path);
-            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+            var stream = System.IO.File.OpenRead(romPath);
+            var finalFileName = Path.GetFileName(romPath);
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{finalFileName}\"";
             return File(stream, "application/octet-stream", enableRangeProcessing: true);
         }
 

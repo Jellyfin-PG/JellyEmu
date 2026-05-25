@@ -136,6 +136,12 @@ namespace JellyEmu.Controllers
             var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".zip";
             var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
             var romUrl = $"/jellyemu/rom/{itemId}/{filename}{ext}";
+            if (!string.IsNullOrEmpty(userId))
+            {
+                romUrl += $"?userId={userId}";
+            }
+
+            var isJ3u = !string.IsNullOrEmpty(item.Path) && item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase);
 
             var hasSaves = !string.IsNullOrEmpty(userId);
             var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
@@ -198,6 +204,7 @@ namespace JellyEmu.Controllers
                 save_exists = saveExists,
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,
+                is_m3u = isJ3u,
                 needs_threads = (core == "dos" || core == "psp" || core == "arcade" || core == "mame2003_plus" || core == "amiga" || core == "3do" || core == "segaSaturn" || core == "jaguar")
             });
 

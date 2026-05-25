@@ -246,6 +246,24 @@ JellyEmu will automatically hide these platform tags in the user interface so yo
 
 *revision flags (like `[!]`) are intentionally ignored by the platform detector and will remain part of the display name.*
 
+### Method 3: Multi-Disc Playlists (`.j3u`)
+For retro games that span across multiple discs (like PlayStation or Dreamcast games), you can create a custom playlist file with the `.j3u` extension (JellyEmu's specialized format for multi-disc games).
+
+This enables seamless gameplay and disc switching using the "One Smooth Move" workflow:
+1. When playing a `.j3u` playlist, JellyEmu automatically adds **Next Disc** and **Select Disc** controls to the player dock.
+2. Swapping discs auto-saves your game progress to a temporary slot (Slot 99), updates the user's active disc preference, reloads the interface, and automatically restores the save state so you can carry over progress seamlessly.
+
+**How to configure a `.j3u` playlist:**
+1. Place your ROM files (e.g., `.chd`, `.bin`, `.iso`) in the same directory.
+2. Create a plain text file named after the game with a `.j3u` extension (e.g., `Final Fantasy VII (USA).j3u`).
+3. Open the file in a text editor and list the relative paths to each disc's ROM file, one per line:
+   ```text
+   Final Fantasy VII (USA) (Disc 1).chd
+   Final Fantasy VII (USA) (Disc 2).chd
+   Final Fantasy VII (USA) (Disc 3).chd
+   ```
+4. Place the `.j3u` file in your library alongside your ROM files.
+
 ---
 
 ### Forcing Specific Metadata (IGDB & RAWG)

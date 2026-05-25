@@ -358,8 +358,30 @@ namespace JellyEmu
                 ".col", ".cv", ".ngp", ".ngc", ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
-                ".xex", ".xiso", ".vpk",
+                ".xex", ".xiso", ".vpk", ".j3u",
             };
+    }
+
+    public static class J3uParser
+    {
+        public static List<string> GetReferencedFiles(string j3uPath)
+        {
+            var result = new List<string>();
+            try
+            {
+                if (!File.Exists(j3uPath)) return result;
+                var dir = Path.GetDirectoryName(j3uPath) ?? string.Empty;
+                foreach (var line in File.ReadLines(j3uPath))
+                {
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#")) continue;
+                    var candidate = Path.IsPathRooted(trimmed) ? trimmed : Path.Combine(dir, trimmed);
+                    result.Add(candidate);
+                }
+            }
+            catch { }
+            return result;
+        }
     }
 
     public static class CueParser
