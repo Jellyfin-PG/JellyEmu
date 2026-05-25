@@ -74,13 +74,26 @@ namespace JellyEmu
                         return null;
                 }
 
+                var ext = Path.GetExtension(args.Path);
+                var isJ3u = string.Equals(ext, ".j3u", StringComparison.OrdinalIgnoreCase);
+
                 var consoleTag  = _platformResolver.Resolve(args.Path);
+                if (isJ3u)
+                {
+                    var refs = J3uParser.GetReferencedFiles(args.Path);
+                    if (refs.Count > 0)
+                    {
+                        consoleTag = _platformResolver.Resolve(refs[0]);
+                    }
+                }
+
                 var regionTag   = PlatformResolver.ResolveRegions(args.Path).FirstOrDefault();
                 var displayName = PlatformResolver.CleanDisplayName(
                     Path.GetFileNameWithoutExtension(args.Path) ?? string.Empty);
 
                 var tags = new List<string> { "JellyEmu", consoleTag };
                 if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+                if (isJ3u) tags.Add("MultiDisc");
 
                 var parentFolder = Path.GetFileName(Path.GetDirectoryName(args.Path));
                 var seriesName   = (!string.IsNullOrEmpty(parentFolder) &&

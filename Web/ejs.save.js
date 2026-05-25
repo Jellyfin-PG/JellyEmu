@@ -17,6 +17,7 @@
     var itemId = cfg.itemId || '';
     var userId = cfg.userId || '';
     var token  = cfg.token || '';
+    var isM3u  = !!cfg.isM3u;
 
     function gm() {
         var e = window.EJS_emulator;
@@ -410,6 +411,134 @@
             }
         };
         reader.readAsArrayBuffer(file);
+    }
+
+    // --- Multi-Disc / Playlist (J3U/M3U) Swapping & Restoration ---
+    if (isM3u) {
+        // Hook EJS start event to check and restore Slot 99 SRAM
+        var origOnGameStart = window.EJS_onGameStart;
+        window.EJS_onGameStart = function () {
+            if (origOnGameStart) origOnGameStart();
+
+            setTimeout(function () {
+                var loadHeaders = {};
+                if (token) {
+                    loadHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
+                }
+                fetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', { headers: loadHeaders })
+                    .then(function (r) {
+                        if (r.ok) return r.arrayBuffer();
+                        throw new Error('No Slot 99 backup');
+                    })
+                    .then(function (buf) {
+                        var g = gm();
+                        if (!g) return;
+                        var sramPath = g.getSaveFilePath ? g.getSaveFilePath() : '';
+                        if (!sramPath) return;
+                        try { g.FS.unlink(sramPath); } catch (_) {}
+                        g.FS.writeFile(sramPath, new Uint8Array(buf));
+                        g.loadSaveFiles();
+                        g.restart();
+                        console.log('[JellyEmu] Restored Slot 99 SRAM for next disc.');
+
+                        // Delete the slot 99 save from server
+                        fetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', {
+                            method: 'DELETE',
+                            headers: loadHeaders
+                        }).catch(function () {});
+                    })
+                    .catch(function () {});
+            }, 500);
+        };
+
+        // Wire up disc swap UI triggers
+        var btnNext = document.getElementById('je-btn-nextdisc');
+        var btnSel = document.getElementById('je-btn-selectdisc');
+        
+        if (btnNext) {
+            btnNext.addEventListener('click', function () {
+                triggerDiscSwap('next');
+            });
+        }
+        
+        if (btnSel) {
+            btnSel.addEventListener('click', function () {
+                var listEl = document.getElementById('je-disc-list');
+                listEl.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:12px 0;">Loading discs…</div>';
+                
+                jeFetch('/jellyemu/playlist/' + itemId + '/discs/' + userId)
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        listEl.innerHTML = '';
+                        if (!data.discs || data.discs.length === 0) {
+                            listEl.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:12px 0;">No discs found.</div>';
+                            return;
+                        }
+                        data.discs.forEach(function (disc) {
+                            var item = document.createElement('div');
+                            item.className = 'je-disc-item' + (disc.index === data.activeDiscIndex ? ' je-active' : '');
+                            item.textContent = disc.name + ' (' + disc.filename + ')';
+                            
+                            item.addEventListener('click', function () {
+                                if (disc.index === data.activeDiscIndex) {
+                                    window._jeClosePopup('je-pop-selectdisc');
+                                    return;
+                                }
+                                triggerDiscSwap(disc.index);
+                            });
+                            listEl.appendChild(item);
+                        });
+                    })
+                    .catch(function () {
+                        listEl.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:12px 0;color:#f44">Failed to load discs.</div>';
+                    });
+                window._jeOpenPopup('je-pop-selectdisc');
+            });
+        }
+    }
+
+    function triggerDiscSwap(targetDisc) {
+        var btnNext = document.getElementById('je-btn-nextdisc');
+        var btnSel = document.getElementById('je-btn-selectdisc');
+        if (btnNext) btnNext.disabled = true;
+        if (btnSel) btnSel.disabled = true;
+        
+        var statusEl = document.getElementById('je-loader-status');
+        if (statusEl) statusEl.textContent = 'Saving progress & swapping disc...';
+        
+        var loader = document.getElementById('je-loader');
+        if (loader) {
+            loader.style.display = 'flex';
+            loader.classList.remove('je-dismiss');
+        }
+        
+        // 1. Get SRAM
+        var g = gm();
+        var rawSave = g ? g.getSaveFile() : null;
+        var savePromise = Promise.resolve();
+        
+        if (rawSave) {
+            var saveBlob = ensureBinary(rawSave);
+            if (saveBlob) {
+                var headers = { 'Content-Type': 'application/octet-stream' };
+                // 2. Upload to slot 99
+                savePromise = jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', {
+                    method: 'POST',
+                    headers: headers,
+                    body: saveBlob
+                });
+            }
+        }
+        
+        // 3. Swap index and reload
+        savePromise.finally(function () {
+            jeFetch('/jellyemu/playlist/' + itemId + '/swap/' + userId + '?disc=' + targetDisc, {
+                method: 'POST'
+            })
+            .finally(function () {
+                window.location.reload();
+            });
+        });
     }
 
 })();

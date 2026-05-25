@@ -885,6 +885,39 @@
                 height: 38px;
             }
         }
+
+        /* ── Disc Selector ── */
+        .je-disc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background .2s, border-color .2s;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .je-disc-item:hover {
+            background: rgba(255, 255, 255, .1);
+            border-color: rgba(255, 255, 255, .2);
+        }
+
+        .je-disc-item.je-active {
+            background: rgba(255, 255, 255, .15);
+            border-color: rgba(255, 255, 255, .4);
+            font-weight: 600;
+        }
+        
+        .je-disc-item.je-active::after {
+            content: '✓';
+            color: #fff;
+            font-size: 14px;
+        }
     </style>
 </head>
 
@@ -980,6 +1013,22 @@
                 <path
                     d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
             </svg></button>
+        {{ if is_m3u }}
+        <div class="je-dock-sep"></div>
+        <button class="je-dockbtn" id="je-btn-nextdisc" title="Next Disc">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                <circle cx="12" cy="12" r="2"/>
+                <path d="M16 12l-4-4v3H8v2h4v3z"/>
+            </svg>
+        </button>
+        <button class="je-dockbtn" id="je-btn-selectdisc" title="Select Disc">
+            <svg viewBox="0 0 24 24">
+                <path d="M10 2c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 11c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
+                <path d="M16 14h6l-3 4z"/>
+            </svg>
+        </button>
+        {{ end }}
         <div class="je-dock-sep"></div>
         <button class="je-dockbtn" id="je-btn-fullscreen" title="Fullscreen">
             <svg id="je-fs-enter" viewBox="0 0 24 24">
@@ -1075,8 +1124,22 @@
                 <div class="je-vol-wrap">
                     <div id="je-vol-pct" class="je-vol-pct">50%</div>
                     <input type="range" min="0" max="1" step="0.01" value="1.0" class="je-vol-slider"
-                        id="je-vol-slider">
+                         id="je-vol-slider">
                     <button class="je-btn" id="je-vol-mute">Mute</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup: Select Disc -->
+    <div class="je-overlay" id="je-pop-selectdisc">
+        <div class="je-popup" style="max-width:360px">
+            <div class="je-popup-hdr">
+                <h3>Select Disc</h3><button class="je-closebtn" data-close="je-pop-selectdisc">&times;</button>
+            </div>
+            <div class="je-popup-body">
+                <div id="je-disc-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- populated dynamically -->
                 </div>
             </div>
         </div>
@@ -1281,7 +1344,7 @@
                 dismissLoader();
                 setTimeout(refocusGame, 500);
 
-                {{ if has_saves && slot_value > 0 }}
+                 {{ if has_saves && slot_value > 0 }}
                 setTimeout(function () {
                     var loadHeaders = {};
                     if (typeof _jellyToken !== 'undefined' && _jellyToken) {
@@ -2205,6 +2268,7 @@
             userId: '{{ user_id }}',
             savePostUrl: '{{ save_post_url }}',
             activeSlot: {{ active_slot }},
+            isM3u: {{ is_m3u }},
             token: typeof _jellyToken !== 'undefined' ? _jellyToken : ''
         };
     </script>
