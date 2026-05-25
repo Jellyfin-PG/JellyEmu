@@ -33,7 +33,7 @@ namespace JellyEmu
             new PluginPageInfo
             {
                 Name                 = "JellyEmuConfigPage",
-                DisplayName          = "Emulator Library",
+                DisplayName          = "JellyEmu",
                 EnableInMainMenu     = true,
                 EmbeddedResourcePath = $"{GetType().Namespace}.Configuration.configPage.html"
             }
