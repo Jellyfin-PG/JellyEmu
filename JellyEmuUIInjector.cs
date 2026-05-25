@@ -137,7 +137,7 @@ namespace JellyEmu.Services
                         "Dreamcast","PlayStation 2","PlayStation 3",
                         "Xbox","Xbox 360",
                         "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
-                        "PlayStation Vita"
+                        "PlayStation Vita","Windows","Unsupported"
                     ]);
 
                     function isPlayable(tags) {
@@ -421,7 +421,7 @@ namespace JellyEmu.Services
 
                         perf.mark('inject-misc-start');
 
-                        const systemTags = cachedTags.filter(t => t !== 'Game' && t !== 'JellyEmu' && !knownRegions.has(t) && !isDiscTag(t));
+                        const systemTags = cachedTags.filter(t => t !== 'Game' && t !== 'JellyEmu' && t !== 'Unsupported' && !knownRegions.has(t) && !isDiscTag(t));
                         const regionTags = cachedTags.filter(t => knownRegions.has(t));
                         const discTags   = cachedTags.filter(t => isDiscTag(t));
                         const allTags    = [...systemTags, ...regionTags, ...discTags];
@@ -944,7 +944,7 @@ namespace JellyEmu.Services
                                         const badgeWrap = document.createElement('div');
                                         badgeWrap.className = 'jellyemu-card-badge-wrap';
                                         badgeWrap.style.cssText = 'position:absolute;bottom:4px;left:4px;display:flex;gap:3px;flex-wrap:wrap;z-index:2;pointer-events:none;';
-                                        item.Tags.filter(t => t !== 'JellyEmu' && t !== 'Game').forEach(function(tag) {
+                                        item.Tags.filter(t => t !== 'JellyEmu' && t !== 'Game' && t !== 'Unsupported').forEach(function(tag) {
                                             const badge = document.createElement('span');
                                             const isRegion      = knownRegions.has(tag);
                                             const isDisc        = isDiscTag(tag);

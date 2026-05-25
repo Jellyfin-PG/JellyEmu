@@ -29,13 +29,14 @@ namespace JellyEmu.Providers
             return match.Success ? match.Groups[1].Value : null;
         }
 
-        public bool Supports(BaseItem item) => item is Book;
+        public bool Supports(BaseItem item) => item is Book && !RomExtensions.IsWindowsRom(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Logo };
 
         public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
         {
             var list = new List<RemoteImageInfo>();
+            if (!string.IsNullOrEmpty(item.Path) && (!RomExtensions.IsRomPath(item.Path) || RomExtensions.IsWindowsRom(item.Path))) return list;
             var apiKey = Plugin.Instance?.Configuration.SteamGridDbApiKey;
             if (string.IsNullOrEmpty(apiKey)) return list;
 
@@ -137,7 +138,7 @@ namespace JellyEmu.Providers
         public string Key => "SteamGridDb";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://www.steamgriddb.com/game/{0}";
-        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
+        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path) && !RomExtensions.IsWindowsRom((item as BaseItem)?.Path);
     }
 
     public class SteamGridDbExternalUrlProvider : IExternalUrlProvider
@@ -146,6 +147,7 @@ namespace JellyEmu.Providers
 
         public IEnumerable<string> GetExternalUrls(BaseItem item)
         {
+            if (RomExtensions.IsWindowsRom(item.Path)) yield break;
             if (item.TryGetProviderId("SteamGridDb", out var id))
                 yield return $"https://www.steamgriddb.com/game/{id}";
         }

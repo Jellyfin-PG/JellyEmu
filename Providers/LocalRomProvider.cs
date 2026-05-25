@@ -33,10 +33,24 @@ namespace JellyEmu.Providers
                 var nfoPath = Path.ChangeExtension(info.Path, ".nfo");
                 if (File.Exists(nfoPath))
                 {
-                    var nfoTags = new List<string> { "JellyEmu", "Game", _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path)) };
+                    var isJ3u = string.Equals(Path.GetExtension(info.Path), ".j3u", StringComparison.OrdinalIgnoreCase);
+                    var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
+                    var nfoTags = new List<string> { "JellyEmu", "Game", consoleTag };
+                    if (string.Equals(consoleTag, "Windows", StringComparison.OrdinalIgnoreCase))
+                    {
+                        nfoTags.Add("Unsupported");
+                    }
                     nfoTags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
-                    var nfoDisc = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
-                    if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
+                    
+                    if (isJ3u)
+                    {
+                        nfoTags.Add("MultiDisc");
+                    }
+                    else
+                    {
+                        var nfoDisc = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
+                        if (!string.IsNullOrEmpty(nfoDisc)) nfoTags.Add(nfoDisc);
+                    }
 
                     var item = new Book { Tags = nfoTags.ToArray() };
 
@@ -103,7 +117,8 @@ namespace JellyEmu.Providers
             {
                 try
                 {
-                    var hash = RomExtensions.GetFileHash(info.Path);
+                    var effectivePath = RomExtensions.EffectiveRomPath(info.Path);
+                    var hash = RomExtensions.GetFileHash(effectivePath);
                     if (result.Item == null) result.Item = new Book();
                     result.Item.SetProviderId("MD5", hash);
                     _logger.LogInformation("[JellyEmu] MD5 for {Path}: {Hash}", info.Path, hash);

@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using System.IO.Compression;
+using System.Threading.Tasks;
 
 namespace JellyEmu.Controllers
 {
@@ -99,6 +101,54 @@ namespace JellyEmu.Controllers
             var finalFileName = Path.GetFileName(romPath);
             Response.Headers["Content-Disposition"] = $"attachment; filename=\"{finalFileName}\"";
             return File(stream, "application/octet-stream", enableRangeProcessing: true);
+        }
+
+        [HttpGet("/jellyemu/rom/download-zip/{itemId}")]
+        [Authorize]
+        public async Task DownloadZip(string itemId)
+        {
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null || string.IsNullOrEmpty(item.Path))
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var filesToZip = new List<string>();
+            if (item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase))
+            {
+                filesToZip.AddRange(J3uParser.GetReferencedFiles(item.Path));
+            }
+            else
+            {
+                filesToZip.Add(item.Path);
+            }
+
+            filesToZip = filesToZip.Where(System.IO.File.Exists).ToList();
+
+            if (filesToZip.Count == 0)
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var zipName = $"{Path.GetFileNameWithoutExtension(item.Path)}.zip";
+            Response.ContentType = "application/zip";
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Uri.EscapeDataString(zipName)}\"";
+
+            using (var archive = new ZipArchive(Response.Body, ZipArchiveMode.Create, true))
+            {
+                foreach (var filePath in filesToZip)
+                {
+                    var entryName = Path.GetFileName(filePath);
+                    var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                    using (var entryStream = entry.Open())
+                    using (var fileStream = System.IO.File.OpenRead(filePath))
+                    {
+                        await fileStream.CopyToAsync(entryStream).ConfigureAwait(false);
+                    }
+                }
+            }
         }
 
         /// <summary>

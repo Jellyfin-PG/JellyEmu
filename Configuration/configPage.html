@@ -2,314 +2,485 @@
     <div data-role="content">
         <div class="content-primary">
 
-            <div class="verticalSection">
-                <h2 class="sectionTitle">JellyEmu — Retro Games Library</h2>
-            </div>
-
-            <div class="paperList"
-                style="padding: 1.5em; text-align: center; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 1.5em;">
-                <p style="margin: 0; color: #aaa; font-size: 0.9em;">ROMs Scanned</p>
-                <h1 id="romCountDisplay" style="font-size: 4em; color: #00a4dc; margin: 4px 0;">...</h1>
-                <p style="color: #aaa; font-size: 0.85em; margin: 0;">Tagged <b>Book</b> items with the
-                    <code>JellyEmu</code> tag found in your library.
-                </p>
-            </div>
-
-            <div class="verticalSection">
-                <h2 class="sectionTitle">IGDB Metadata (via Twitch)</h2>
-                <p style="color: #aaa; margin-bottom: 1em;">
-                    Used for game descriptions, release dates, and cover art.
-                    Register your app at <a href="https://dev.twitch.tv/console/apps" target="_blank"
-                        style="color: #00a4dc;">dev.twitch.tv/console/apps</a>
-                    and set the OAuth redirect to <code>http://localhost</code>.
-                </p>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="igdbClientId">Twitch Client ID</label>
-                    <input id="igdbClientId" type="text" is="emby-input" class="emby-input"
-                        placeholder="e.g. 7imyo6cfhtx5pzsoq3lnd7ochv6kle" autocomplete="off" />
+            <!-- Premium Header with Inline SVG Logo -->
+            <div class="je-header" style="display: flex; align-items: center; gap: 14px; margin-bottom: 2em;">
+                <div class="je-logo-container" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: rgba(0, 164, 220, 0.15); border: 1.5px solid rgba(0, 164, 220, 0.4); border-radius: 12px; padding: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#00a4dc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 100%; height: 100%;">
+                        <path d="M12 2L3 18a2 2 0 0 0 1.7 3h14.6a2 2 0 0 0 1.7-3L12 2z" />
+                        <path d="M7.5 15.5h3M9 14v3" stroke="#00a4dc" stroke-width="1.2" />
+                        <circle cx="15.5" cy="14.5" r="0.8" fill="#00a4dc" stroke="none" />
+                        <circle cx="17" cy="16.5" r="0.8" fill="#00a4dc" stroke="none" />
+                    </svg>
                 </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="igdbClientSecret">Twitch Client Secret</label>
-                    <input id="igdbClientSecret" type="password" is="emby-input" class="emby-input"
-                        placeholder="Your Twitch client secret" autocomplete="off" />
+                <div>
+                    <h2 style="margin: 0; font-size: 1.8em; font-weight: 600; color: #fff;">JellyEmu</h2>
+                    <p style="margin: 2px 0 0; color: #aaa; font-size: 0.9em;">Retro Games Library Integration</p>
                 </div>
             </div>
 
-            <div class="verticalSection" style="margin-top: 1.5em;">
-                <h2 class="sectionTitle">RAWG Metadata</h2>
-                <p style="color: #aaa; margin-bottom: 1em;">
-                    Used as a fallback provider for game metadata and screenshots.
-                    Get your free API key at <a href="https://rawg.io/apidocs" target="_blank"
-                        style="color: #00a4dc;">rawg.io/apidocs</a>.
-                </p>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="rawgApiKey">RAWG API Key</label>
-                    <input id="rawgApiKey" type="password" is="emby-input" class="emby-input"
-                        placeholder="Your RAWG API key" autocomplete="off" />
-                </div>
-            </div>
-
-            <div class="verticalSection" style="margin-top: 1.5em;">
-                <h2 class="sectionTitle">SteamGridDB Images</h2>
-                <p style="color: #aaa; margin-bottom: 1em;">
-                    Used for high-quality game grids, heroes, and logos.
-                    Get your API key at <a href="https://www.steamgriddb.com/profile/api" target="_blank"
-                        style="color: #00a4dc;">steamgriddb.com/profile/api</a>.
-                </p>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="steamGridDbApiKey">SteamGridDB API Key</label>
-                    <input id="steamGridDbApiKey" type="password" is="emby-input" class="emby-input"
-                        placeholder="Your SteamGridDB API key" autocomplete="off" />
-                </div>
-            </div>
-
-            <div class="verticalSection" style="margin-top: 1.5em;">
-                <h2 class="sectionTitle">Romm Integration <span
-                        style="font-size: 0.65em; vertical-align: middle; background: #555; color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px;">Disabled
-                        by default</span></h2>
-                <p style="color: #aaa; margin-bottom: 1em;">
-                    Connects to your self-hosted
-                    <a href="https://github.com/rommapp/romm" target="_blank" style="color: #00a4dc;">Romm</a>
-                    instance for metadata, cover art, save-state cloud sync, playtime reporting, collection sync, and
-                    screenshot push.
-                    Requires Romm v3.4 or later. Authentication uses OAuth2 (bearer token) with Basic Auth as fallback.
-                </p>
-
-                <style>
-                    .je-toggle-row {
-                        display: flex;
-                        align-items: center;
-                        gap: 14px;
-                        margin-bottom: 1em;
-                    }
-
-                    .je-toggle-btn {
-                        flex-shrink: 0;
-                        min-width: 90px;
-                        padding: 5px 14px;
-                        border-radius: 4px;
-                        border: 1px solid rgba(255, 255, 255, 0.2);
-                        cursor: pointer;
-                        font-size: 0.82em;
-                        font-weight: 600;
-                        letter-spacing: 0.04em;
-                        text-transform: uppercase;
-                        transition: background 0.15s, border-color 0.15s;
-                        background: rgba(255, 255, 255, 0.06);
-                        color: #aaa;
-                    }
-
-                    .je-toggle-btn.je-on {
-                        background: rgba(82, 181, 75, 0.18);
-                        border-color: rgba(82, 181, 75, 0.55);
-                        color: #52B54B;
-                    }
-
-                    .je-toggle-label {
-                        color: #ccc;
-                        font-size: 0.92em;
-                        line-height: 1.3;
-                    }
-
-                    .je-toggle-label small {
-                        display: block;
-                        color: #777;
-                        font-size: 0.88em;
-                        margin-top: 2px;
-                    }
-                </style>
-
-                <div class="je-toggle-row">
-                    <input type="hidden" id="rommEnabled" value="false" />
-                    <button type="button" class="je-toggle-btn" id="rommEnabledBtn"
-                        onclick="jeToggle('rommEnabled')">OFF</button>
-                    <span class="je-toggle-label">
-                        Enable Romm integration
-                        <small>Enables metadata, cover art, save sync, playtime reporting, collection sync and
-                            screenshot push.</small>
-                    </span>
-                </div>
-
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="rommInstanceUrl">Romm Instance URL</label>
-                    <input id="rommInstanceUrl" type="text" is="emby-input" class="emby-input"
-                        placeholder="e.g. https://romm.example.com" autocomplete="off" />
-                </div>
-                <div style="margin: -0.5em 0 1em 0; display: flex; align-items: center; gap: 10px;">
-                    <button type="button" id="btnRommHealth" is="emby-button" class="emby-button"
-                        style="padding: 5px 14px; font-size: 0.82em;">
-                        Test Connection
-                    </button>
-                    <span id="rommHealthStatus" style="font-size: 0.82em; color: #aaa;"></span>
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="rommUsername">Romm Username</label>
-                    <input id="rommUsername" type="text" is="emby-input" class="emby-input"
-                        placeholder="Your Romm username" autocomplete="off" />
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="rommPassword">Romm Password</label>
-                    <input id="rommPassword" type="password" is="emby-input" class="emby-input"
-                        placeholder="Your Romm password" autocomplete="off" />
-                </div>
-                <p style="color: #777; font-size: 0.82em; margin-top: 0.25em;">
-                    Credentials are sent as HTTP Basic Auth on every request to your Romm instance.
-                    A secure HTTPS connection is strongly recommended.
-                </p>
-
-                <div style="margin-top: 1.25em; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.25em;">
-                    <p style="color: #ccc; font-size: 0.88em; margin-bottom: 1em; font-weight: 600;">Romm Features
-                        (requires Romm enabled above)</p>
-
-                    <div class="je-toggle-row">
-                        <input type="hidden" id="rommSaveSyncEnabled" value="true" />
-                        <button type="button" class="je-toggle-btn je-on" id="rommSaveSyncEnabledBtn"
-                            onclick="jeToggle('rommSaveSyncEnabled')">ON</button>
-                        <span class="je-toggle-label">
-                            Save-state sync
-                            <small>Pull save from Romm on launch if it's newer; push to Romm after each save.</small>
-                        </span>
-                    </div>
-
-                    <div class="je-toggle-row">
-                        <input type="hidden" id="rommPlaytimeReportEnabled" value="true" />
-                        <button type="button" class="je-toggle-btn je-on" id="rommPlaytimeReportEnabledBtn"
-                            onclick="jeToggle('rommPlaytimeReportEnabled')">ON</button>
-                        <span class="je-toggle-label">
-                            Playtime reporting
-                            <small>Send session playtime to Romm when a game session ends.</small>
-                        </span>
-                    </div>
-
-                    <div class="je-toggle-row">
-                        <input type="hidden" id="rommCollectionSyncEnabled" value="true" />
-                        <button type="button" class="je-toggle-btn je-on" id="rommCollectionSyncEnabledBtn"
-                            onclick="jeToggle('rommCollectionSyncEnabled')">ON</button>
-                        <span class="je-toggle-label">
-                            Collection sync
-                            <small>Import Romm collections as Jellyfin collections.</small>
-                        </span>
-                    </div>
-                    <div id="rommCollectionSyncRow" style="margin: -0.25em 0 1em 104px;">
-                        <button id="btnRommSyncCollections" is="emby-button" type="button" class="raised emby-button"
-                            style="padding: 6px 16px; font-size: 0.85em;">
-                            <span>Sync Collections Now</span>
-                        </button>
-                        <span id="rommCollectionSyncStatus"
-                            style="margin-left: 10px; font-size: 0.82em; color: #aaa;"></span>
-                    </div>
-
-                    <div class="je-toggle-row">
-                        <input type="hidden" id="rommScreenshotPushEnabled" value="true" />
-                        <button type="button" class="je-toggle-btn je-on" id="rommScreenshotPushEnabledBtn"
-                            onclick="jeToggle('rommScreenshotPushEnabled')">ON</button>
-                        <span class="je-toggle-label">
-                            Screenshot push
-                            <small>Send in-game screenshots to Romm when you take one.</small>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="verticalSection" style="margin-top: 1.5em;">
-                <h2 class="sectionTitle">Netplay</h2>
-                <p style="color: #aaa; margin-bottom: 1em;">
-                    Optional. Provide your netplay server address to enable multiplayer via EmulatorJS.
-                    Leave blank to disable netplay. Requires a running
-                    <a href="https://github.com/EmulatorJS/EmulatorJS-Netplay" target="_blank"
-                        style="color: #00a4dc;">EmulatorJS netplay server</a>.
-                </p>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="netplayServer">Netplay Server</label>
-                    <input id="netplayServer" type="text" is="emby-input" class="emby-input"
-                        placeholder="e.g. https://192.168.1.100:3000" autocomplete="off" />
-                </div>
-            </div>
-
-            <div class="verticalSection" style="margin-top: 1.5em;">
-                <h2 class="sectionTitle">RetroArch Integration</h2>
-                <p style="color: #aaa; margin-bottom: 1.25em;">
-                    JellyEmu exposes endpoints so RetroArch can stream ROMs directly from your Jellyfin server.
-                    RetroArch does not support importing playlists from a URL — you need to download the
-                    <code>.lpl</code> file and place it manually in RetroArch's <code>playlists/</code> folder.
-                </p>
-
-                <div class="paperList"
-                    style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
-                    <p
-                        style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Full library playlist</p>
-                    <code id="raPlaylistUrl"
-                        style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
-                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
-                        Downloads <code>JellyEmu.lpl</code>. Copy it to your RetroArch <code>playlists/</code> folder,
-                        then open RetroArch → <strong>Playlists</strong> to see all ROMs. RetroArch will stream each ROM
-                        over HTTP when you launch it — no local files needed.
-                    </p>
-                </div>
-
-                <div class="paperList"
-                    style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
-                    <p
-                        style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Per-system playlists</p>
-                    <code id="raPlaylistSystemUrl"
-                        style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
-                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
-                        Replace <code>{system}</code> with a platform tag exactly as stored in Jellyfin, e.g.
-                        <code>NES</code>, <code>SNES</code>, <code>PlayStation</code>. Downloads
-                        <code>JellyEmu-{system}.lpl</code>.
-                    </p>
-                </div>
-
-                <div class="paperList"
-                    style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
-                    <p
-                        style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Deep-link launch (Android)</p>
-                    <code id="raLaunchUrl"
-                        style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
-                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
-                        Replace <code>{itemId}</code> with a Jellyfin item ID. Opening this URL in a browser on Android
-                        (with RetroArch installed from the Play Store) hands the ROM directly to RetroArch via an
-                        intent.
-                        On desktop, RetroArch must be registered as the <code>retroarch://</code> protocol handler.
-                    </p>
-                </div>
-
-                <div class="paperList"
-                    style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 1.25em;">
-                    <p
-                        style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Server info &amp; system discovery</p>
-                    <code id="raInfoUrl"
-                        style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
-                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
-                        Returns JSON listing all detected systems, their ROM counts, and their per-system playlist URLs.
-                        Useful for custom front-ends or scripts that generate playlists automatically.
-                    </p>
-                </div>
-
-                <div class="paperList" style="padding: 1.25em; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                    <p
-                        style="margin: 0 0 4px; color: #ccc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">
-                        ROM streaming</p>
-                    <code id="raRomUrl" style="color: #00a4dc; word-break: break-all; font-size: 0.9em;">Loading…</code>
-                    <p style="margin: 0.6em 0 0; color: #888; font-size: 0.82em;">
-                        Each playlist entry points here. RetroArch fetches the ROM over HTTP when launching.
-                        You can also use this URL directly with <code>curl</code> or any HTTP client.
-                    </p>
-                </div>
-            </div>
-
-            <div style="margin-top: 2em;">
-                <button id="btnSaveConfig" is="emby-button" type="button"
-                    class="raised button-submit block emby-button">
-                    <span>Save Settings</span>
+            <!-- Tab Navigation Bar -->
+            <div class="je-tabs-nav" style="display: flex; gap: 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 2em; padding-bottom: 2px;">
+                <button type="button" class="je-tab-btn active" data-tab="statistics" onclick="jeSwitchTab('statistics')">
+                    <span class="material-icons">bar_chart</span>
+                    <span>Statistics</span>
+                </button>
+                <button type="button" class="je-tab-btn" data-tab="settings" onclick="jeSwitchTab('settings')">
+                    <span class="material-icons">settings</span>
+                    <span>Settings</span>
+                </button>
+                <button type="button" class="je-tab-btn" data-tab="api" onclick="jeSwitchTab('api')">
+                    <span class="material-icons">code</span>
+                    <span>API Doc</span>
+                </button>
+                <button type="button" class="je-tab-btn" data-tab="about" onclick="jeSwitchTab('about')">
+                    <span class="material-icons">info</span>
+                    <span>About</span>
                 </button>
             </div>
 
-            <p id="saveStatus" style="margin-top: 1em; color: #52B54B; display: none; text-align: center;"></p>
+            <!-- Tab Styles and Component Styles -->
+            <style>
+                .je-tab-btn {
+                    background: none !important;
+                    border: none !important;
+                    padding: 10px 20px !important;
+                    color: #aaa !important;
+                    cursor: pointer !important;
+                    font-size: 0.95em !important;
+                    font-weight: 600 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 8px !important;
+                    border-bottom: 2px solid transparent !important;
+                    transition: color 0.15s, border-color 0.15s !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                .je-tab-btn .material-icons {
+                    font-size: 18px !important;
+                }
+                .je-tab-btn:hover {
+                    color: #fff !important;
+                }
+                .je-tab-btn.active {
+                    color: #00a4dc !important;
+                    border-bottom-color: #00a4dc !important;
+                }
+                .je-tab-content {
+                    display: none;
+                }
+                .je-tab-content.active {
+                    display: block;
+                }
+
+                .je-toggle-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    margin-bottom: 1em;
+                }
+
+                .je-toggle-btn {
+                    flex-shrink: 0;
+                    min-width: 90px;
+                    padding: 5px 14px;
+                    border-radius: 4px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    cursor: pointer;
+                    font-size: 0.82em;
+                    font-weight: 600;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    transition: background 0.15s, border-color 0.15s;
+                    background: rgba(255, 255, 255, 0.06);
+                    color: #aaa;
+                }
+
+                .je-toggle-btn.je-on {
+                    background: rgba(82, 181, 75, 0.18);
+                    border-color: rgba(82, 181, 75, 0.55);
+                    color: #52B54B;
+                }
+
+                .je-toggle-label {
+                    color: #ccc;
+                    font-size: 0.92em;
+                    line-height: 1.3;
+                }
+
+                .je-toggle-label small {
+                    display: block;
+                    color: #777;
+                    font-size: 0.88em;
+                    margin-top: 2px;
+                }
+
+                .je-api-item {
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 8px;
+                    padding: 1.25em;
+                    margin-bottom: 1.25em;
+                    transition: background 0.15s, border-color 0.15s;
+                }
+                .je-api-item:hover {
+                    background: rgba(255, 255, 255, 0.04);
+                    border-color: rgba(255, 255, 255, 0.1);
+                }
+                .je-api-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 6px;
+                    flex-wrap: wrap;
+                }
+                .je-api-method {
+                    font-size: 0.72em;
+                    font-weight: 700;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+                .je-api-method.get {
+                    background: rgba(82, 181, 75, 0.12);
+                    color: #52B54B;
+                    border: 1px solid rgba(82, 181, 75, 0.25);
+                }
+                .je-api-method.post {
+                    background: rgba(220, 140, 0, 0.12);
+                    color: #dca000;
+                    border: 1px solid rgba(220, 140, 0, 0.25);
+                }
+                .je-api-path {
+                    font-family: monospace;
+                    font-size: 1.02em;
+                    color: #00a4dc;
+                    word-break: break-all;
+                }
+                .je-api-desc {
+                    color: #aaa;
+                    font-size: 0.88em;
+                    line-height: 1.45;
+                    margin: 6px 0 0;
+                }
+            </style>
+
+            <!-- Tab 1: Statistics -->
+            <div id="tab-statistics" class="je-tab-content active">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5em; margin-bottom: 2.5em;">
+                    <div class="paperList" style="padding: 1.5em; text-align: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 120px; box-shadow: none;">
+                        <p style="margin: 0; color: #999; font-size: 0.9em; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">ROMs Scanned</p>
+                        <h1 id="romCountDisplay" style="font-size: 3.2em; font-weight: 700; color: #00a4dc; margin: 6px 0 4px; line-height: 1.1;">...</h1>
+                        <p style="color: #666; font-size: 0.8em; margin: 0; max-width: 220px;">
+                            Tagged Book items with the JellyEmu tag.
+                        </p>
+                    </div>
+                    <div class="paperList" style="padding: 1.5em; text-align: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 120px; box-shadow: none;">
+                        <p style="margin: 0; color: #999; font-size: 0.9em; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">Unsupported ROMs</p>
+                        <h1 id="unsupportedCountDisplay" style="font-size: 3.2em; font-weight: 700; color: #aaa; margin: 6px 0 4px; line-height: 1.1;">...</h1>
+                        <p style="color: #666; font-size: 0.8em; margin: 0; max-width: 220px;">
+                            Games on platforms not supported by EmulatorJS.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="verticalSection">
+                    <h2 class="sectionTitle" style="margin-bottom: 1em; font-size: 1.25em; font-weight: 600; color: #fff;">Console Distribution</h2>
+                    <div id="je-stats-console-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2em;">
+                        <!-- Dynamically populated in JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Settings -->
+            <div id="tab-settings" class="je-tab-content">
+                <div class="verticalSection">
+                    <h2 class="sectionTitle">IGDB Metadata (via Twitch)</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Used for game descriptions, release dates, and cover art.
+                        Register your app at <a href="https://dev.twitch.tv/console/apps" target="_blank"
+                            style="color: #00a4dc; text-decoration: none;">dev.twitch.tv/console/apps</a>
+                        and set the OAuth redirect to <code>http://localhost</code>.
+                    </p>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="igdbClientId">Twitch Client ID</label>
+                        <input id="igdbClientId" type="text" class="emby-input"
+                            placeholder="e.g. 7imyo6cfhtx5pzsoq3lnd7ochv6kle" autocomplete="off" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="igdbClientSecret">Twitch Client Secret</label>
+                        <input id="igdbClientSecret" type="password" class="emby-input"
+                            placeholder="Your Twitch client secret" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">RAWG Metadata</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Used as a fallback provider for game metadata and screenshots.
+                        Get your free API key at <a href="https://rawg.io/apidocs" target="_blank"
+                            style="color: #00a4dc; text-decoration: none;">rawg.io/apidocs</a>.
+                    </p>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="rawgApiKey">RAWG API Key</label>
+                        <input id="rawgApiKey" type="password" class="emby-input"
+                            placeholder="Your RAWG API key" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">SteamGridDB Images</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Used for high-quality game grids, heroes, and logos.
+                        Get your API key at <a href="https://www.steamgriddb.com/profile/api" target="_blank"
+                            style="color: #00a4dc; text-decoration: none;">steamgriddb.com/profile/api</a>.
+                    </p>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="steamGridDbApiKey">SteamGridDB API Key</label>
+                        <input id="steamGridDbApiKey" type="password" class="emby-input"
+                            placeholder="Your SteamGridDB API key" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">Romm Integration <span
+                            style="font-size: 0.65em; vertical-align: middle; background: rgba(255,255,255,0.08); color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px; font-weight: 500;">Disabled
+                            by default</span></h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Connects to your self-hosted Romm instance for metadata, cover art, save-state cloud sync, playtime reporting, collection sync, and screenshot push.
+                        Requires Romm v3.4 or later.
+                    </p>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="rommEnabled" value="false" />
+                        <button type="button" class="je-toggle-btn" id="rommEnabledBtn"
+                            onclick="jeToggle('rommEnabled')">OFF</button>
+                        <span class="je-toggle-label">
+                            Enable Romm integration
+                            <small>Enables metadata, cover art, save sync, playtime reporting, collection sync and screenshot push.</small>
+                        </span>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="rommInstanceUrl">Romm Instance URL</label>
+                        <input id="rommInstanceUrl" type="text" class="emby-input"
+                            placeholder="e.g. https://romm.example.com" autocomplete="off" />
+                    </div>
+                    <div style="margin: -0.5em 0 1em 0; display: flex; align-items: center; gap: 10px;">
+                        <button type="button" id="btnRommHealth" is="emby-button" class="emby-button"
+                            style="padding: 5px 14px; font-size: 0.82em; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                            Test Connection
+                        </button>
+                        <span id="rommHealthStatus" style="font-size: 0.82em; color: #aaa;"></span>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="rommUsername">Romm Username</label>
+                        <input id="rommUsername" type="text" class="emby-input"
+                            placeholder="Your Romm username" autocomplete="off" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="rommPassword">Romm Password</label>
+                        <input id="rommPassword" type="password" class="emby-input"
+                            placeholder="Your Romm password" autocomplete="off" />
+                    </div>
+                    <p style="color: #777; font-size: 0.82em; margin-top: 0.25em;">
+                        Credentials are sent as HTTP Basic Auth on every request to your Romm instance. A secure HTTPS connection is strongly recommended.
+                    </p>
+
+                    <div style="margin-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.5em;">
+                        <p style="color: #ccc; font-size: 0.9em; margin-bottom: 1.2em; font-weight: 600;">Romm Features (requires Romm enabled above)</p>
+
+                        <div class="je-toggle-row">
+                            <input type="hidden" id="rommSaveSyncEnabled" value="true" />
+                            <button type="button" class="je-toggle-btn je-on" id="rommSaveSyncEnabledBtn"
+                                onclick="jeToggle('rommSaveSyncEnabled')">ON</button>
+                            <span class="je-toggle-label">
+                                Save-state sync
+                                <small>Pull save from Romm on launch if it's newer; push to Romm after each save.</small>
+                            </span>
+                        </div>
+
+                        <div class="je-toggle-row">
+                            <input type="hidden" id="rommPlaytimeReportEnabled" value="true" />
+                            <button type="button" class="je-toggle-btn je-on" id="rommPlaytimeReportEnabledBtn"
+                                onclick="jeToggle('rommPlaytimeReportEnabled')">ON</button>
+                            <span class="je-toggle-label">
+                                Playtime reporting
+                                <small>Send session playtime to Romm when a game session ends.</small>
+                            </span>
+                        </div>
+
+                        <div class="je-toggle-row">
+                            <input type="hidden" id="rommCollectionSyncEnabled" value="true" />
+                            <button type="button" class="je-toggle-btn je-on" id="rommCollectionSyncEnabledBtn"
+                                onclick="jeToggle('rommCollectionSyncEnabled')">ON</button>
+                            <span class="je-toggle-label">
+                                Collection sync
+                                <small>Import Romm collections as Jellyfin collections.</small>
+                            </span>
+                        </div>
+                        <div id="rommCollectionSyncRow" style="margin: -0.25em 0 1em 104px;">
+                            <button id="btnRommSyncCollections" is="emby-button" type="button" class="raised emby-button"
+                                style="padding: 6px 16px; font-size: 0.85em; background: rgba(0, 164, 220, 0.15); border: 1px solid rgba(0, 164, 220, 0.25);">
+                                <span>Sync Collections Now</span>
+                            </button>
+                            <span id="rommCollectionSyncStatus"
+                                style="margin-left: 10px; font-size: 0.82em; color: #aaa;"></span>
+                        </div>
+
+                        <div class="je-toggle-row">
+                            <input type="hidden" id="rommScreenshotPushEnabled" value="true" />
+                            <button type="button" class="je-toggle-btn je-on" id="rommScreenshotPushEnabledBtn"
+                                onclick="jeToggle('rommScreenshotPushEnabled')">ON</button>
+                            <span class="je-toggle-label">
+                                Screenshot push
+                                <small>Send in-game screenshots to Romm when you take one.</small>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">Netplay</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Provide your netplay server address to enable multiplayer via EmulatorJS.
+                        Leave blank to disable netplay. Requires a running EmulatorJS netplay server.
+                    </p>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="netplayServer">Netplay Server</label>
+                        <input id="netplayServer" type="text" class="emby-input"
+                            placeholder="e.g. https://192.168.1.100:3000" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div style="margin-top: 2em;">
+                    <button id="btnSaveConfig" is="emby-button" type="button"
+                        class="raised button-submit block emby-button"
+                        style="background: #00a4dc; color: #fff; padding: 10px 24px; font-weight: 600;">
+                        <span>Save Settings</span>
+                    </button>
+                </div>
+
+                <p id="saveStatus" style="margin-top: 1em; color: #52B54B; display: none; text-align: center; font-weight: 500;"></p>
+            </div>
+
+            <!-- Tab 3: API Doc -->
+            <div id="tab-api" class="je-tab-content">
+                <div class="verticalSection">
+                    <h2 class="sectionTitle" style="margin-bottom: 0.5em; font-size: 1.25em; font-weight: 600;">RetroArch Integration</h2>
+                    <p style="color: #aaa; margin-bottom: 1.5em; font-size: 0.92em; line-height: 1.4;">
+                        Endpoints exposed for RetroArch system streaming and playlist auto-generation.
+                    </p>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path" id="raPlaylistUrl">/jellyemu/retroarch/playlist</span>
+                        </div>
+                        <p class="je-api-desc">Downloads <code>JellyEmu.lpl</code>, the full library playlist. Copy it to your RetroArch <code>playlists/</code> folder to stream ROMs directly over HTTP.</p>
+                    </div>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path" id="raPlaylistSystemUrl">/jellyemu/retroarch/playlist/{system}</span>
+                        </div>
+                        <p class="je-api-desc">Downloads a per-system playlist <code>JellyEmu-{system}.lpl</code>. Replace <code>{system}</code> with a platform tag like <code>NES</code> or <code>SNES</code>.</p>
+                    </div>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path" id="raLaunchUrl">/jellyemu/retroarch/launch/{itemId}</span>
+                        </div>
+                        <p class="je-api-desc">Deep-link launch handler. Opening this endpoint on a system with RetroArch installed initiates the game directly.</p>
+                    </div>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path" id="raInfoUrl">/jellyemu/retroarch/info</span>
+                        </div>
+                        <p class="je-api-desc">Returns a JSON summary of all detected systems, total game counts, and playlist configuration details.</p>
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 2.5em;">
+                    <h2 class="sectionTitle" style="margin-bottom: 0.5em; font-size: 1.25em; font-weight: 600;">Core File Delivery</h2>
+                    <p style="color: #aaa; margin-bottom: 1.5em; font-size: 0.92em; line-height: 1.4;">
+                        Endpoints managing direct game ROM delivery and packaging.
+                    </p>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path" id="raRomUrl">/jellyemu/rom/{itemId}</span>
+                        </div>
+                        <p class="je-api-desc">Streams the raw game ROM binary file. Used for RetroArch playback and download routing.</p>
+                    </div>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path">/jellyemu/rom/download-zip/{itemId}</span>
+                        </div>
+                        <p class="je-api-desc">Builds and streams a ZIP file packaging all multi-part installer files (designed for Windows/GOG installer packages).</p>
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 2.5em;">
+                    <h2 class="sectionTitle" style="margin-bottom: 0.5em; font-size: 1.25em; font-weight: 600;">Saves &amp; Preferences</h2>
+                    <p style="color: #aaa; margin-bottom: 1.5em; font-size: 0.92em; line-height: 1.4;">
+                        Endpoints managing cloud saves, SRAM, state states, and settings.
+                    </p>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-path">/jellyemu/saves/{itemId}/slots</span>
+                        </div>
+                        <p class="je-api-desc">Retrieves a list of saved state slots, modified dates, and active emulator details for the given game.</p>
+                    </div>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-method post" style="margin-left: 4px;">POST</span>
+                            <span class="je-api-path" style="margin-left: 4px;">/jellyemu/saves/{itemId}/slots/{slot}</span>
+                        </div>
+                        <p class="je-api-desc">Downloads (GET) or uploads (POST) the save state file for the specified slot. Slot 100 corresponds to auto-saves, and slot 99 corresponds to disc-swapping saves.</p>
+                    </div>
+
+                    <div class="je-api-item">
+                        <div class="je-api-header">
+                            <span class="je-api-method get">GET</span>
+                            <span class="je-api-method post" style="margin-left: 4px;">POST</span>
+                            <span class="je-api-path" style="margin-left: 4px;">/jellyemu/saves/{itemId}/prefs</span>
+                        </div>
+                        <p class="je-api-desc">Downloads (GET) or uploads (POST) EmulatorJS controller mapping and preferences JSON.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: About -->
+            <div id="tab-about" class="je-tab-content">
+                <div class="paperList" style="padding: 2em; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 2em; display: flex; flex-direction: column; gap: 14px; box-shadow: none;">
+                    <h3 style="margin: 0; font-size: 1.25em; font-weight: 600; color: #fff;">Thank you for using JellyEmu</h3>
+                    <p style="margin: 0; color: #ccc; font-size: 0.95em; line-height: 1.5;">
+                        JellyEmu is an open-source plugin designed to seamlessly connect you to your emulation library, enabling in-browser gameplay, cloud save synchronisation, playtime tracking, and self-hosted Romm manager integrations.
+                    </p>
+                    <p style="margin: 0; color: #ccc; font-size: 0.95em; line-height: 1.5;">
+                        Development is community-driven. If you encounter bugs, want to propose features, or want to contribute to the code, please visit our repository on GitHub.
+                    </p>
+                    <div style="margin-top: 0.8em;">
+                        <a href="https://github.com/Jellyfin-PG/JellyEmu" target="_blank" class="raised emby-button" style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; padding: 10px 20px; font-weight: 600; background: #00a4dc; color: #fff; border-radius: 4px;">
+                            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; fill: white;"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                            <span>JellyEmu on GitHub</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
 
         </div>
     </div>
@@ -318,8 +489,55 @@
         (function () {
             var pluginId = "9bab105e-9af0-4e25-a87d-876713b60962";
 
+            var knownRegions = new Set([
+                "USA","Europe","Japan","World","Australia","Brazil","Canada","China",
+                "France","Germany","Italy","Korea","Netherlands","Russia","Spain","Sweden",
+                "Asia","Scandinavia","Unlicensed","Prototype","Demo","Sample"
+            ]);
+
+            window.jeSwitchTab = function (tabId) {
+                var page = document.querySelector('#JellyEmuConfigPage');
+                if (!page) return;
+                
+                var navButtons = page.querySelectorAll('.je-tab-btn');
+                var tabContents = page.querySelectorAll('.je-tab-content');
+                
+                navButtons.forEach(function (btn) {
+                    btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+                });
+                
+                tabContents.forEach(function (content) {
+                    content.classList.toggle('active', content.id === 'tab-' + tabId);
+                });
+            };
+
+            function getConsoleColor(consoleName) {
+                var c = consoleName.toLowerCase();
+                if (c.indexOf('nes') !== -1 || c.indexOf('nintendo entertainment system') !== -1) return '#e60012';
+                if (c.indexOf('snes') !== -1 || c.indexOf('super nintendo') !== -1) return '#8c52ff';
+                if (c.indexOf('n64') !== -1 || c.indexOf('nintendo 64') !== -1) return '#007cff';
+                if (c.indexOf('game boy') !== -1 || c.indexOf('gb') !== -1) return '#52B54B';
+                if (c.indexOf('windows') !== -1 || c.indexOf('gog') !== -1) return '#00a4dc';
+                if (c.indexOf('playstation') !== -1 || c.indexOf('ps') !== -1) return '#2e6db4';
+                if (c.indexOf('pico') !== -1) return '#ff7e00';
+                if (c.indexOf('dreamcast') !== -1) return '#ff5a00';
+                if (c.indexOf('xbox') !== -1) return '#107c10';
+                if (c.indexOf('wii') !== -1) return '#00d2ff';
+                if (c.indexOf('sega') !== -1 || c.indexOf('genesis') !== -1 || c.indexOf('megadrive') !== -1) return '#005ecc';
+                if (c.indexOf('atari') !== -1) return '#e21b22';
+                
+                // Hashed fallback color
+                var hash = 0;
+                for (var i = 0; i < consoleName.length; i++) {
+                    hash = consoleName.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                var h = Math.abs(hash % 360);
+                return 'hsl(' + h + ', 65%, 55%)';
+            }
+
             function showStatus(msg, isError) {
                 var el = document.querySelector('#JellyEmuConfigPage #saveStatus');
+                if (!el) return;
                 el.textContent = msg;
                 el.style.color = isError ? '#FF4444' : '#52B54B';
                 el.style.display = 'block';
@@ -361,21 +579,125 @@
 
             function loadRomCount(page) {
                 var display = page.querySelector('#romCountDisplay');
-                display.innerText = '...';
-                display.style.color = '#00a4dc';
+                if (display) {
+                    display.innerText = '...';
+                    display.style.color = '#00a4dc';
+                }
+                
+                var statsContainer = page.querySelector('#je-stats-console-grid');
+                if (statsContainer) statsContainer.innerHTML = '<p style="color: #aaa; text-align: center; width: 100%;">Analyzing your library...</p>';
+                
                 ApiClient.getItems(ApiClient.getCurrentUserId(), {
                     Recursive: true,
                     IncludeItemTypes: 'Book',
                     Fields: 'Tags'
                 }).then(function (result) {
-                    var count = (result.Items || []).filter(function (i) {
+                    var items = (result.Items || []).filter(function (i) {
                         return i.Tags && i.Tags.includes('JellyEmu');
-                    }).length;
-                    display.innerText = count;
-                    display.style.color = count > 0 ? '#52B54B' : '#00a4dc';
-                }).catch(function () {
-                    display.innerText = 'Error';
-                    display.style.color = '#FF4444';
+                    });
+                    
+                    var count = items.length;
+                    if (display) {
+                        display.innerText = count;
+                        display.style.color = count > 0 ? '#52B54B' : '#00a4dc';
+                    }
+                    
+                    // Compute console statistics
+                    var consoleCounts = {};
+                    var unsupportedCount = 0;
+                    
+                    var ejsUnsupportedPlatforms = new Set([
+                        "Dreamcast","PlayStation 2","PlayStation 3",
+                        "Xbox","Xbox 360",
+                        "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
+                        "PlayStation Vita","Windows","Unsupported"
+                    ]);
+                    
+                    items.forEach(function (item) {
+                        var consoleTag = null;
+                        var isUnsupported = false;
+                        if (item.Tags) {
+                            if (item.Tags.includes('Unsupported')) {
+                                isUnsupported = true;
+                            }
+                            item.Tags.forEach(function (tag) {
+                                if (tag === 'JellyEmu' || tag === 'Game' || tag === 'Unsupported' || tag === 'MultiDisc') return;
+                                if (knownRegions.has(tag)) return;
+                                if (tag.indexOf('Disc ') === 0 || tag.indexOf('Side ') === 0 || tag.indexOf('Tape ') === 0) return;
+                                
+                                if (ejsUnsupportedPlatforms.has(tag)) {
+                                    isUnsupported = true;
+                                }
+                                consoleTag = tag;
+                            });
+                        }
+                        if (isUnsupported) {
+                            unsupportedCount++;
+                        }
+                        if (!consoleTag) consoleTag = 'Unknown';
+                        consoleCounts[consoleTag] = (consoleCounts[consoleTag] || 0) + 1;
+                    });
+                    
+                    if (statsContainer) {
+                        statsContainer.innerHTML = '';
+                        var consoles = Object.keys(consoleCounts).sort(function (a, b) {
+                            return consoleCounts[b] - consoleCounts[a];
+                        });
+                        
+                        if (consoles.length === 0) {
+                            statsContainer.innerHTML = '<p style="color: #aaa; text-align: center; width: 100%;">No games found in your library.</p>';
+                        } else {
+                            consoles.forEach(function (consoleName) {
+                                var cCount = consoleCounts[consoleName];
+                                var percent = count > 0 ? Math.round((cCount / count) * 100) : 0;
+                                var color = getConsoleColor(consoleName);
+                                
+                                var card = document.createElement('div');
+                                card.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1.25em; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden;';
+                                
+                                var glow = document.createElement('div');
+                                glow.style.cssText = 'position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: ' + color + ';';
+                                card.appendChild(glow);
+                                
+                                var headerRow = document.createElement('div');
+                                headerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-left: 6px;';
+                                
+                                var nameSpan = document.createElement('span');
+                                nameSpan.style.cssText = 'font-weight: 600; font-size: 1.05em; color: #fff;';
+                                nameSpan.textContent = consoleName;
+                                headerRow.appendChild(nameSpan);
+                                
+                                var countSpan = document.createElement('span');
+                                countSpan.style.cssText = 'font-size: 0.9em; color: #aaa;';
+                                countSpan.innerHTML = '<strong style="color: ' + color + ';">' + cCount + '</strong> ' + (cCount === 1 ? 'game' : 'games');
+                                headerRow.appendChild(countSpan);
+                                
+                                card.appendChild(headerRow);
+                                
+                                var progressWrap = document.createElement('div');
+                                progressWrap.style.cssText = 'height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-left: 6px;';
+                                
+                                var progressFill = document.createElement('div');
+                                progressFill.style.cssText = 'height: 100%; width: ' + percent + '%; background: ' + color + '; border-radius: 3px;';
+                                progressWrap.appendChild(progressFill);
+                                
+                                card.appendChild(progressWrap);
+                                statsContainer.appendChild(card);
+                            });
+                        }
+                    }
+                    
+                    var unsupportDisplay = page.querySelector('#unsupportedCountDisplay');
+                    if (unsupportDisplay) {
+                        unsupportDisplay.innerText = unsupportedCount;
+                        unsupportDisplay.style.color = unsupportedCount > 0 ? '#f0c040' : '#aaa';
+                    }
+                }).catch(function (err) {
+                    console.error('[JellyEmu] Failed to load stats:', err);
+                    if (display) {
+                        display.innerText = 'Error';
+                        display.style.color = '#FF4444';
+                    }
                 });
             }
 
@@ -428,12 +750,17 @@
 
             document.querySelector('#JellyEmuConfigPage').addEventListener('pageshow', function (e) {
                 var page = e.target;
+                jeSwitchTab('statistics');
                 loadRomCount(page);
                 loadRetroArchUrl(page);
                 loadConfig(page);
-                page.querySelector('#btnSaveConfig').addEventListener('click', function () {
-                    saveConfig(page);
-                });
+                
+                var btnSave = page.querySelector('#btnSaveConfig');
+                if (btnSave) {
+                    btnSave.addEventListener('click', function () {
+                        saveConfig(page);
+                    });
+                }
 
                 // Romm health check
                 var btnHealth = page.querySelector('#btnRommHealth');

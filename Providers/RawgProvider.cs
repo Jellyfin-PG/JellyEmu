@@ -221,12 +221,24 @@ namespace JellyEmu.Providers
                     using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                     var root = document.RootElement;
 
+                    var isJ3u = string.Equals(Path.GetExtension(info.Path), ".j3u", StringComparison.OrdinalIgnoreCase);
                     var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
-                    var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                     var tags = new List<string> { "JellyEmu", "Game", consoleTag };
+                    if (string.Equals(consoleTag, "Windows", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tags.Add("Unsupported");
+                    }
                     tags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
-                    if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                    if (isJ3u)
+                    {
+                        tags.Add("MultiDisc");
+                    }
+                    else
+                    {
+                        var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
+                        if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                    }
 
                     var item = new Book
                     {
@@ -317,7 +329,7 @@ namespace JellyEmu.Providers
         public RawgImageProvider(IHttpClientFactory httpClientFactory, ILogger<RawgImageProvider> logger)
             : base(httpClientFactory, logger) { }
 
-        public bool Supports(BaseItem item) => item is Book;
+        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 

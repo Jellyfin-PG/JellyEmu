@@ -165,6 +165,7 @@ namespace JellyEmu
                 { "switch", "Nintendo Switch" }, { "nintendo switch", "Nintendo Switch" },
                 { "3ds", "Nintendo 3DS" }, { "nintendo 3ds", "Nintendo 3DS" },
                 { "psvita", "PlayStation Vita" }, { "ps vita", "PlayStation Vita" }, { "playstation vita", "PlayStation Vita" }, { "play station vita", "PlayStation Vita" },
+                { "windows", "Windows" }, { "gog", "Windows" },
             };
 
         private static readonly Dictionary<string, string> LibraryOnlyExtensions =
@@ -174,6 +175,7 @@ namespace JellyEmu
                 { ".gcm", "GameCube" }, { ".gcz", "GameCube" }, { ".rvz", "Wii" },
                 { ".wbfs", "Wii" }, { ".wad", "Wii" }, { ".xex", "Xbox 360" },
                 { ".xiso", "Xbox" }, { ".vpk", "PlayStation Vita" },
+                { ".exe", "Windows" }, { ".msi", "Windows" },
             };
 
         public static bool IsEjsSupported(string? tag)
@@ -358,7 +360,7 @@ namespace JellyEmu
                 ".col", ".cv", ".ngp", ".ngc", ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
-                ".xex", ".xiso", ".vpk", ".j3u",
+                ".xex", ".xiso", ".vpk", ".j3u", ".exe", ".msi",
             };
     }
 
@@ -381,6 +383,21 @@ namespace JellyEmu
             }
             catch { }
             return result;
+        }
+
+        public static bool IsReferencedByAnyJ3u(string romPath)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(romPath) ?? string.Empty;
+                var romName = Path.GetFileName(romPath);
+                if (string.IsNullOrEmpty(dir)) return false;
+                foreach (var j3uFile in Directory.GetFiles(dir, "*.j3u"))
+                    foreach (var referenced in GetReferencedFiles(j3uFile))
+                        if (string.Equals(Path.GetFileName(referenced), romName, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            catch { }
+            return false;
         }
     }
 

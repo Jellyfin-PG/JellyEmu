@@ -45,6 +45,12 @@ namespace JellyEmu
             return false;
         }
 
+        public static bool IsWindowsRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Windows";
+        }
+
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
@@ -65,6 +71,12 @@ namespace JellyEmu
         public static string EffectiveRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return string.Empty;
+            if (string.Equals(Path.GetExtension(path), ".j3u", StringComparison.OrdinalIgnoreCase))
+            {
+                var refs = J3uParser.GetReferencedFiles(path);
+                if (refs.Count > 0)
+                    return refs[0];
+            }
             if (Directory.Exists(path))
             {
                 try
