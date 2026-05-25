@@ -95,7 +95,7 @@ namespace JellyEmu.Providers
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
-            if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+            if (!string.IsNullOrEmpty(searchInfo.Path) && (!RomExtensions.IsRomPath(searchInfo.Path) || RomExtensions.IsWindowsRom(searchInfo.Path))) return results;
 
             searchInfo.ProviderIds.TryGetValue("Wikipedia", out var directId);
             if (string.IsNullOrEmpty(directId))
@@ -193,7 +193,7 @@ namespace JellyEmu.Providers
         public async Task<MetadataResult<Book>> GetMetadata(BookInfo info, CancellationToken cancellationToken)
         {
             var result = new MetadataResult<Book> { HasMetadata = false };
-            if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
+            if (!string.IsNullOrEmpty(info.Path) && (!RomExtensions.IsRomPath(info.Path) || RomExtensions.IsWindowsRom(info.Path))) return result;
 
             info.ProviderIds.TryGetValue("Wikipedia", out var pageId);
             if (string.IsNullOrEmpty(pageId))
@@ -214,12 +214,24 @@ namespace JellyEmu.Providers
                         q.TryGetProperty("pages", out var pages) &&
                         pages.TryGetProperty(pageId, out var page))
                     {
+                        var isJ3u = string.Equals(Path.GetExtension(info.Path), ".j3u", StringComparison.OrdinalIgnoreCase);
                         var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
-                        var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
  
                         var tags = new List<string> { "JellyEmu", "Game", consoleTag };
+                        if (string.Equals(consoleTag, "Windows", StringComparison.OrdinalIgnoreCase))
+                        {
+                            tags.Add("Unsupported");
+                        }
                         tags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
-                        if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                        if (isJ3u)
+                        {
+                            tags.Add("MultiDisc");
+                        }
+                        else
+                        {
+                            var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
+                            if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                        }
 
                         var item = new Book
                         {
@@ -247,14 +259,14 @@ namespace JellyEmu.Providers
         public WikipediaImageProvider(IHttpClientFactory httpClientFactory, ILogger<WikipediaImageProvider> logger)
             : base(httpClientFactory, logger) { }
 
-        public bool Supports(BaseItem item) => item is Book;
+        public bool Supports(BaseItem item) => item is Book && !RomExtensions.IsWindowsRom(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary };
 
         public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
         {
             var list = new List<RemoteImageInfo>();
-            if (!string.IsNullOrEmpty(item.Path) && !RomExtensions.IsRomPath(item.Path)) return list;
+            if (!string.IsNullOrEmpty(item.Path) && (!RomExtensions.IsRomPath(item.Path) || RomExtensions.IsWindowsRom(item.Path))) return list;
 
             var pageId = item.GetProviderId("Wikipedia") ?? await ResolvePageIdAsync(
                 item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
@@ -331,7 +343,7 @@ namespace JellyEmu.Providers
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://en.wikipedia.org/?curid={0}";
         public bool Supports(IHasProviderIds item) 
-            => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
+            => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path) && !RomExtensions.IsWindowsRom((item as BaseItem)?.Path);
     }
 
     public class WikipediaExternalUrlProvider : IExternalUrlProvider
@@ -340,6 +352,7 @@ namespace JellyEmu.Providers
 
         public IEnumerable<string> GetExternalUrls(BaseItem item)
         {
+            if (RomExtensions.IsWindowsRom(item.Path)) yield break;
             if (item is Book && item.TryGetProviderId("Wikipedia", out var wikiId))
                 yield return $"https://en.wikipedia.org/?curid={wikiId}";
         }

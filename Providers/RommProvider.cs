@@ -96,7 +96,7 @@ namespace JellyEmu.Providers
         {
             var results = new List<RemoteSearchResult>();
             if (!IsEnabled) return results;
-            if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+            if (!string.IsNullOrEmpty(searchInfo.Path) && (!RomExtensions.IsRomPath(searchInfo.Path) || RomExtensions.IsWindowsRom(searchInfo.Path))) return results;
 
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             if (string.IsNullOrEmpty(cleanName) || string.IsNullOrEmpty(InstanceUrl)) return results;
@@ -153,7 +153,7 @@ namespace JellyEmu.Providers
         {
             var result = new MetadataResult<Book> { HasMetadata = false };
             if (!IsEnabled) return result;
-            if (!string.IsNullOrEmpty(info.Path) && !RomExtensions.IsRomPath(info.Path)) return result;
+            if (!string.IsNullOrEmpty(info.Path) && (!RomExtensions.IsRomPath(info.Path) || RomExtensions.IsWindowsRom(info.Path))) return result;
             if (string.IsNullOrEmpty(InstanceUrl)) return result;
 
             info.ProviderIds.TryGetValue("Romm", out var romId);
@@ -182,12 +182,24 @@ namespace JellyEmu.Providers
             {
                 var resolvedId = rom.Value.TryGetProperty("id", out var idEl) ? idEl.GetInt32().ToString() : romId ?? string.Empty;
 
+                var isJ3u = string.Equals(Path.GetExtension(info.Path), ".j3u", StringComparison.OrdinalIgnoreCase);
                 var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
-                var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                 var tags = new List<string> { "JellyEmu", "Game", consoleTag };
+                if (string.Equals(consoleTag, "Windows", StringComparison.OrdinalIgnoreCase))
+                {
+                    tags.Add("Unsupported");
+                }
                 tags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
-                if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                if (isJ3u)
+                {
+                    tags.Add("MultiDisc");
+                }
+                else
+                {
+                    var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
+                    if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                }
 
                 var item = new Book
                 {
@@ -281,7 +293,7 @@ namespace JellyEmu.Providers
         public RommImageProvider(IHttpClientFactory httpClientFactory, ILogger<RommImageProvider> logger)
             : base(httpClientFactory, logger) { }
 
-        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path);
+        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path) && !RomExtensions.IsWindowsRom(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop };
 
@@ -289,7 +301,7 @@ namespace JellyEmu.Providers
         {
             var list = new List<RemoteImageInfo>();
             if (!IsEnabled || string.IsNullOrEmpty(InstanceUrl)) return list;
-            if (!string.IsNullOrEmpty(item.Path) && !RomExtensions.IsRomPath(item.Path)) return list;
+            if (!string.IsNullOrEmpty(item.Path) && (!RomExtensions.IsRomPath(item.Path) || RomExtensions.IsWindowsRom(item.Path))) return list;
 
             var romId = item.GetProviderId("Romm");
             JsonElement? rom = null;

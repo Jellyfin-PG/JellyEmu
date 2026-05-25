@@ -40,7 +40,7 @@ namespace JellyEmu.Providers
         public async Task<IEnumerable<RemoteSearchResult>> GetSearchResults(BookInfo searchInfo, CancellationToken cancellationToken)
         {
             var results = new List<RemoteSearchResult>();
-            if (!string.IsNullOrEmpty(searchInfo.Path) && !RomExtensions.IsRomPath(searchInfo.Path)) return results;
+            if (!string.IsNullOrEmpty(searchInfo.Path) && (!RomExtensions.IsRomPath(searchInfo.Path) || RomExtensions.IsWindowsRom(searchInfo.Path))) return results;
 
             searchInfo.ProviderIds.TryGetValue("Hasheous", out var hasheousId);
             if (string.IsNullOrEmpty(hasheousId))
@@ -109,6 +109,7 @@ namespace JellyEmu.Providers
         public async Task<MetadataResult<Book>> GetMetadata(BookInfo info, CancellationToken cancellationToken)
         {
             var result = new MetadataResult<Book> { HasMetadata = false };
+            if (!string.IsNullOrEmpty(info.Path) && (!RomExtensions.IsRomPath(info.Path) || RomExtensions.IsWindowsRom(info.Path))) return result;
             
             info.ProviderIds.TryGetValue("Hasheous", out var hasheousId);
             if (string.IsNullOrEmpty(hasheousId))
@@ -148,12 +149,24 @@ namespace JellyEmu.Providers
 
                     if (string.IsNullOrEmpty(name)) return result;
 
+                    var isJ3u = string.Equals(Path.GetExtension(info.Path), ".j3u", StringComparison.OrdinalIgnoreCase);
                     var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
-                    var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
 
                     var tags = new List<string> { "JellyEmu", "Game", consoleTag };
+                    if (string.Equals(consoleTag, "Windows", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tags.Add("Unsupported");
+                    }
                     tags.AddRange(PlatformResolver.ResolveRegions(RomExtensions.EffectiveRomPath(info.Path)));
-                    if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                    if (isJ3u)
+                    {
+                        tags.Add("MultiDisc");
+                    }
+                    else
+                    {
+                        var discTag = PlatformResolver.ResolveDisc(RomExtensions.EffectiveRomPath(info.Path));
+                        if (!string.IsNullOrEmpty(discTag)) tags.Add(discTag);
+                    }
 
                     result.Item = new Book
                     {
@@ -290,14 +303,14 @@ namespace JellyEmu.Providers
         public string Name => "Hasheous Image Provider";
         public int Order => 1;
 
-        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path);
+        public bool Supports(BaseItem item) => item is Book && RomExtensions.IsRomPath(item.Path) && !RomExtensions.IsWindowsRom(item.Path);
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary, ImageType.Backdrop, ImageType.Logo };
 
         public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
         {
             var list = new List<RemoteImageInfo>();
-            if (!string.IsNullOrEmpty(item.Path) && !RomExtensions.IsRomPath(item.Path)) return list;
+            if (!string.IsNullOrEmpty(item.Path) && (!RomExtensions.IsRomPath(item.Path) || RomExtensions.IsWindowsRom(item.Path))) return list;
 
             var id = item.GetProviderId("Hasheous");
             var md5 = item.GetProviderId("MD5");
@@ -363,7 +376,7 @@ namespace JellyEmu.Providers
         public string Key => "Hasheous";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://hasheous.org/index.html?page=dataobjectdetail&type=game&id={0}";
-        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path);
+        public bool Supports(IHasProviderIds item) => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path) && !RomExtensions.IsWindowsRom((item as BaseItem)?.Path);
     }
 
     public class HasheousExternalUrlProvider : IExternalUrlProvider
@@ -372,6 +385,7 @@ namespace JellyEmu.Providers
 
         public IEnumerable<string> GetExternalUrls(BaseItem item)
         {
+            if (RomExtensions.IsWindowsRom(item.Path)) yield break;
             if (item.TryGetProviderId("Hasheous", out var id))
                 yield return $"https://hasheous.org/index.html?page=dataobjectdetail&type=game&id={id}";
         }

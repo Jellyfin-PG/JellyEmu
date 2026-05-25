@@ -74,6 +74,12 @@ namespace JellyEmu
                         return null;
                 }
 
+                if (!string.Equals(Path.GetExtension(args.Path), ".j3u", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (J3uParser.IsReferencedByAnyJ3u(args.Path))
+                        return null;
+                }
+
                 var ext = Path.GetExtension(args.Path);
                 var isJ3u = string.Equals(ext, ".j3u", StringComparison.OrdinalIgnoreCase);
 
