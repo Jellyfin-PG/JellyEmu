@@ -135,7 +135,12 @@ namespace JellyEmu.Controllers
             var core = ResolveCore(item);
             var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".zip";
             var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
-            var romUrl = $"/jellyemu/rom/{itemId}/{filename}{ext}";
+            var cleanFilename = CleanCosmeticFilename(filename);
+            if (string.IsNullOrWhiteSpace(cleanFilename))
+            {
+                cleanFilename = itemId;
+            }
+            var romUrl = $"/jellyemu/rom/{itemId}/{cleanFilename}{ext}";
             if (!string.IsNullOrEmpty(userId))
             {
                 romUrl += $"?userId={userId}";
@@ -214,6 +219,21 @@ namespace JellyEmu.Controllers
             Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
 
             return Content(html, MediaTypeNames.Text.Html);
+        }
+
+        internal static string CleanCosmeticFilename(string filename)
+        {
+            if (string.IsNullOrEmpty(filename)) return string.Empty;
+
+            // Remove characters that break URL routing or JavaScript string literals:
+            // ', ", #, ?, &, \
+            return filename
+                .Replace("'", "")
+                .Replace("\"", "")
+                .Replace("#", "")
+                .Replace("?", "")
+                .Replace("&", "")
+                .Replace("\\", "");
         }
     }
 }

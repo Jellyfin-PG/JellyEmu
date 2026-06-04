@@ -310,8 +310,7 @@ namespace JellyEmu.Services
                     document.body.addEventListener('click', function(e) {
                         const menuBtn = e.target.closest('button[data-action="menu"]');
                         if (!menuBtn) return;
-                        const card = menuBtn.closest('.card[data-collectiontype="games"]') ||
-                                     menuBtn.closest('.card[data-jellyemu-game="1"]');
+                        const card = menuBtn.closest('.card[data-jellyemu-game="1"]');
                         if (card) lastGameCardId = card.getAttribute('data-id');
                     }, true);
 
@@ -913,7 +912,6 @@ namespace JellyEmu.Services
                     }
 
                     function applyGameCardTreatment(card) {
-                        card.setAttribute('data-collectiontype', 'games');
                         card.setAttribute('data-jellyemu-game', '1');
 
                         // Defer all DOM reads/writes to the next animation frame so the
@@ -1016,8 +1014,7 @@ namespace JellyEmu.Services
 
                     function processCard(card) {
                         const path = card.getAttribute('data-path');
-                        let isGameCard = card.getAttribute('data-collectiontype') === 'games' ||
-                                         card.getAttribute('data-jellyemu-game') === '1' ||
+                        let isGameCard = card.getAttribute('data-jellyemu-game') === '1' ||
                                          (card.querySelector('.cardText') && (card.querySelector('.cardText').textContent.includes('Games') || card.querySelector('.cardText').textContent.includes('Emulators')));
 
                         if (path) {

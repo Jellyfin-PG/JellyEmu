@@ -106,5 +106,25 @@ namespace JellyEmu
         /// Whether to push EmulatorJS screenshots to Romm.
         /// </summary>
         public bool RommScreenshotPushEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Configured marketplace provider URLs.
+        /// </summary>
+        public List<string> MarketplaceProviders { get; set; } = new();
+
+        /// <summary>
+        /// Whether the marketplace configuration has been customized.
+        /// </summary>
+        public bool MarketplaceConfigured { get; set; } = false;
+
+        /// <summary>
+        /// External feed URL containing scraper provider definitions.
+        /// </summary>
+        public string MarketplaceFeedUrl { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The folder path where downloaded ROMs should be placed.
+        /// </summary>
+        public string GamesLibraryPath { get; set; } = string.Empty;
     }
 }

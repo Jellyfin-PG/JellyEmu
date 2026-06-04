@@ -8,7 +8,7 @@
             "args": [
                 "-NoProfile",
                 "-Command",
-                "if ((Get-Content JellyEmu.csproj -Raw) -match '<Version>(?<v>[^<]+)</Version>') { $ver = $Matches['v']; $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json; $manifest.version = $ver; $manifest | ConvertTo-Json -Depth 10 | Set-Content manifest.json -Encoding utf8; Write-Host 'Synchronized manifest.json version to ' $ver }; dotnet build -c Debug"
+                "dotnet test; if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed. Build aborted.' }; if ((Get-Content JellyEmu.csproj -Raw) -match '<Version>(?<v>[^<]+)</Version>') { $ver = $Matches['v']; $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json; $manifest.version = $ver; $manifest | ConvertTo-Json -Depth 10 | Set-Content manifest.json -Encoding utf8; Write-Host 'Synchronized manifest.json version to ' $ver }; dotnet build -c Debug"
             ],
             "problemMatcher": "$msCompile",
             "group": {

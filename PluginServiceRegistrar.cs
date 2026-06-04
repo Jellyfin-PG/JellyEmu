@@ -33,6 +33,7 @@ namespace JellyEmu
 
             serviceCollection.AddSingleton<JellyEmuSessionService>();
             serviceCollection.AddSingleton<IgdbClientService>();
+            serviceCollection.AddSingleton<MarketplaceService>();
 
             serviceCollection.AddHostedService<JellyEmuInjectorService>();
         }
