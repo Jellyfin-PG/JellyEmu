@@ -25,6 +25,9 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Run tests
+        run: dotnet test --configuration Debug --no-restore
+
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
