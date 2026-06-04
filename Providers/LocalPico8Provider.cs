@@ -49,7 +49,7 @@ namespace JellyEmu.Providers
                     e.FullName.EndsWith(".p8",     StringComparison.OrdinalIgnoreCase));
                 return cart?.FullName;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return null;
             }

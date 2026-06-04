@@ -216,7 +216,8 @@ namespace JellyEmu
             // 2. Check Folders (if path is provided)
             if (!string.IsNullOrEmpty(path))
             {
-                var dirPath = Path.GetDirectoryName(path);
+                var normalizedPath = path.Replace(Path.DirectorySeparatorChar == '/' ? '\\' : '/', Path.DirectorySeparatorChar);
+                var dirPath = Path.GetDirectoryName(normalizedPath);
                 if (!string.IsNullOrEmpty(dirPath))
                 {
                     var fromFolder = MatchAliasFromFolders(dirPath);
@@ -279,7 +280,8 @@ namespace JellyEmu
         private static string? MatchAliasFromFolders(string dirPath)
         {
             if (string.IsNullOrEmpty(dirPath)) return null;
-            var dir = new DirectoryInfo(dirPath);
+            var normalizedPath = dirPath.Replace(Path.DirectorySeparatorChar == '/' ? '\\' : '/', Path.DirectorySeparatorChar);
+            var dir = new DirectoryInfo(normalizedPath);
 
             var brandPrefixRegex = new Regex(@"^(?:sony|nintendo|sega|atari|nec|commodore|snk)\s+(?=\S)|^(?:sony|nintendo|sega|atari|nec|commodore|snk)\s*-\s*(?=\S)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
