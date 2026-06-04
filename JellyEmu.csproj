@@ -1,17 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RollForward>Major</RollForward>
 
     <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
     <RootNamespace>JellyEmu</RootNamespace>
-    <Version>0.7.7.0</Version>
-    <AssemblyVersion>0.7.7.0</AssemblyVersion>
-    <FileVersion>0.7.7.0</FileVersion>
+    <Version>0.8.0.0</Version>
+    <AssemblyVersion>0.8.0.0</AssemblyVersion>
+    <FileVersion>0.8.0.0</FileVersion>
     <Authors>Jellyfin-PG</Authors>
     <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -24,6 +25,7 @@
     <PackageReference Include="Jellyfin.Model" Version="10.11.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
     <PackageReference Include="Scriban" Version="7.1.0" />
+    <PackageReference Include="SharpCompress" Version="0.48.1" />
     <PackageReference Include="System.Text.Encodings.Web" Version="9.0.0" />
   </ItemGroup>
 
@@ -35,12 +37,25 @@
     <!-- Config Page -->
     <EmbeddedResource Include="Configuration\configPage.html" LogicalName="JellyEmu.Configuration.configPage.html" />
     <!-- Templates -->
-    <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html"/>
-    <EmbeddedResource Include="Templates\ejs.html" LogicalName="JellyEmu.Templates.ejs.html"/>
+    <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html" />
+    <EmbeddedResource Include="Templates\ejs.html" LogicalName="JellyEmu.Templates.ejs.html" />
     <!-- Script Modules-->
     <EmbeddedResource Include="Web/ejs.input.js" />
     <EmbeddedResource Include="Web/ejs.xr.js" />
     <EmbeddedResource Include="Web/ejs.save.js" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <Compile Remove="Tests\**" />
   </ItemGroup>
 
 </Project>

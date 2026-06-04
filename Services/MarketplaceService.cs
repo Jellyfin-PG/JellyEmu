@@ -109,23 +109,6 @@ namespace JellyEmu.Services
         {
             var config = Plugin.Instance?.Configuration;
             var feedUrl = config?.MarketplaceFeedUrl;
-            var defaultUrl = "https://raw.githubusercontent.com/Jellyfin-PG/JellyEmu-Resources/refs/heads/main/providers.json";
-            
-            bool isDefaultUrl = string.IsNullOrWhiteSpace(feedUrl) || feedUrl.Equals(defaultUrl, StringComparison.OrdinalIgnoreCase);
-
-            if (isDefaultUrl)
-            {
-                var localProviders = await LoadLocalOrEmbeddedProvidersAsync();
-                if (localProviders != null && localProviders.Count > 0)
-                {
-                    return localProviders;
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(feedUrl))
-            {
-                feedUrl = defaultUrl;
-            }
 
             try
             {
@@ -140,75 +123,8 @@ namespace JellyEmu.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[JellyEmu] Failed to load external scraper providers from {Url}", feedUrl);
-                
-                if (!isDefaultUrl)
-                {
-                    var localProviders = await LoadLocalOrEmbeddedProvidersAsync();
-                    if (localProviders != null && localProviders.Count > 0)
-                    {
-                        return localProviders;
-                    }
-                }
                 return new List<ScraperProvider>();
             }
-        }
-
-        private async Task<List<ScraperProvider>> LoadLocalOrEmbeddedProvidersAsync()
-        {
-            try
-            {
-                var dllDir = Path.GetDirectoryName(typeof(MarketplaceService).Assembly.Location);
-                if (!string.IsNullOrEmpty(dllDir))
-                {
-                    var localPath = Path.Combine(dllDir, "providers.json");
-                    if (File.Exists(localPath))
-                    {
-                        var json = await File.ReadAllTextAsync(localPath);
-                        var providers = System.Text.Json.JsonSerializer.Deserialize<List<ScraperProvider>>(json, new System.Text.Json.JsonSerializerOptions
-                        {
-                            PropertyNameCaseInsensitive = true
-                        });
-                        if (providers != null && providers.Count > 0)
-                        {
-                            _logger.LogInformation("[JellyEmu] Loaded providers from local file: {Path}", localPath);
-                            return providers;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "[JellyEmu] Failed to load providers.json from DLL directory");
-            }
-
-            try
-            {
-                using (var stream = typeof(MarketplaceService).Assembly.GetManifestResourceStream("JellyEmu.providers.json"))
-                {
-                    if (stream != null)
-                    {
-                        using (var reader = new StreamReader(stream))
-                        {
-                            var json = await reader.ReadToEndAsync();
-                            var providers = System.Text.Json.JsonSerializer.Deserialize<List<ScraperProvider>>(json, new System.Text.Json.JsonSerializerOptions
-                            {
-                                PropertyNameCaseInsensitive = true
-                            });
-                            if (providers != null && providers.Count > 0)
-                            {
-                                _logger.LogInformation("[JellyEmu] Loaded providers from embedded resource");
-                                return providers;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "[JellyEmu] Failed to load embedded providers.json");
-            }
-
-            return new List<ScraperProvider>();
         }
 
         public async Task<List<MarketplaceGameResult>> SearchAsync(string query, string systemFilter = "", string letterFilter = "")

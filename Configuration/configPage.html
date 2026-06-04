@@ -28,6 +28,10 @@
                     <span class="material-icons">settings</span>
                     <span>Settings</span>
                 </button>
+                <button type="button" class="je-tab-btn" data-tab="marketplace" onclick="jeSwitchTab('marketplace')">
+                    <span class="material-icons">shopping_bag</span>
+                    <span>Marketplace</span>
+                </button>
                 <button type="button" class="je-tab-btn" data-tab="api" onclick="jeSwitchTab('api')">
                     <span class="material-icons">code</span>
                     <span>API Doc</span>
@@ -163,6 +167,265 @@
                     font-size: 0.88em;
                     line-height: 1.45;
                     margin: 6px 0 0;
+                }
+
+                /* ROM Marketplace styles */
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+
+                .je-spinner {
+                    animation: spin 1s linear infinite;
+                }
+
+                .je-quick-add-btn {
+                    background: rgba(255, 255, 255, 0.05) !important;
+                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                    border-radius: 4px !important;
+                    color: #ccc !important;
+                    padding: 4px 10px !important;
+                    font-size: 0.8em !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease-in-out !important;
+                    margin-right: 4px;
+                    margin-bottom: 4px;
+                }
+                .je-quick-add-btn:hover {
+                    background: rgba(0, 164, 220, 0.1) !important;
+                    border-color: rgba(0, 164, 220, 0.4) !important;
+                    color: #fff !important;
+                }
+
+                .je-provider-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                }
+                .je-provider-url {
+                    font-family: monospace;
+                    color: #fff;
+                    font-size: 0.9em;
+                }
+                .je-provider-delete {
+                    background: none !important;
+                    border: none !important;
+                    color: #ff4444 !important;
+                    cursor: pointer !important;
+                    padding: 4px !important;
+                    font-size: 20px !important;
+                    display: flex;
+                    align-items: center;
+                }
+                .je-provider-delete:hover {
+                    color: #ff6666 !important;
+                }
+
+                .je-console-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                    gap: 8px;
+                }
+                .je-console-card {
+                    background: rgba(255, 255, 255, 0.03) !important;
+                    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+                    border-radius: 6px !important;
+                    color: #aaa !important;
+                    padding: 10px 6px !important;
+                    text-align: center !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    transition: all 0.2s ease-in-out !important;
+                    box-shadow: none !important;
+                }
+                .je-console-card:hover {
+                    color: #fff !important;
+                    background: rgba(255, 255, 255, 0.08) !important;
+                    transform: translateY(-2px);
+                }
+                .je-console-card.active {
+                    color: #fff !important;
+                    background: rgba(0, 164, 220, 0.2) !important;
+                    border-color: #00a4dc !important;
+                    box-shadow: 0 0 10px rgba(0, 164, 220, 0.3) !important;
+                }
+                .je-console-card.nes.active { background: rgba(228, 57, 60, 0.25) !important; border-color: rgb(228, 57, 60) !important; box-shadow: 0 0 10px rgba(228, 57, 60, 0.3) !important; }
+                .je-console-card.snes.active { background: rgba(106, 90, 205, 0.25) !important; border-color: rgb(106, 90, 205) !important; box-shadow: 0 0 10px rgba(106, 90, 205, 0.3) !important; }
+                .je-console-card.n64.active { background: rgba(30, 144, 255, 0.25) !important; border-color: rgb(30, 144, 255) !important; box-shadow: 0 0 10px rgba(30, 144, 255, 0.3) !important; }
+                .je-console-card.genesis.active { background: rgba(128, 128, 128, 0.25) !important; border-color: rgb(128, 128, 128) !important; box-shadow: 0 0 10px rgba(128, 128, 128, 0.3) !important; }
+                .je-console-card.gba.active { background: rgba(46, 139, 87, 0.25) !important; border-color: rgb(46, 139, 87) !important; box-shadow: 0 0 10px rgba(46, 139, 87, 0.3) !important; }
+                .je-console-card.gbc.active { background: rgba(218, 165, 32, 0.25) !important; border-color: rgb(218, 165, 32) !important; box-shadow: 0 0 10px rgba(218, 165, 32, 0.3) !important; }
+                .je-console-card.nds.active { background: rgba(186, 85, 211, 0.25) !important; border-color: rgb(186, 85, 211) !important; box-shadow: 0 0 10px rgba(186, 85, 211, 0.3) !important; }
+                .je-console-card.ps1.active { background: rgba(70, 130, 180, 0.25) !important; border-color: rgb(70, 130, 180) !important; box-shadow: 0 0 10px rgba(70, 130, 180, 0.3) !important; }
+                .je-console-card.pico8.active { background: rgba(255, 0, 77, 0.25) !important; border-color: rgb(255, 0, 77) !important; box-shadow: 0 0 10px rgba(255, 0, 77, 0.3) !important; }
+
+                .je-letter-row {
+                    display: flex;
+                    gap: 4px;
+                    flex-wrap: nowrap;
+                }
+                .je-letter-btn {
+                    background: rgba(255, 255, 255, 0.03) !important;
+                    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                    border-radius: 4px !important;
+                    color: #888 !important;
+                    min-width: 32px !important;
+                    height: 32px !important;
+                    font-size: 0.85em !important;
+                    font-weight: 700 !important;
+                    cursor: pointer !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    transition: all 0.15s ease-in-out !important;
+                }
+                .je-letter-btn:hover {
+                    color: #fff !important;
+                    background: rgba(255, 255, 255, 0.08) !important;
+                }
+                .je-letter-btn.active {
+                    background: #00a4dc !important;
+                    color: #fff !important;
+                    border-color: #00a4dc !important;
+                }
+
+                .je-rom-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 16px;
+                }
+                .je-rom-card {
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 10px;
+                    padding: 14px;
+                    display: flex;
+                    gap: 14px;
+                    align-items: center;
+                    transition: all 0.2s ease-in-out;
+                }
+                .je-rom-card:hover {
+                    background: rgba(255, 255, 255, 0.04);
+                    border-color: rgba(255, 255, 255, 0.1);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                }
+                .je-rom-thumb-container {
+                    width: 70px;
+                    height: 90px;
+                    flex-shrink: 0;
+                    border-radius: 6px;
+                    background: rgba(0,0,0,0.3);
+                    border: 1px solid rgba(255,255,255,0.06);
+                    overflow: hidden;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .je-rom-thumb {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                .je-rom-info {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    overflow: hidden;
+                }
+                .je-rom-title {
+                    color: #fff;
+                    font-weight: 600;
+                    font-size: 0.95em;
+                    margin: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .je-rom-badge-row {
+                    display: flex;
+                    gap: 6px;
+                    flex-wrap: wrap;
+                }
+                .je-rom-badge {
+                    font-size: 0.7em;
+                    font-weight: 700;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                }
+                .je-rom-badge.system {
+                    background: rgba(0, 164, 220, 0.15);
+                    color: #00a4dc;
+                    border: 1px solid rgba(0, 164, 220, 0.3);
+                }
+                .je-rom-badge.provider {
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #aaa;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                }
+                .je-rom-badge.region {
+                    background: rgba(30, 144, 255, 0.15);
+                    color: #1e90ff;
+                    border: 1px solid rgba(30, 144, 255, 0.3);
+                }
+                .je-rom-badge.language {
+                    background: rgba(255, 165, 0, 0.15);
+                    color: #ffa500;
+                    border: 1px solid rgba(255, 165, 0, 0.3);
+                }
+                .je-rom-badge.version {
+                    background: rgba(147, 112, 219, 0.15);
+                    color: #9370db;
+                    border: 1px solid rgba(147, 112, 219, 0.3);
+                }
+                .je-rom-badge.extra {
+                    background: rgba(255, 69, 0, 0.15);
+                    color: #ff4500;
+                    border: 1px solid rgba(255, 69, 0, 0.3);
+                }
+                .je-rom-badge.manual {
+                    background: rgba(46, 139, 87, 0.15);
+                    color: #2e8b57;
+                    border: 1px solid rgba(46, 139, 87, 0.3);
+                }
+                .je-rom-dl-btn {
+                    align-self: flex-start;
+                    background: rgba(0, 164, 220, 0.15) !important;
+                    border: 1px solid rgba(0, 164, 220, 0.3) !important;
+                    color: #00a4dc !important;
+                    padding: 6px 12px !important;
+                    border-radius: 6px !important;
+                    font-size: 0.85em !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease-in-out !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 4px !important;
+                    box-shadow: none !important;
+                }
+                .je-rom-dl-btn:hover {
+                    background: #00a4dc !important;
+                    color: #fff !important;
+                }
+                .je-rom-dl-btn.downloading {
+                    background: rgba(220, 140, 0, 0.15) !important;
+                    border-color: rgba(220, 140, 0, 0.3) !important;
+                    color: #dca000 !important;
+                    cursor: default !important;
+                }
+                .je-rom-dl-btn.downloaded {
+                    background: rgba(82, 181, 75, 0.15) !important;
+                    border-color: rgba(82, 181, 75, 0.3) !important;
+                    color: #52B54B !important;
+                    cursor: default !important;
                 }
             </style>
 
@@ -354,6 +617,28 @@
                     </div>
                 </div>
 
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">ROM Download Location</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Select a Jellyfin library folder where downloaded ROMs will be stored.
+                    </p>
+                    <div class="selectContainer" style="margin-bottom: 1.5em;">
+                        <label class="selectLabel" for="gamesLibraryPath">Select Jellyfin Library Folder</label>
+                        <select id="gamesLibraryPath" class="emby-select" style="width:100%; box-sizing:border-box; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 10px; color: #fff;"></select>
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">Marketplace Feed URL</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Provide a URL pointing to a Scraper JSON file containing metadata sources.
+                    </p>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="marketplaceFeedUrl">Scraper Feed URL</label>
+                        <input id="marketplaceFeedUrl" type="text" class="emby-input" placeholder="e.g. https://raw.githubusercontent.com/Jellyfin-PG/JellyEmu-Resources/refs/heads/main/providers.json" autocomplete="off" />
+                    </div>
+                </div>
+
                 <div style="margin-top: 2em;">
                     <button id="btnSaveConfig" is="emby-button" type="button"
                         class="raised button-submit block emby-button"
@@ -363,6 +648,98 @@
                 </div>
 
                 <p id="saveStatus" style="margin-top: 1em; color: #52B54B; display: none; text-align: center; font-weight: 500;"></p>
+            </div>
+
+            <!-- Tab 5: Marketplace -->
+            <div id="tab-marketplace" class="je-tab-content">
+                <div class="verticalSection" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 1.8em; margin-bottom: 2em; backdrop-filter: blur(10px);">
+                    <h2 style="color: #fff; margin: 0 0 4px 0; font-size: 1.4em; font-weight: 600;">ROM Providers</h2>
+                    <p style="color: #888; font-size: 0.88em; margin: 0 0 1.5em 0;">Manage external scraper sources configured in your Marketplace Feed. Enable or disable individual scraper targets.</p>
+
+                    <!-- Active Providers List -->
+                    <div style="margin-top: 1em;">
+                        <div id="activeProvidersList" style="display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROM Search & Explorer -->
+                <div class="verticalSection" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 1.8em; backdrop-filter: blur(10px);">
+                    <h2 style="color: #fff; margin: 0 0 4px 0; font-size: 1.4em; font-weight: 600;">ROM Explorer</h2>
+                    <p style="color: #888; font-size: 0.88em; margin: 0 0 1.5em 0;">Search, browse, and download ROMs directly into your games folder.</p>
+
+                    <!-- Search Input and Action -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 1.5em;">
+                        <input id="marketplaceQuery" type="text" class="emby-input" placeholder="Search game title..." style="flex: 1; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 8px 12px; color: #fff;" />
+                        <button id="btnSearchMarketplace" type="button" class="raised emby-button" style="background: #00a4dc; color: #fff; padding: 8px 24px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; height: 38px;">
+                            <span class="material-icons" style="font-size: 18px;">search</span>
+                            <span>Search</span>
+                        </button>
+                    </div>
+
+                    <!-- System Filter Grid -->
+                    <div style="margin-bottom: 1.5em;">
+                        <span style="color: #aaa; font-size: 0.82em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 10px;">Filter by System</span>
+                        <div class="je-console-grid">
+                            <button type="button" class="je-console-card active" data-system="" onclick="jeSetSystemFilter('')">All</button>
+                            <button type="button" class="je-console-card nes" data-system="NES" onclick="jeSetSystemFilter('NES')">NES</button>
+                            <button type="button" class="je-console-card snes" data-system="SNES" onclick="jeSetSystemFilter('SNES')">SNES</button>
+                            <button type="button" class="je-console-card n64" data-system="N64" onclick="jeSetSystemFilter('N64')">N64</button>
+                            <button type="button" class="je-console-card genesis" data-system="Sega Genesis" onclick="jeSetSystemFilter('Sega Genesis')">Genesis</button>
+                            <button type="button" class="je-console-card gba" data-system="Game Boy Advance" onclick="jeSetSystemFilter('Game Boy Advance')">GBA</button>
+                            <button type="button" class="je-console-card gbc" data-system="Game Boy Color" onclick="jeSetSystemFilter('Game Boy Color')">GBC</button>
+                            <button type="button" class="je-console-card nds" data-system="Nintendo DS" onclick="jeSetSystemFilter('Nintendo DS')">NDS</button>
+                            <button type="button" class="je-console-card ps1" data-system="PlayStation" onclick="jeSetSystemFilter('PlayStation')">PS1</button>
+                            <button type="button" class="je-console-card pico8" data-system="PICO-8" onclick="jeSetSystemFilter('PICO-8')">PICO-8</button>
+                        </div>
+                    </div>
+
+                    <!-- Alphabet Filter Row -->
+                    <div style="margin-bottom: 2em; overflow-x: auto; white-space: nowrap; padding-bottom: 6px;">
+                        <span style="color: #aaa; font-size: 0.82em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Filter by Starting Letter</span>
+                        <div class="je-letter-row">
+                            <button type="button" class="je-letter-btn active" data-letter="" onclick="jeSetLetterFilter('')">ALL</button>
+                            <button type="button" class="je-letter-btn" data-letter="#" onclick="jeSetLetterFilter('#')">#</button>
+                            <button type="button" class="je-letter-btn" data-letter="A" onclick="jeSetLetterFilter('A')">A</button>
+                            <button type="button" class="je-letter-btn" data-letter="B" onclick="jeSetLetterFilter('B')">B</button>
+                            <button type="button" class="je-letter-btn" data-letter="C" onclick="jeSetLetterFilter('C')">C</button>
+                            <button type="button" class="je-letter-btn" data-letter="D" onclick="jeSetLetterFilter('D')">D</button>
+                            <button type="button" class="je-letter-btn" data-letter="E" onclick="jeSetLetterFilter('E')">E</button>
+                            <button type="button" class="je-letter-btn" data-letter="F" onclick="jeSetLetterFilter('F')">F</button>
+                            <button type="button" class="je-letter-btn" data-letter="G" onclick="jeSetLetterFilter('G')">G</button>
+                            <button type="button" class="je-letter-btn" data-letter="H" onclick="jeSetLetterFilter('H')">H</button>
+                            <button type="button" class="je-letter-btn" data-letter="I" onclick="jeSetLetterFilter('I')">I</button>
+                            <button type="button" class="je-letter-btn" data-letter="J" onclick="jeSetLetterFilter('J')">J</button>
+                            <button type="button" class="je-letter-btn" data-letter="K" onclick="jeSetLetterFilter('K')">K</button>
+                            <button type="button" class="je-letter-btn" data-letter="L" onclick="jeSetLetterFilter('L')">L</button>
+                            <button type="button" class="je-letter-btn" data-letter="M" onclick="jeSetLetterFilter('M')">M</button>
+                            <button type="button" class="je-letter-btn" data-letter="N" onclick="jeSetLetterFilter('N')">N</button>
+                            <button type="button" class="je-letter-btn" data-letter="O" onclick="jeSetLetterFilter('O')">O</button>
+                            <button type="button" class="je-letter-btn" data-letter="P" onclick="jeSetLetterFilter('P')">P</button>
+                            <button type="button" class="je-letter-btn" data-letter="Q" onclick="jeSetLetterFilter('Q')">Q</button>
+                            <button type="button" class="je-letter-btn" data-letter="R" onclick="jeSetLetterFilter('R')">R</button>
+                            <button type="button" class="je-letter-btn" data-letter="S" onclick="jeSetLetterFilter('S')">S</button>
+                            <button type="button" class="je-letter-btn" data-letter="T" onclick="jeSetLetterFilter('T')">T</button>
+                            <button type="button" class="je-letter-btn" data-letter="U" onclick="jeSetLetterFilter('U')">U</button>
+                            <button type="button" class="je-letter-btn" data-letter="V" onclick="jeSetLetterFilter('V')">V</button>
+                            <button type="button" class="je-letter-btn" data-letter="W" onclick="jeSetLetterFilter('W')">W</button>
+                            <button type="button" class="je-letter-btn" data-letter="X" onclick="jeSetLetterFilter('X')">X</button>
+                            <button type="button" class="je-letter-btn" data-letter="Y" onclick="jeSetLetterFilter('Y')">Y</button>
+                            <button type="button" class="je-letter-btn" data-letter="Z" onclick="jeSetLetterFilter('Z')">Z</button>
+                        </div>
+                    </div>
+
+                    <!-- Marketplace Results Status -->
+                    <div id="marketplaceStatus" style="color: #aaa; text-align: center; padding: 2em; display: none;">
+                        <!-- Loading spinner or message -->
+                    </div>
+
+                    <!-- ROM Results Grid -->
+                    <div id="marketplaceResults" class="je-rom-grid">
+                        <!-- Dynamically populated card grid -->
+                    </div>
+                </div>
             </div>
 
             <!-- Tab 3: API Doc -->
@@ -495,6 +872,17 @@
                 "Asia","Scandinavia","Unlicensed","Prototype","Demo","Sample"
             ]);
 
+            function updateUrlTab(tabId) {
+                var hash = window.location.hash || '';
+                var qIndex = hash.indexOf('?');
+                var basePath = qIndex !== -1 ? hash.substring(0, qIndex) : hash;
+                var params = new URLSearchParams(qIndex !== -1 ? hash.substring(qIndex) : '');
+                if (params.get('tab') !== tabId) {
+                    params.set('tab', tabId);
+                    history.replaceState(null, '', basePath + '?' + params.toString());
+                }
+            }
+
             window.jeSwitchTab = function (tabId) {
                 var page = document.querySelector('#JellyEmuConfigPage');
                 if (!page) return;
@@ -509,6 +897,8 @@
                 tabContents.forEach(function (content) {
                     content.classList.toggle('active', content.id === 'tab-' + tabId);
                 });
+
+                updateUrlTab(tabId);
             };
 
             function getConsoleColor(consoleName) {
@@ -718,6 +1108,8 @@
                     var collRow = page.querySelector('#rommCollectionSyncRow');
                     if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
                     page.querySelector('#netplayServer').value = config.NetplayServer || '';
+                    page.querySelector('#marketplaceFeedUrl').value = config.MarketplaceFeedUrl || '';
+                    loadLibraryFolders(config.GamesLibraryPath || '');
                 }).catch(function (err) {
                     console.error('[JellyEmu] Failed to load config:', err);
                     showStatus('Failed to load settings.', true);
@@ -739,6 +1131,8 @@
                     config.RommCollectionSyncEnabled = page.querySelector('#rommCollectionSyncEnabled').value === 'true';
                     config.RommScreenshotPushEnabled = page.querySelector('#rommScreenshotPushEnabled').value === 'true';
                     config.NetplayServer = page.querySelector('#netplayServer').value.trim();
+                    config.GamesLibraryPath = page.querySelector('#gamesLibraryPath').value;
+                    config.MarketplaceFeedUrl = page.querySelector('#marketplaceFeedUrl').value.trim();
                     return ApiClient.updatePluginConfiguration(pluginId, config);
                 }).then(function () {
                     showStatus('Settings saved successfully!', false);
@@ -748,9 +1142,422 @@
                 });
             }
 
-            document.querySelector('#JellyEmuConfigPage').addEventListener('pageshow', function (e) {
+            var activeSystemFilter = '';
+            var activeLetterFilter = '';
+
+            function loadProviders() {
+                var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                fetch('/jellyemu/marketplace/feed-providers', {
+                    headers: { 'Authorization': authHeader }
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(providers) {
+                    var listEl = document.getElementById('activeProvidersList');
+                    if (!listEl) return;
+                    listEl.innerHTML = '';
+                    if (providers.length === 0) {
+                        listEl.innerHTML = '<p style="color: #aaa; font-style: italic; margin: 0;">No providers loaded from feed. Please configure a valid Marketplace Feed URL in Settings.</p>';
+                        return;
+                    }
+                    providers.forEach(function(p) {
+                        var row = document.createElement('div');
+                        row.className = 'je-provider-row';
+                        row.style.marginBottom = '8px';
+                        
+                        var infoDiv = document.createElement('div');
+                        
+                        var nameDiv = document.createElement('div');
+                        nameDiv.style.fontWeight = '600';
+                        nameDiv.style.color = '#fff';
+                        nameDiv.textContent = p.name;
+                        infoDiv.appendChild(nameDiv);
+
+                        var domainDiv = document.createElement('div');
+                        domainDiv.style.fontSize = '0.82em';
+                        domainDiv.style.color = '#aaa';
+                        domainDiv.textContent = p.domain;
+                        infoDiv.appendChild(domainDiv);
+
+                        row.appendChild(infoDiv);
+
+                        var toggleBtn = document.createElement('button');
+                        toggleBtn.type = 'button';
+                        if (p.isEnabled) {
+                            toggleBtn.className = 'je-toggle-btn je-on';
+                            toggleBtn.textContent = 'ON';
+                            toggleBtn.onclick = function() {
+                                removeProvider(p.url);
+                            };
+                        } else {
+                            toggleBtn.className = 'je-toggle-btn';
+                            toggleBtn.textContent = 'OFF';
+                            toggleBtn.onclick = function() {
+                                addProvider(p.url);
+                            };
+                        }
+                        row.appendChild(toggleBtn);
+
+                        listEl.appendChild(row);
+                    });
+                })
+                .catch(function(err) {
+                    console.error('[JellyEmu] Failed to load providers:', err);
+                });
+            }
+
+            function addProvider(url) {
+                if (!url) return;
+                var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                fetch('/jellyemu/marketplace/providers', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                })
+                .then(function(r) {
+                    if (!r.ok) {
+                        return r.text().then(function(text) { throw new Error(text); });
+                    }
+                    return r.json();
+                })
+                .then(function() {
+                    loadProviders();
+                    showStatus('Provider enabled successfully!', false);
+                })
+                .catch(function(err) {
+                    console.error('[JellyEmu] Failed to enable provider:', err);
+                    showStatus('Failed to enable provider: ' + err.message, true);
+                });
+            }
+
+            function removeProvider(url) {
+                var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                fetch('/jellyemu/marketplace/providers?url=' + encodeURIComponent(url), {
+                    method: 'DELETE',
+                    headers: { 'Authorization': authHeader }
+                })
+                .then(function(r) {
+                    if (!r.ok) throw new Error('Failed to disable provider');
+                    return r.json();
+                })
+                .then(function() {
+                    loadProviders();
+                    showStatus('Provider disabled successfully!', false);
+                })
+                .catch(function(err) {
+                    console.error('[JellyEmu] Failed to disable provider:', err);
+                    showStatus('Failed to disable provider.', true);
+                });
+            }
+
+            function loadLibraryFolders(selectedPath) {
+                var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                fetch('/jellyemu/marketplace/library-folders', {
+                    headers: { 'Authorization': authHeader }
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(folders) {
+                    var selectEl = document.getElementById('gamesLibraryPath');
+                    if (!selectEl) return;
+                    selectEl.innerHTML = '<option value="">-- Select a Jellyfin library folder --</option>';
+                    
+                    folders.forEach(function(folder) {
+                        if (folder.paths && folder.paths.length) {
+                            folder.paths.forEach(function(path) {
+                                var opt = document.createElement('option');
+                                opt.value = path;
+                                opt.textContent = folder.name + ' - ' + path + ' (' + (folder.type || 'Unknown Type') + ')';
+                                selectEl.appendChild(opt);
+                            });
+                        }
+                    });
+                    
+                    if (selectedPath) {
+                        var hasOption = Array.from(selectEl.options).some(function(opt) {
+                            return opt.value === selectedPath;
+                        });
+                        if (hasOption) {
+                            selectEl.value = selectedPath;
+                        } else {
+                            var opt = document.createElement('option');
+                            opt.value = selectedPath;
+                            opt.textContent = 'Custom Path: ' + selectedPath;
+                            selectEl.appendChild(opt);
+                            selectEl.value = selectedPath;
+                        }
+                    }
+                })
+                .catch(function(err) {
+                    console.error('[JellyEmu] Failed to load virtual folders:', err);
+                });
+            }
+
+            function searchMarketplace() {
+                var queryInput = document.getElementById('marketplaceQuery');
+                if (!queryInput) return;
+                var q = queryInput.value.trim();
+                if (!q) {
+                    showStatus('Please enter a search query first.', true);
+                    return;
+                }
+
+                var statusEl = document.getElementById('marketplaceStatus');
+                var resultsEl = document.getElementById('marketplaceResults');
+                
+                if (statusEl) {
+                    statusEl.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; gap:10px;"><div class="je-spinner" style="border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #00a4dc; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite;"></div><span>Searching providers...</span></div>';
+                    statusEl.style.display = 'block';
+                }
+                if (resultsEl) {
+                    resultsEl.innerHTML = '';
+                }
+
+                var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                var url = '/jellyemu/marketplace/search?q=' + encodeURIComponent(q);
+                if (activeSystemFilter) url += '&system=' + encodeURIComponent(activeSystemFilter);
+                if (activeLetterFilter) url += '&letter=' + encodeURIComponent(activeLetterFilter);
+
+                fetch(url, {
+                    headers: { 'Authorization': authHeader }
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(results) {
+                    if (statusEl) statusEl.style.display = 'none';
+                    if (!resultsEl) return;
+                    
+                    if (results.length === 0) {
+                        resultsEl.innerHTML = '<div style="color: #aaa; text-align: center; width: 100%; grid-column: 1/-1; padding: 2em;">No ROMs found matching query. Try another search or adjust filters.</div>';
+                        return;
+                    }
+
+                    results.forEach(function(rawGame) {
+                        var game = {
+                            title: rawGame.title || rawGame.Title || 'Unknown',
+                            system: rawGame.system || rawGame.System || 'Unknown',
+                            providerName: rawGame.providerName || rawGame.ProviderName || 'Unknown',
+                            thumbnailUrl: rawGame.thumbnailUrl || rawGame.ThumbnailUrl || '',
+                            detailUrl: rawGame.detailUrl || rawGame.DetailUrl || '',
+                            region: rawGame.region || rawGame.Region || '',
+                            version: rawGame.version || rawGame.Version || '',
+                            languages: rawGame.languages || rawGame.Languages || '',
+                            extraFlags: rawGame.extraFlags || rawGame.ExtraFlags || '',
+                            hasManual: rawGame.hasManual || rawGame.HasManual || false
+                        };
+
+                        var card = document.createElement('div');
+                        card.className = 'je-rom-card';
+
+                        var thumbContainer = document.createElement('div');
+                        thumbContainer.className = 'je-rom-thumb-container';
+                        
+                        if (game.thumbnailUrl) {
+                            var img = document.createElement('img');
+                            img.className = 'je-rom-thumb';
+                            img.src = game.thumbnailUrl;
+                            img.alt = game.title;
+                            thumbContainer.appendChild(img);
+                        } else {
+                            var icon = document.createElement('span');
+                            icon.className = 'material-icons';
+                            icon.style.cssText = 'font-size: 32px; color: rgba(255,255,255,0.15);';
+                            icon.textContent = 'sports_esports';
+                            thumbContainer.appendChild(icon);
+                        }
+                        card.appendChild(thumbContainer);
+
+                        var info = document.createElement('div');
+                        info.className = 'je-rom-info';
+
+                        var title = document.createElement('h3');
+                        title.className = 'je-rom-title';
+                        title.textContent = game.title;
+                        info.appendChild(title);
+
+                        var badges = document.createElement('div');
+                        badges.className = 'je-rom-badge-row';
+
+                        var sysBadge = document.createElement('span');
+                        sysBadge.className = 'je-rom-badge system';
+                        sysBadge.textContent = game.system;
+                        badges.appendChild(sysBadge);
+
+                        var provBadge = document.createElement('span');
+                        provBadge.className = 'je-rom-badge provider';
+                        provBadge.textContent = game.providerName;
+                        badges.appendChild(provBadge);
+
+                        if (game.region) {
+                            var regBadge = document.createElement('span');
+                            regBadge.className = 'je-rom-badge region';
+                            regBadge.textContent = game.region;
+                            badges.appendChild(regBadge);
+                        }
+
+                        if (game.languages) {
+                            var langBadge = document.createElement('span');
+                            langBadge.className = 'je-rom-badge language';
+                            langBadge.textContent = game.languages;
+                            badges.appendChild(langBadge);
+                        }
+
+                        if (game.version) {
+                            var verBadge = document.createElement('span');
+                            verBadge.className = 'je-rom-badge version';
+                            verBadge.textContent = 'v' + game.version;
+                            badges.appendChild(verBadge);
+                        }
+
+                        if (game.extraFlags) {
+                            var extraBadge = document.createElement('span');
+                            extraBadge.className = 'je-rom-badge extra';
+                            extraBadge.textContent = game.extraFlags;
+                            badges.appendChild(extraBadge);
+                        }
+
+                        if (game.hasManual) {
+                            var manualBadge = document.createElement('span');
+                            manualBadge.className = 'je-rom-badge manual';
+                            manualBadge.textContent = 'Manual';
+                            badges.appendChild(manualBadge);
+                        }
+
+                        info.appendChild(badges);
+
+                        var dlBtn = document.createElement('button');
+                        dlBtn.type = 'button';
+                        dlBtn.className = 'je-rom-dl-btn';
+                        dlBtn.innerHTML = '<span class="material-icons" style="font-size:16px;">download</span><span>Add to Library</span>';
+                        dlBtn.onclick = function() {
+                            downloadRom(game.detailUrl, game.system, dlBtn);
+                        };
+                        info.appendChild(dlBtn);
+
+                        card.appendChild(info);
+                        resultsEl.appendChild(card);
+                    });
+                })
+                .catch(function(err) {
+                    console.error('[JellyEmu] Failed to search ROMs:', err);
+                    if (statusEl) {
+                         statusEl.innerHTML = '<div style="color: #ff4444;">Search failed: ' + err.message + '</div>';
+                         statusEl.style.display = 'block';
+                    }
+                });
+            }
+
+            function downloadRom(detailUrl, system, btnEl) {
+                if (btnEl.classList.contains('downloading') || btnEl.classList.contains('downloaded')) return;
+
+                btnEl.className = 'je-rom-dl-btn downloading';
+                btnEl.innerHTML = '<div class="je-spinner" style="border: 2px solid rgba(220,140,0,0.1); border-top: 2px solid #dca000; border-radius: 50%; width: 14px; height: 14px; display: inline-block;"></div><span>Downloading...</span>';
+
+                var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                fetch(ApiClient.getUrl('/jellyemu/marketplace/download'), {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        detailUrl: detailUrl,
+                        DetailUrl: detailUrl,
+                        system: system,
+                        System: system
+                    })
+                })
+                .then(function(r) {
+                    if (!r.ok) {
+                        return r.text().then(function(text) {
+                            try {
+                                var parsed = JSON.parse(text);
+                                throw new Error(parsed.message || parsed.title || text || 'Download failed');
+                            } catch (e) {
+                                throw new Error(text || 'Download failed');
+                            }
+                        });
+                    }
+                    return r.json();
+                })
+                .then(function(res) {
+                    btnEl.className = 'je-rom-dl-btn downloaded';
+                    btnEl.innerHTML = '<span class="material-icons" style="font-size:16px;">check_circle</span><span>Added</span>';
+                    showStatus('Downloaded ' + res.filename + ' successfully!', false);
+                })
+                .catch(function(err) {
+                    console.error('[JellyEmu] Download failed:', err);
+                    btnEl.className = 'je-rom-dl-btn';
+                    btnEl.innerHTML = '<span class="material-icons" style="font-size:16px;">error</span><span>Retry Download</span>';
+                    showStatus('Download failed: ' + err.message, true);
+                });
+            }
+
+            window.jeSetSystemFilter = function(system) {
+                activeSystemFilter = system;
+                var page = document.querySelector('#JellyEmuConfigPage');
+                var cards = page.querySelectorAll('.je-console-card');
+                cards.forEach(function(card) {
+                    card.classList.toggle('active', card.getAttribute('data-system') === system);
+                });
+                
+                // If there's a query, re-run search automatically on filter change
+                var queryInput = document.getElementById('marketplaceQuery');
+                if (queryInput && queryInput.value.trim()) {
+                    searchMarketplace();
+                }
+            };
+
+            window.jeSetLetterFilter = function(letter) {
+                activeLetterFilter = letter;
+                var page = document.querySelector('#JellyEmuConfigPage');
+                var btns = page.querySelectorAll('.je-letter-btn');
+                btns.forEach(function(btn) {
+                    btn.classList.toggle('active', btn.getAttribute('data-letter') === letter);
+                });
+
+                // If there's a query, re-run search automatically on filter change
+                var queryInput = document.getElementById('marketplaceQuery');
+                if (queryInput && queryInput.value.trim()) {
+                    searchMarketplace();
+                }
+            };
+
+            // Redefine jeSwitchTab to add marketplace activation hook
+            var originalSwitchTab = window.jeSwitchTab;
+            window.jeSwitchTab = function (tabId) {
+                if (originalSwitchTab) {
+                    originalSwitchTab(tabId);
+                } else {
+                    var page = document.querySelector('#JellyEmuConfigPage');
+                    if (page) {
+                        var navButtons = page.querySelectorAll('.je-tab-btn');
+                        var tabContents = page.querySelectorAll('.je-tab-content');
+                        navButtons.forEach(function (btn) {
+                            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+                        });
+                        tabContents.forEach(function (content) {
+                            content.classList.toggle('active', content.id === 'tab-' + tabId);
+                        });
+                    }
+                    if (typeof updateUrlTab === 'function') {
+                        updateUrlTab(tabId);
+                    }
+                }
+                
+                if (tabId === 'marketplace') {
+                    loadProviders();
+                }
+            };
+
+            document.addEventListener('pageshow', function (e) {
                 var page = e.target;
-                jeSwitchTab('statistics');
+                if (!page || page.id !== 'JellyEmuConfigPage') return;
+                var hash = window.location.hash || '';
+                var qIndex = hash.indexOf('?');
+                var params = new URLSearchParams(qIndex !== -1 ? hash.substring(qIndex) : '');
+                var initialTab = params.get('tab') || 'statistics';
+                jeSwitchTab(initialTab);
                 loadRomCount(page);
                 loadRetroArchUrl(page);
                 loadConfig(page);
@@ -759,6 +1566,24 @@
                 if (btnSave) {
                     btnSave.addEventListener('click', function () {
                         saveConfig(page);
+                    });
+                }
+
+
+
+                var btnSearch = page.querySelector('#btnSearchMarketplace');
+                if (btnSearch) {
+                    btnSearch.addEventListener('click', function() {
+                        searchMarketplace();
+                    });
+                }
+
+                var queryInput = page.querySelector('#marketplaceQuery');
+                if (queryInput) {
+                    queryInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            searchMarketplace();
+                        }
                     });
                 }
 
@@ -863,7 +1688,7 @@
                             });
                     });
                 }
-            });
+            }, true);
         })();
     </script>
 </div>
