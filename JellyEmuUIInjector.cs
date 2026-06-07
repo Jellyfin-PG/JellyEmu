@@ -142,6 +142,7 @@ namespace JellyEmu.Services
 
                     function isPlayable(tags) {
                         if (!tags || !tags.length) return false;
+                        if (!tags.includes('JellyEmu')) return false;
                         for (const tag of tags) {
                             if (tag === 'Unknown') return false;
                             if (ejsUnsupportedPlatforms.has(tag)) return false;
@@ -199,7 +200,7 @@ namespace JellyEmu.Services
                                     // Non-threaded cores work fine in an iframe
                                     var iframe = document.createElement('iframe');
                                     iframe.id = 'jellyemu-iframe';
-                                    iframe.allow = 'xr-spatial-tracking';
+                                    iframe.allow = 'xr-spatial-tracking; gamepad';
                                     iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
                                     iframe.src = playUrl;
                                     document.body.appendChild(iframe);
@@ -668,11 +669,25 @@ namespace JellyEmu.Services
                         const visiblePage = page || getVisibleDetailPage();
                         const allDetailPages = document.querySelectorAll('.itemDetailPage');
                         allDetailPages.forEach(p => p.classList.remove('jellyemu-game-page'));
-                        if (visiblePage) visiblePage.classList.add('jellyemu-game-page');
 
-                        const cachedCard = document.querySelector('.card[data-id="' + id + '"][data-jellyemu-tags]');
+                        // Speculatively add class only if verified by the card previously
+                        const cachedCard = document.querySelector('.card[data-id="' + id + '"]');
+                        let isSpeculativeGame = false;
                         if (cachedCard) {
-                            const tags = cachedCard.getAttribute('data-jellyemu-tags').split(',');
+                            const tagsAttr = cachedCard.getAttribute('data-jellyemu-tags');
+                            const tags = tagsAttr ? tagsAttr.split(',') : [];
+                            if (tags.includes('JellyEmu') || cachedCard.getAttribute('data-jellyemu-game') === '1') {
+                                isSpeculativeGame = true;
+                            }
+                        }
+
+                        if (isSpeculativeGame && visiblePage) {
+                            visiblePage.classList.add('jellyemu-game-page');
+                        }
+
+                        const cachedCardWithTags = document.querySelector('.card[data-id="' + id + '"][data-jellyemu-tags]');
+                        if (cachedCardWithTags) {
+                            const tags = cachedCardWithTags.getAttribute('data-jellyemu-tags').split(',');
                             if (tags.includes('JellyEmu')) {
                                 perf.mark('details-fast-path:' + id);
                                 currentItemIsGame = true;
@@ -690,6 +705,7 @@ namespace JellyEmu.Services
                                 currentItemIsGame = true;
                                 cachedTags        = item.Tags;
                                 cachedProviderIds = item.ProviderIds || {};
+                                if (visiblePage) visiblePage.classList.add('jellyemu-game-page');
                                 var _pollAttempts = 0;
                                 var _pollId = setInterval(function() {
                                     if (currentItemId !== id) { clearInterval(_pollId); return; }
@@ -920,8 +936,6 @@ namespace JellyEmu.Services
                         perf.mark('card-rAF-scheduled:' + cardId0);
                         requestAnimationFrame(function() {
                             perf.mark('card-rAF-start:' + cardId0);
-                            const iconSpan = card.querySelector('.cardImageIcon');
-                            if (iconSpan) iconSpan.innerHTML = 'sports_esports';
 
                             card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(b) {
                                 b.style.display = 'none';
@@ -931,7 +945,16 @@ namespace JellyEmu.Services
                                 const cardId = card.getAttribute('data-id');
                                 if (cardId && window.ApiClient) {
                                     queueGetItem(cardId, function(item) {
-                                        if (!item || !item.Tags) return;
+                                        if (!item || !item.Tags || !item.Tags.includes('JellyEmu')) {
+                                            card.removeAttribute('data-jellyemu-game');
+                                            card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(b) {
+                                                b.style.display = '';
+                                            });
+                                            return;
+                                        }
+                                        const iconSpan = card.querySelector('.cardImageIcon');
+                                        if (iconSpan) iconSpan.innerHTML = 'sports_esports';
+
                                         const imgCtr = card.querySelector('.cardImageContainer');
                                         if (!imgCtr) return;
 
@@ -1013,9 +1036,23 @@ namespace JellyEmu.Services
                     }
 
                     function processCard(card) {
+                        if (card.getAttribute('data-jellyemu-checked') === '1') return;
+
+                        const cardType = card.getAttribute('data-type');
+                        const cardText = card.querySelector('.cardText')?.textContent || '';
+
+                        // Swap icon for library folders named "Games" or "Emulators"
+                        if (cardType === 'CollectionFolder') {
+                            card.setAttribute('data-jellyemu-checked', '1');
+                            if (cardText.includes('Games') || cardText.includes('Emulators')) {
+                                const iconSpan = card.querySelector('.cardImageIcon');
+                                if (iconSpan) iconSpan.innerHTML = 'sports_esports';
+                            }
+                            return;
+                        }
+
                         const path = card.getAttribute('data-path');
-                        let isGameCard = card.getAttribute('data-jellyemu-game') === '1' ||
-                                         (card.querySelector('.cardText') && (card.querySelector('.cardText').textContent.includes('Games') || card.querySelector('.cardText').textContent.includes('Emulators')));
+                        let isGameCard = card.getAttribute('data-jellyemu-game') === '1';
 
                         if (path) {
                             const extMatch = path.match(/\.([a-zA-Z0-9]+)$/);
@@ -1025,11 +1062,9 @@ namespace JellyEmu.Services
                         }
 
                         if (isGameCard) {
+                            card.setAttribute('data-jellyemu-checked', '1');
                             applyGameCardTreatment(card);
-                        } else if (
-                            card.getAttribute('data-type') === 'Book' &&
-                            !card.getAttribute('data-jellyemu-checked')
-                        ) {
+                        } else if (cardType === 'Book') {
                             card.setAttribute('data-jellyemu-checked', '1');
                             const cardId = card.getAttribute('data-id');
                             if (cardId && window.ApiClient) {

@@ -258,65 +258,121 @@
             0: {}, 1: {}, 2: {}, 3: {}
         };
 
+        if (_prevOnGameStart) {
+            try {
+                _prevOnGameStart();
+            } catch (err) {
+                console.error('[JellyEmu] Error in prevOnGameStart:', err);
+            }
+        }
+
+        var ejsButtonDown = null;
+        var ejsButtonUp   = null;
+        var ejsAxisChange = null;
+        var _jeGpActiveState = {};
+
         function _jeHijack() {
             var e = window.EJS_emulator;
             if (!e || !e.gamepad) return false;
 
             var gh = e.gamepad;
 
-            if (!gh.listeners['buttondown']) return false;
+            var originalOn = gh.on;
+            if (originalOn && !originalOn._jeHijacked) {
+                gh.on = function (name, cb) {
+                    var lowerName = name.toLowerCase();
+                    if (lowerName === 'buttondown') {
+                        ejsButtonDown = cb;
+                    } else if (lowerName === 'buttonup') {
+                        ejsButtonUp = cb;
+                    } else if (lowerName === 'axischanged') {
+                        ejsAxisChange = cb;
+                    } else {
+                        originalOn.call(gh, name, cb);
+                    }
+                };
+                gh.on._jeHijacked = true;
+            }
 
-            var ejsButtonDown = gh.listeners['buttondown'] || null;
-            var ejsButtonUp   = gh.listeners['buttonup']   || null;
-            var ejsAxisChange = gh.listeners['axischanged'] || null;
+            if (gh.listeners) {
+                if (gh.listeners['buttondown'] && gh.listeners['buttondown'] !== ejsButtonDown) {
+                    ejsButtonDown = gh.listeners['buttondown'];
+                }
+                if (gh.listeners['buttonup'] && gh.listeners['buttonup'] !== ejsButtonUp) {
+                    ejsButtonUp = gh.listeners['buttonup'];
+                }
+                if (gh.listeners['axischanged'] && gh.listeners['axischanged'] !== ejsAxisChange) {
+                    ejsAxisChange = gh.listeners['axischanged'];
+                }
+            }
 
-            gh.on('buttondown', function (ev) {
-                var matched = _jeFindBindingsForGp(ev.label);
+            var registerOn = originalOn || gh.on;
+
+            registerOn.call(gh, 'buttondown', function (ev) {
+                var label = ev.label;
+                var matched = _jeFindBindingsForGp(label);
                 if (matched.length > 0) {
-                    matched.forEach(function (idx) { _jeSimulate(idx, true); });
+                    if (!_jeGpActiveState[label]) {
+                        _jeGpActiveState[label] = true;
+                        matched.forEach(function (idx) { _jeSimulate(idx, true); });
+                    }
                 } else {
                     if (ejsButtonDown) ejsButtonDown(ev);
                 }
             });
 
-            gh.on('buttonup', function (ev) {
-                var matched = _jeFindBindingsForGp(ev.label);
+            registerOn.call(gh, 'buttonup', function (ev) {
+                var label = ev.label;
+                var matched = _jeFindBindingsForGp(label);
                 if (matched.length > 0) {
-                    matched.forEach(function (idx) { _jeSimulate(idx, false); });
+                    if (_jeGpActiveState[label]) {
+                        _jeGpActiveState[label] = false;
+                        matched.forEach(function (idx) { _jeSimulate(idx, false); });
+                    }
                 } else {
                     if (ejsButtonUp) ejsButtonUp(ev);
                 }
             });
 
-            gh.on('axischanged', function (ev) {
+            registerOn.call(gh, 'axischanged', function (ev) {
                 var axisName = ev.axis;
                 var newVal   = ev.value;
+                var label    = ev.label;
 
-                if (ev.label) {
-                    var matched = _jeFindBindingsForGp(ev.label);
+                if (label) {
+                    var matched = _jeFindBindingsForGp(label);
                     if (matched.length > 0) {
-                        matched.forEach(function (idx) { _jeSimulate(idx, true); });
+                        if (!_jeGpActiveState[label]) {
+                            _jeGpActiveState[label] = true;
+                            matched.forEach(function (idx) { _jeSimulate(idx, true); });
+                        }
                         var oppositeDir = newVal > 0 ? ':-1' : ':+1';
-                        _jeFindBindingsForGp(axisName + oppositeDir).forEach(function (idx) {
-                            _jeSimulate(idx, false);
-                        });
+                        var oppositeLabel = axisName + oppositeDir;
+                        if (_jeGpActiveState[oppositeLabel]) {
+                            _jeGpActiveState[oppositeLabel] = false;
+                            _jeFindBindingsForGp(oppositeLabel).forEach(function (idx) {
+                                _jeSimulate(idx, false);
+                            });
+                        }
                         return;
                     }
                 }
 
-                if (!ev.label) {
-                    [':+1', ':-1'].forEach(function (dir) {
-                        _jeFindBindingsForGp(axisName + dir).forEach(function (idx) {
+                [':+1', ':-1'].forEach(function (dir) {
+                    var checkLabel = axisName + dir;
+                    if (_jeGpActiveState[checkLabel]) {
+                        _jeGpActiveState[checkLabel] = false;
+                        _jeFindBindingsForGp(checkLabel).forEach(function (idx) {
                             _jeSimulate(idx, false);
                         });
-                    });
-                    var anyBound = _jeFindBindingsForGp(axisName + ':+1').length > 0 ||
-                                   _jeFindBindingsForGp(axisName + ':-1').length > 0;
-                    if (!anyBound && ejsAxisChange) ejsAxisChange(ev);
-                    return;
-                }
+                    }
+                });
 
-                if (ejsAxisChange) ejsAxisChange(ev);
+                var anyBound = _jeFindBindingsForGp(axisName + ':+1').length > 0 ||
+                               _jeFindBindingsForGp(axisName + ':-1').length > 0;
+                if (!anyBound && ejsAxisChange) {
+                    ejsAxisChange(ev);
+                }
             });
 
             var ejsControls = e.controls && e.controls[0];
@@ -335,18 +391,16 @@
 
         function _jeTryHijack(attemptsLeft) {
             if (_jeHijack()) {
-                if (_prevOnGameStart) _prevOnGameStart();
                 return;
             }
             if (attemptsLeft <= 0) {
-                console.warn('[JellyEmu] Gave up waiting for EJS gamepad listeners');
-                if (_prevOnGameStart) _prevOnGameStart();
+                console.warn('[JellyEmu] Gave up waiting for EJS gamepad object');
                 return;
             }
             setTimeout(function () { _jeTryHijack(attemptsLeft - 1); }, 100);
         }
 
-        _jeTryHijack(30);
+        _jeTryHijack(50);
     };
 
     var _syncTimer = null;
@@ -476,12 +530,12 @@
         bk.classList.add('je-listening');
         bk.textContent = 'Move/press…';
 
-        var baseAxes = [];
+        var baseAxes = {};
         var pads0 = navigator.getGamepads ? navigator.getGamepads() : [];
         for (var gi0 = 0; gi0 < pads0.length; gi0++) {
             var p0 = pads0[gi0]; if (!p0) continue;
-            for (var ai0 = 0; ai0 < p0.axes.length; ai0++) baseAxes[ai0] = p0.axes[ai0];
-            break;
+            baseAxes[p0.index] = [];
+            for (var ai0 = 0; ai0 < p0.axes.length; ai0++) baseAxes[p0.index][ai0] = p0.axes[ai0];
         }
 
         var pollId = setInterval(function () {
@@ -504,7 +558,8 @@
 
                 // Axes
                 for (var ai = 0; ai < pad.axes.length; ai++) {
-                    var base = baseAxes[ai] !== undefined ? baseAxes[ai] : 0;
+                    var gpBase = baseAxes[pad.index];
+                    var base = gpBase && gpBase[ai] !== undefined ? gpBase[ai] : 0;
                     var val  = pad.axes[ai];
                     if (Math.abs(val) > 0.5 && Math.abs(val - base) > 0.5) {
                         clearInterval(pollId);
@@ -557,6 +612,14 @@
         buildGamepadBinds();
         syncVGTogglesLocal();
         openPopup('je-pop-inputmap');
+    });
+
+    // ── Gamepad Hotplug events ──
+    window.addEventListener("gamepadconnected", function () {
+        if (_popupOpen()) buildGamepadBinds();
+    });
+    window.addEventListener("gamepaddisconnected", function () {
+        if (_popupOpen()) buildGamepadBinds();
     });
 
     // ── Expose build functions for external callers if needed ──
