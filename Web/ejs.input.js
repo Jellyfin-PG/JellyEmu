@@ -166,12 +166,12 @@
         21: { kb1:74,  kb2:0, gp1:'RIGHT_STICK_X:-1',      gp2:'' },
         22: { kb1:75,  kb2:0, gp1:'RIGHT_STICK_Y:+1',      gp2:'' },
         23: { kb1:73,  kb2:0, gp1:'RIGHT_STICK_Y:-1',      gp2:'' },
-        24: { kb1:49,  kb2:0, gp1:'', gp2:'' },
-        25: { kb1:50,  kb2:0, gp1:'', gp2:'' },
-        26: { kb1:51,  kb2:0, gp1:'', gp2:'' },
-        27: { kb1:107, kb2:0, gp1:'', gp2:'' },
-        28: { kb1:32,  kb2:0, gp1:'', gp2:'' },
-        29: { kb1:109, kb2:0, gp1:'', gp2:'' }
+        24: { kb1:49,  kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 },
+        25: { kb1:50,  kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 },
+        26: { kb1:51,  kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 },
+        27: { kb1:107, kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 },
+        28: { kb1:32,  kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 },
+        29: { kb1:109, kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 }
     };
 
     // ── Live binding map ──
@@ -180,6 +180,30 @@
         try {
             var saved = serverPrefs && serverPrefs.jeBindings ? JSON.parse(serverPrefs.jeBindings) : null;
             _jeBindings = saved || JSON.parse(JSON.stringify(_jeDefaultBindings));
+            
+            // Migração de preferências antigas de longPress
+            if (_jeBindings.longPress) {
+                var lp = _jeBindings.longPress;
+                if (lp.saveBtn && !_jeBindings[24].gp1) {
+                    _jeBindings[24].gp1 = lp.saveBtn;
+                    _jeBindings[24].hold1 = lp.saveTime || 3000;
+                }
+                if (lp.loadBtn && !_jeBindings[25].gp1) {
+                    _jeBindings[25].gp1 = lp.loadBtn;
+                    _jeBindings[25].hold1 = lp.loadTime || 3000;
+                }
+                delete _jeBindings.longPress;
+            }
+
+            // Garante que todas as opções de 0 a 29 possuam as propriedades khold e hold
+            for (var idx = 0; idx <= 29; idx++) {
+                if (_jeBindings[idx]) {
+                    if (_jeBindings[idx].khold1 === undefined) _jeBindings[idx].khold1 = 0;
+                    if (_jeBindings[idx].khold2 === undefined) _jeBindings[idx].khold2 = 0;
+                    if (_jeBindings[idx].hold1 === undefined) _jeBindings[idx].hold1 = 0;
+                    if (_jeBindings[idx].hold2 === undefined) _jeBindings[idx].hold2 = 0;
+                }
+            }
         } catch (e) {
             _jeBindings = JSON.parse(JSON.stringify(_jeDefaultBindings));
         }
@@ -223,6 +247,7 @@
     }
 
     var _jeKbDown = {};
+    var activeKbHoldTimers = {};
     var _popupOpen = function () { return !!window._jePopupOpen; };
 
     document.addEventListener('keydown', function (ev) {
@@ -235,7 +260,21 @@
             var b = _jeBindings[idx];
             if (b.kb1 === kc || b.kb2 === kc) {
                 ev.preventDefault();
-                _jeSimulate(parseInt(idx, 10), true);
+                var idxInt = parseInt(idx, 10);
+                var kholdTime = 0;
+                if (b.kb1 === kc) kholdTime = parseInt(b.khold1 || 0, 10);
+                else if (b.kb2 === kc) kholdTime = parseInt(b.khold2 || 0, 10);
+
+                var timerKey = kc + '_' + idxInt;
+                if (kholdTime > 0) {
+                    if (activeKbHoldTimers[timerKey]) clearTimeout(activeKbHoldTimers[timerKey]);
+                    activeKbHoldTimers[timerKey] = setTimeout(function () {
+                        _jeSimulate(idxInt, true);
+                        activeKbHoldTimers[timerKey] = 'triggered';
+                    }, kholdTime);
+                } else {
+                    _jeSimulate(idxInt, true);
+                }
             }
         }
     }, true);
@@ -245,7 +284,21 @@
         _jeKbDown[kc] = false;
         for (var idx in _jeBindings) {
             var b = _jeBindings[idx];
-            if (b.kb1 === kc || b.kb2 === kc) _jeSimulate(parseInt(idx, 10), false);
+            if (b.kb1 === kc || b.kb2 === kc) {
+                var idxInt = parseInt(idx, 10);
+                var timerKey = kc + '_' + idxInt;
+                var t = activeKbHoldTimers[timerKey];
+                if (t) {
+                    if (t !== 'triggered') {
+                        clearTimeout(t);
+                    } else {
+                        _jeSimulate(idxInt, false);
+                    }
+                    delete activeKbHoldTimers[timerKey];
+                } else {
+                    _jeSimulate(idxInt, false);
+                }
+            }
         }
     }, true);
 
@@ -307,30 +360,91 @@
             }
 
             var registerOn = originalOn || gh.on;
+            var activeHoldTimers = {};
+
+            function _jeProcessGpAction(label, pressed) {
+                var matched = _jeFindBindingsForGp(label);
+                if (matched.length === 0) return false;
+
+                matched.forEach(function (idx) {
+                    var idxInt = parseInt(idx, 10);
+                    var b = _jeBindings[idxInt];
+                    var holdTime = 0;
+                    if (b.gp1 === label) holdTime = parseInt(b.hold1 || 0, 10);
+                    else if (b.gp2 === label) holdTime = parseInt(b.hold2 || 0, 10);
+
+                    var timerKey = label + '_' + idxInt;
+
+                    if (idxInt >= 24) {
+                        // É uma hotkey
+                        if (pressed) {
+                            if (holdTime > 0) {
+                                if (activeHoldTimers[timerKey]) clearTimeout(activeHoldTimers[timerKey]);
+                                activeHoldTimers[timerKey] = setTimeout(function () {
+                                    console.log('[JellyEmu] Long press ' + label + ' (' + holdTime + 'ms) -> Hotkey ' + idxInt);
+                                    _jeHotkeyAction(idxInt);
+                                    delete activeHoldTimers[timerKey];
+                                }, holdTime);
+                            } else {
+                                _jeHotkeyAction(idxInt);
+                            }
+                        } else {
+                            if (activeHoldTimers[timerKey]) {
+                                clearTimeout(activeHoldTimers[timerKey]);
+                                delete activeHoldTimers[timerKey];
+                            }
+                        }
+                    } else {
+                        // Ação normal de jogo
+                        if (pressed) {
+                            if (holdTime > 0) {
+                                if (activeHoldTimers[timerKey]) clearTimeout(activeHoldTimers[timerKey]);
+                                activeHoldTimers[timerKey] = setTimeout(function () {
+                                    _jeGpActiveState[label] = true;
+                                    _jeSimulate(idxInt, true);
+                                    activeHoldTimers[timerKey] = 'triggered';
+                                }, holdTime);
+                            } else {
+                                if (!_jeGpActiveState[label]) {
+                                    _jeGpActiveState[label] = true;
+                                    _jeSimulate(idxInt, true);
+                                }
+                            }
+                        } else {
+                            var t = activeHoldTimers[timerKey];
+                            if (t) {
+                                if (t !== 'triggered') {
+                                    clearTimeout(t);
+                                } else {
+                                    _jeGpActiveState[label] = false;
+                                    _jeSimulate(idxInt, false);
+                                }
+                                delete activeHoldTimers[timerKey];
+                            } else {
+                                if (_jeGpActiveState[label]) {
+                                    _jeGpActiveState[label] = false;
+                                    _jeSimulate(idxInt, false);
+                                }
+                            }
+                        }
+                    }
+                });
+                return true;
+            }
 
             registerOn.call(gh, 'buttondown', function (ev) {
                 var label = ev.label;
-                var matched = _jeFindBindingsForGp(label);
-                if (matched.length > 0) {
-                    if (!_jeGpActiveState[label]) {
-                        _jeGpActiveState[label] = true;
-                        matched.forEach(function (idx) { _jeSimulate(idx, true); });
-                    }
-                } else {
-                    if (ejsButtonDown) ejsButtonDown(ev);
+                var handled = _jeProcessGpAction(label, true);
+                if (!handled && ejsButtonDown) {
+                    ejsButtonDown(ev);
                 }
             });
 
             registerOn.call(gh, 'buttonup', function (ev) {
                 var label = ev.label;
-                var matched = _jeFindBindingsForGp(label);
-                if (matched.length > 0) {
-                    if (_jeGpActiveState[label]) {
-                        _jeGpActiveState[label] = false;
-                        matched.forEach(function (idx) { _jeSimulate(idx, false); });
-                    }
-                } else {
-                    if (ejsButtonUp) ejsButtonUp(ev);
+                var handled = _jeProcessGpAction(label, false);
+                if (!handled && ejsButtonUp) {
+                    ejsButtonUp(ev);
                 }
             });
 
@@ -340,32 +454,18 @@
                 var label    = ev.label;
 
                 if (label) {
-                    var matched = _jeFindBindingsForGp(label);
-                    if (matched.length > 0) {
-                        if (!_jeGpActiveState[label]) {
-                            _jeGpActiveState[label] = true;
-                            matched.forEach(function (idx) { _jeSimulate(idx, true); });
-                        }
+                    var handled = _jeProcessGpAction(label, true);
+                    if (handled) {
                         var oppositeDir = newVal > 0 ? ':-1' : ':+1';
                         var oppositeLabel = axisName + oppositeDir;
-                        if (_jeGpActiveState[oppositeLabel]) {
-                            _jeGpActiveState[oppositeLabel] = false;
-                            _jeFindBindingsForGp(oppositeLabel).forEach(function (idx) {
-                                _jeSimulate(idx, false);
-                            });
-                        }
+                        _jeProcessGpAction(oppositeLabel, false);
                         return;
                     }
                 }
 
                 [':+1', ':-1'].forEach(function (dir) {
                     var checkLabel = axisName + dir;
-                    if (_jeGpActiveState[checkLabel]) {
-                        _jeGpActiveState[checkLabel] = false;
-                        _jeFindBindingsForGp(checkLabel).forEach(function (idx) {
-                            _jeSimulate(idx, false);
-                        });
-                    }
+                    _jeProcessGpAction(checkLabel, false);
                 });
 
                 var anyBound = _jeFindBindingsForGp(axisName + ':+1').length > 0 ||
@@ -421,9 +521,9 @@
         var s = document.createElement('style');
         s.textContent =
             '#je-tab-kb .je-bind-headers,' +
-            '#je-tab-kb .je-bind-row { grid-template-columns: 1fr 100px 100px !important; }' +
+            '#je-tab-kb .je-bind-row { grid-template-columns: 1fr 100px 85px 100px 85px !important; }' +
             '#je-tab-gp .je-bind-headers,' +
-            '#je-tab-gp .je-bind-row { grid-template-columns: 1fr 120px 120px !important; }';
+            '#je-tab-gp .je-bind-row { grid-template-columns: 1fr 110px 85px 110px 85px !important; }';
         document.head.appendChild(s);
     })();
 
@@ -441,12 +541,14 @@
             '<div class="je-bind-headers">' +
                 '<span>Action</span>' +
                 '<span>KB 1</span>' +
+                '<span>Hold 1</span>' +
                 '<span>KB 2</span>' +
+                '<span>Hold 2</span>' +
             '</div>';
 
         Object.keys(inputMap).forEach(function (keyStr) {
             var idx = parseInt(keyStr, 10);
-            var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
+            var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'', khold1:0, khold2:0, hold1:0, hold2:0 };
             var row = document.createElement('div');
             row.className = 'je-bind-row';
 
@@ -459,6 +561,41 @@
                 row.appendChild(_jeMakeBindKey(_jeKeyName(b[field]), function () {
                     _jeListenKeyboard(idx, field, row);
                 }));
+
+                var holdField = field === 'kb1' ? 'khold1' : 'khold2';
+                var select = document.createElement('select');
+                select.className = 'je-select je-hold-select';
+                select.style.cssText = 'background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:2px 4px;color:#fff;outline:none;font-size:11px;width:75px;height:24px;text-align:center;margin:0 auto;';
+
+                var options = [
+                    { value: '0', text: 'Normal' },
+                    { value: '500', text: '0.5s' },
+                    { value: '1000', text: '1.0s' },
+                    { value: '1500', text: '1.5s' },
+                    { value: '2000', text: '2.0s' },
+                    { value: '3000', text: '3.0s' },
+                    { value: '4000', text: '4.0s' },
+                    { value: '5000', text: '5.0s' }
+                ];
+                options.forEach(function (opt) {
+                    var o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.text;
+                    if (String(b[holdField] || 0) === opt.value) {
+                        o.selected = true;
+                    }
+                    select.appendChild(o);
+                });
+
+                select.addEventListener('change', function () {
+                    if (!_jeBindings[idx]) {
+                        _jeBindings[idx] = { kb1:0, kb2:0, gp1:'', gp2:'', khold1:0, khold2:0, hold1:0, hold2:0 };
+                    }
+                    _jeBindings[idx][holdField] = parseInt(select.value, 10);
+                    _jeSyncBindingsToServer();
+                });
+
+                row.appendChild(select);
             });
 
             panel.appendChild(row);
@@ -479,12 +616,14 @@
             '<div class="je-bind-headers">' +
                 '<span>Action</span>' +
                 '<span>GP 1</span>' +
+                '<span>Hold 1</span>' +
                 '<span>GP 2</span>' +
+                '<span>Hold 2</span>' +
             '</div>';
 
         Object.keys(inputMap).forEach(function (keyStr) {
             var idx = parseInt(keyStr, 10);
-            var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
+            var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 };
             var row = document.createElement('div');
             row.className = 'je-bind-row';
 
@@ -497,6 +636,41 @@
                 row.appendChild(_jeMakeBindKey(_jeGpName(b[field]), function () {
                     _jeListenGamepad(idx, field, row);
                 }));
+
+                var holdField = field === 'gp1' ? 'hold1' : 'hold2';
+                var select = document.createElement('select');
+                select.className = 'je-select je-hold-select';
+                select.style.cssText = 'background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);border-radius:4px;padding:2px 4px;color:#fff;outline:none;font-size:11px;width:75px;height:24px;text-align:center;margin:0 auto;';
+
+                var options = [
+                    { value: '0', text: 'Normal' },
+                    { value: '500', text: '0.5s' },
+                    { value: '1000', text: '1.0s' },
+                    { value: '1500', text: '1.5s' },
+                    { value: '2000', text: '2.0s' },
+                    { value: '3000', text: '3.0s' },
+                    { value: '4000', text: '4.0s' },
+                    { value: '5000', text: '5s' }
+                ];
+                options.forEach(function (opt) {
+                    var o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.text;
+                    if (String(b[holdField] || 0) === opt.value) {
+                        o.selected = true;
+                    }
+                    select.appendChild(o);
+                });
+
+                select.addEventListener('change', function () {
+                    if (!_jeBindings[idx]) {
+                        _jeBindings[idx] = { kb1:0, kb2:0, gp1:'', gp2:'', hold1:0, hold2:0 };
+                    }
+                    _jeBindings[idx][holdField] = parseInt(select.value, 10);
+                    _jeSyncBindingsToServer();
+                });
+
+                row.appendChild(select);
             });
 
             bindsPanel.appendChild(row);
