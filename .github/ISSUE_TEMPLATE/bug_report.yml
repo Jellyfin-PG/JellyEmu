@@ -7,8 +7,8 @@ body:
 type: markdown
 attributes:
 value: |
-### Important Response Policy
-By submitting this report, you acknowledge that you are responsible for providing requested information or testing fixes promptly. If we require more details and there is no response from you within 48 hours, this ticket will be closed.
+  ### Important Response Policy
+  By submitting this report, you acknowledge that you are responsible for providing requested information or testing fixes promptly. If we require more details and there is no response from you within 48 hours, this ticket will be closed.
 
 type: checkboxes
 id: acknowledgment
