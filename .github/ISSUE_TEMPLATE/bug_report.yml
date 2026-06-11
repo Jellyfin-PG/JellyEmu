@@ -4,86 +4,101 @@ title: "[Bug]: "
 labels: ["bug"]
 body:
 
-  - type: dropdown
-    id: severity
-    attributes:
-      label: Severity
-      options:
-        - Low
-        - Medium
-        - High
-        - Critical
-    validations:
-      required: true
+type: markdown
+attributes:
+value: |
+### Important Response Policy
+By submitting this report, you acknowledge that you are responsible for providing requested information or testing fixes promptly. If we require more details and there is no response from you within 48 hours, this ticket will be closed.
 
-  - type: input
-    id: jellyfin_version
-    attributes:
-      label: Jellyfin Version
-      placeholder: "10.9.0"
-    validations:
-      required: true
+type: checkboxes
+id: acknowledgment
+attributes:
+label: Response Policy Acknowledgment
+options:
+- label: I understand that if I do not respond to requests for further information within 48 hours, this ticket will be closed.
+validations:
+required: true
 
-  - type: input
-    id: jellyemu_version
-    attributes:
-      label: JellyEmu Version
-      placeholder: "1.4.2"
-    validations:
-      required: true
+type: dropdown
+id: severity
+attributes:
+label: Severity
+options:
+- Low
+- Medium
+- High
+- Critical
+validations:
+required: true
 
-  - type: input
-    id: file_transform_version
-    attributes:
-      label: File Transformation Version
-      placeholder: "0.8.1"
-    validations:
-      required: true
+type: input
+id: jellyfin_version
+attributes:
+label: Jellyfin Version
+placeholder: "10.9.0"
+validations:
+required: true
 
-  - type: textarea
-    id: description
-    attributes:
-      label: Bug Description
-      description: Describe the issue clearly
-    validations:
-      required: true
+type: input
+id: jellyemu_version
+attributes:
+label: JellyEmu Version
+placeholder: "1.4.2"
+validations:
+required: true
 
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to Reproduce
-      placeholder: |
-        1. ...
-        2. ...
-        3. ...
-    validations:
-      required: true
+type: input
+id: file_transform_version
+attributes:
+label: File Transformation Version
+placeholder: "0.8.1"
+validations:
+required: true
 
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected Behavior
-    validations:
-      required: true
+type: textarea
+id: description
+attributes:
+label: Bug Description
+description: Describe the issue clearly
+validations:
+required: true
 
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual Behavior
-    validations:
-      required: true
+type: textarea
+id: steps
+attributes:
+label: Steps to Reproduce
+placeholder: |
+1. ...
+2. ...
+3. ...
+validations:
+required: true
 
-  - type: textarea
-    id: logs
-    attributes:
-      label: Logs / Screenshots
-      description: Paste logs or attach screenshots
-    validations:
-      required: false
+type: textarea
+id: expected
+attributes:
+label: Expected Behavior
+validations:
+required: true
 
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional Context
-    validations:
-      required: false
+type: textarea
+id: actual
+attributes:
+label: Actual Behavior
+validations:
+required: true
+
+type: textarea
+id: logs
+attributes:
+label: Logs / Screenshots
+description: Paste logs or attach screenshots
+validations:
+required: false
+
+type: textarea
+id: context
+attributes:
+label: Additional Context
+validations:
+required: false
