@@ -7,14 +7,17 @@ body:
   - type: markdown
     attributes:
       value: |
-        ### Important Response Policy
-        By submitting this report, you acknowledge that you are responsible for providing requested information or testing fixes promptly. If we require more details and there is no response from you within 48 hours, this ticket will be closed.
+        ### Important Rules Before You Submit
+        By opening this ticket, you agree to the following community standards:
+        - Responsiveness: You must be able to respond to requests for further information or testing within 48 hours. Failure to do so will result in the ticket being closed.
+        - Respect Ticket Boundaries: Do not hijack other tickets to discuss separate issues. Keep each issue focused on its original topic.
+        - Professionalism: Maintain a respectful tone. Disrespectful, spammy, or repetitive false reports will lead to being blocked from the repository.
   - type: checkboxes
     id: acknowledgment
     attributes:
-      label: Response Policy Acknowledgment
+      label: Acknowledgment
       options:
-        - label: I understand that if I do not respond to requests for further information within 48 hours, this ticket will be closed.
+        - label: I agree to the 48-hour response policy and agree to maintain professional boundaries in this ticket.
     validations:
       required: true
   - type: dropdown
