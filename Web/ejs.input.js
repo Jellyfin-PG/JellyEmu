@@ -6,7 +6,15 @@
     var activeSlot  = cfg.activeSlot  || 1;
     var token       = cfg.token       || '';
 
-    // ── Helpers ──
+    if (!token && userId) {
+        try {
+            var _jellyCreds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
+            var _jellyServer = (_jellyCreds.Servers || []).find(function (s) { return s.UserId === userId; });
+            token = (_jellyServer && _jellyServer.AccessToken) || '';
+        } catch (e) { }
+    }
+
+    // Helpers
     function emu() { return window.EJS_emulator; }
     function gm()  { var e = emu(); return e ? e.gameManager : null; }
     function _jeEnsureBinary(data) { return window._jeEnsureBinary ? window._jeEnsureBinary(data) : data; }
@@ -14,7 +22,7 @@
     function closePopup(id) { window._jeClosePopup && window._jeClosePopup(id); }
     function syncVGToggles(){ window._jeSyncVGToggles && window._jeSyncVGToggles(); }
 
-    // ── Input Map ──
+    // Input Map
     var inputMap = {
         0:  'B',               1:  'Y',              2:  'SELECT',         3:  'START',
         4:  'UP',              5:  'DOWN',            6:  'LEFT',           7:  'RIGHT',
@@ -26,7 +34,7 @@
         28: 'REWIND',          29: 'SLOW MOTION'
     };
 
-    // ── Hotkey handlers ──
+    // Hotkey handlers
     var _jeActiveSlot = activeSlot;
 
     function _jeHotkeyAction(idx) {
@@ -85,7 +93,7 @@
         }
     }
 
-    // ── Key code → display name ──
+    // Key code -> display name
     var keyCodeMap = {
         8:'Backspace',9:'Tab',13:'Enter',16:'Shift',17:'Ctrl',18:'Alt',
         19:'Pause',20:'Caps Lock',27:'Escape',32:'Space',33:'Page Up',
@@ -121,7 +129,7 @@
     function _jeGpName(s)    { return s ? (_jeGpLabels[s] || s) : '—'; }
     function _jeKeyName(code){ if (!code) return '—'; return keyCodeMap[code] || ('Key ' + code); }
 
-    // ── Button index → EJS label
+    // Button index -> EJS label
     var _jeButtonIndexToLabel = [
         'BUTTON_1','BUTTON_2','BUTTON_3','BUTTON_4',
         'LEFT_TOP_SHOULDER','RIGHT_TOP_SHOULDER',
@@ -133,14 +141,14 @@
         return bi < _jeButtonIndexToLabel.length ? _jeButtonIndexToLabel[bi] : ('GAMEPAD_' + bi);
     }
 
-    // ── Axis index → EJS axis name
+    // Axis index -> EJS axis name
     var _jeAxisNames = ['LEFT_STICK_X','LEFT_STICK_Y','RIGHT_STICK_X','RIGHT_STICK_Y'];
     function _jeAxisLabel(ai, val) {
         var name = ai < _jeAxisNames.length ? _jeAxisNames[ai] : ('EXTRA_STICK_' + ai);
         return name + (val > 0 ? ':+1' : ':-1');
     }
 
-    // ── Default bindings ──
+    // Default bindings
     var _jeDefaultBindings = {
         0:  { kb1:88,  kb2:0, gp1:'BUTTON_2',              gp2:'' },
         1:  { kb1:83,  kb2:0, gp1:'BUTTON_4',              gp2:'' },
@@ -174,8 +182,10 @@
         29: { kb1:109, kb2:0, gp1:'', gp2:'' }
     };
 
-    // ── Live binding map ──
+    // Live binding map
     var _jeBindings = {};
+    var _jeVirtualGamepad = "false";
+    var _jeVirtualGamepadLeftHand = "false";
     function _jeLoadBindings(serverPrefs) {
         try {
             var saved = serverPrefs && serverPrefs.jeBindings ? JSON.parse(serverPrefs.jeBindings) : null;
@@ -192,18 +202,24 @@
         fetch('/jellyemu/prefs/' + userId, { headers: prefHeaders })
             .then(function (r) { if (r.ok) return r.json(); })
             .then(function (data) {
-                if (data && data.jeBindings) {
-                    _jeLoadBindings(data);
-                    if (document.getElementById('je-tab-kb')) {
-                        buildKeyboardBinds();
-                        buildGamepadBinds();
+                if (data) {
+                    if (data.virtualGamepad !== undefined) _jeVirtualGamepad = data.virtualGamepad;
+                    if (data.virtualGamepadLeftHand !== undefined) _jeVirtualGamepadLeftHand = data.virtualGamepadLeftHand;
+                    _jeApplyVirtualGamepadSettings();
+
+                    if (data.jeBindings) {
+                        _jeLoadBindings(data);
+                        if (document.getElementById('je-tab-kb')) {
+                            buildKeyboardBinds();
+                            buildGamepadBinds();
+                        }
                     }
                 }
             })
             .catch(function (err) { console.warn('[JellyEmu] Failed to load bindings:', err); });
     }
 
-    // ── simulateInput bridge ──
+    // simulateInput bridge
     function _jeSimulate(idx, pressed) {
         if (idx >= 24) { if (pressed) _jeHotkeyAction(idx); return; }
         var g = gm();
@@ -249,7 +265,22 @@
         }
     }, true);
 
-    // ── Gamepad hijack ──
+    // EJS onLoad
+    var _prevOnLoad = window.EJS_onLoad;
+    window.EJS_onLoad = function () {
+        console.log('[JellyEmu] EJS_onLoad fired, applying virtual gamepad settings');
+        if (_prevOnLoad) {
+            try {
+                _prevOnLoad();
+            } catch (err) {
+                console.error('[JellyEmu] Error in prevOnLoad:', err);
+            }
+        }
+        _jeApplyVirtualGamepadSettings();
+        setTimeout(_jeApplyVirtualGamepadSettings, 500);
+    };
+
+    // Gamepad hijack
     var _prevOnGameStart = window.EJS_onGameStart;
     window.EJS_onGameStart = function () {
         console.log('[JellyEmu] EJS_onGameStart fired, hijacking gamepad listeners');
@@ -265,6 +296,9 @@
                 console.error('[JellyEmu] Error in prevOnGameStart:', err);
             }
         }
+
+        _jeApplyVirtualGamepadSettings();
+        setTimeout(_jeApplyVirtualGamepadSettings, 500);
 
         var ejsButtonDown = null;
         var ejsButtonUp   = null;
@@ -503,7 +537,7 @@
         });
     }
 
-    // ── Keyboard listen ──
+    // Keyboard listen
     function _jeListenKeyboard(idx, field, row) {
         var col = field === 'kb1' ? 1 : 2;
         var bk  = row.children[col];
@@ -522,7 +556,7 @@
         document.addEventListener('keydown', onKey, true);
     }
 
-    // ── Gamepad listen
+    // Gamepad listen
     function _jeListenGamepad(idx, field, row) {
         var col = field === 'gp1' ? 1 : 2;
         var bk  = row.children[col];
@@ -583,7 +617,50 @@
         }, 10000);
     }
 
-    // ── Virtual gamepad toggles ──
+    // Virtual gamepad toggles
+    function _jeApplyVirtualGamepadSettings() {
+        var e = emu();
+        var vgOn = document.getElementById('je-vg-toggle');
+        var vgLefty = document.getElementById('je-vg-lefty');
+
+        var isVg = (_jeVirtualGamepad === "true" || _jeVirtualGamepad === true);
+        var isLefty = (_jeVirtualGamepadLeftHand === "true" || _jeVirtualGamepadLeftHand === true);
+
+        if (vgOn) vgOn.checked = isVg;
+        if (vgLefty) vgLefty.checked = isLefty;
+
+        if (e) {
+            try {
+                if (e.toggleVirtualGamepad) {
+                    e.toggleVirtualGamepad(isVg);
+                }
+            } catch (err) {
+                console.warn('[JellyEmu] Failed to toggle virtual gamepad:', err);
+            }
+            try {
+                if (e.toggleVirtualGamepadLeftHanded) {
+                    e.toggleVirtualGamepadLeftHanded(isLefty);
+                }
+            } catch (err) {
+                console.warn('[JellyEmu] Failed to toggle virtual gamepad left handed:', err);
+            }
+        }
+    }
+
+    function _jeSyncVirtualGamepadPrefs(vgEnabled, leftyEnabled) {
+        if (!userId) return;
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+        fetch('/jellyemu/prefs/' + userId, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                virtualGamepad: vgEnabled ? "true" : "false",
+                virtualGamepadLeftHand: leftyEnabled ? "true" : "false"
+            })
+        }).catch(function (err) { console.warn('[JellyEmu] Virtual gamepad settings sync failed:', err); });
+    }
+
     function syncVGTogglesLocal() {
         var e = emu(); if (!e) return;
         var vgOn = document.getElementById('je-vg-toggle');
@@ -592,13 +669,17 @@
     document.getElementById('je-vg-toggle').addEventListener('change', function () {
         var e = emu(); if (!e || !e.toggleVirtualGamepad) return;
         e.toggleVirtualGamepad(this.checked);
+        _jeVirtualGamepad = this.checked ? "true" : "false";
+        _jeSyncVirtualGamepadPrefs(this.checked, document.getElementById('je-vg-lefty').checked);
     });
     document.getElementById('je-vg-lefty').addEventListener('change', function () {
         var e = emu(); if (!e || !e.toggleVirtualGamepadLeftHanded) return;
         e.toggleVirtualGamepadLeftHanded(this.checked);
+        _jeVirtualGamepadLeftHand = this.checked ? "true" : "false";
+        _jeSyncVirtualGamepadPrefs(document.getElementById('je-vg-toggle').checked, this.checked);
     });
 
-    // ── Reset to defaults ──
+    // Reset to defaults
     document.getElementById('je-input-reset').addEventListener('click', function () {
         _jeBindings = JSON.parse(JSON.stringify(_jeDefaultBindings));
         buildKeyboardBinds();
@@ -606,7 +687,7 @@
         _jeSyncBindingsToServer();
     });
 
-    // ── Wire up the dock button ──
+    // Wire up the dock button
     document.getElementById('je-btn-inputmap').addEventListener('click', function () {
         buildKeyboardBinds();
         buildGamepadBinds();
@@ -614,7 +695,7 @@
         openPopup('je-pop-inputmap');
     });
 
-    // ── Gamepad Hotplug events ──
+    // Gamepad Hotplug events
     window.addEventListener("gamepadconnected", function () {
         if (_popupOpen()) buildGamepadBinds();
     });
@@ -622,7 +703,7 @@
         if (_popupOpen()) buildGamepadBinds();
     });
 
-    // ── Expose build functions for external callers if needed ──
+    // Expose build functions for external callers if needed
     window._jeBuildKeyboardBinds = buildKeyboardBinds;
     window._jeBuildGamepadBinds  = buildGamepadBinds;
 

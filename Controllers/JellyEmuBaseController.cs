@@ -70,10 +70,12 @@ namespace JellyEmu.Controllers
             string Controls,
             string ControllerControls,
             string RaUsername,
-            string RaApiKey);
+            string RaApiKey,
+            string VirtualGamepad,
+            string VirtualGamepadLeftHand);
 
         protected static readonly UserFullPrefs DefaultFullPrefs =
-            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty);
+            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty, "false", "false");
 
         /// <summary>
         /// Maps Jellyfin console tag names to EmulatorJS core identifiers.
@@ -400,7 +402,9 @@ namespace JellyEmu.Controllers
                     Controls:           Str("controls",           DefaultFullPrefs.Controls),
                     ControllerControls: Str("controllerControls", DefaultFullPrefs.ControllerControls),
                     RaUsername:         Str("raUsername",         DefaultFullPrefs.RaUsername),
-                    RaApiKey:           Str("raApiKey",           DefaultFullPrefs.RaApiKey));
+                    RaApiKey:           Str("raApiKey",           DefaultFullPrefs.RaApiKey),
+                    VirtualGamepad:     Str("virtualGamepad",     DefaultFullPrefs.VirtualGamepad),
+                    VirtualGamepadLeftHand: Str("virtualGamepadLeftHand", DefaultFullPrefs.VirtualGamepadLeftHand));
             }
             catch (Exception ex)
             {
@@ -424,7 +428,9 @@ namespace JellyEmu.Controllers
                 controls           = prefs.Controls,
                 controllerControls = prefs.ControllerControls,
                 raUsername         = prefs.RaUsername,
-                raApiKey           = prefs.RaApiKey
+                raApiKey           = prefs.RaApiKey,
+                virtualGamepad     = prefs.VirtualGamepad,
+                virtualGamepadLeftHand = prefs.VirtualGamepadLeftHand
             }));
         }
 

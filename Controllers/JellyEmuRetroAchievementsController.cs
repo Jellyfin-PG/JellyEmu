@@ -82,7 +82,9 @@ namespace JellyEmu.Controllers
                     Controls: current.Controls,
                     ControllerControls: current.ControllerControls,
                     RaUsername: newUsername,
-                    RaApiKey: newApiKey);
+                    RaApiKey: newApiKey,
+                    VirtualGamepad: current.VirtualGamepad,
+                    VirtualGamepadLeftHand: current.VirtualGamepadLeftHand);
 
                 WriteFullPrefs(userId, updated);
                 return Ok(new { success = true, raUsername = newUsername });

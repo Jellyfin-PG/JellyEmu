@@ -32,6 +32,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetPrefs(string userId)
         {
+            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
             var prefs = ReadFullPrefs(userId);
             return Ok(new
             {
@@ -44,7 +45,9 @@ namespace JellyEmu.Controllers
                 shader        = prefs.Shader,
                 videoRotation      = prefs.VideoRotation,
                 controls           = prefs.Controls,
-                jeBindings         = prefs.Controls
+                jeBindings         = prefs.Controls,
+                virtualGamepad     = prefs.VirtualGamepad,
+                virtualGamepadLeftHand = prefs.VirtualGamepadLeftHand
             });
         }
 
@@ -81,7 +84,9 @@ namespace JellyEmu.Controllers
                     Controls:           Str("jeBindings",         Str("controls",           current.Controls)),
                     ControllerControls: Str("controllerControls", current.ControllerControls),
                     RaUsername:         current.RaUsername,
-                    RaApiKey:           current.RaApiKey);
+                    RaApiKey:           current.RaApiKey,
+                    VirtualGamepad:     Str("virtualGamepad",     current.VirtualGamepad),
+                    VirtualGamepadLeftHand: Str("virtualGamepadLeftHand", current.VirtualGamepadLeftHand));
             }
             catch { return BadRequest("Body must be a JSON object."); }
 
@@ -99,7 +104,9 @@ namespace JellyEmu.Controllers
                 videoRotation      = current.VideoRotation,
                 controls           = current.Controls,
                 controllerControls = current.ControllerControls,
-                jeBindings         = current.Controls
+                jeBindings         = current.Controls,
+                virtualGamepad     = current.VirtualGamepad,
+                virtualGamepadLeftHand = current.VirtualGamepadLeftHand
             });
         }
     }
