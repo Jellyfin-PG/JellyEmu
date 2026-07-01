@@ -28,7 +28,7 @@
             height: 100%;
         }
 
-        /* ── EJS Elements ── */
+        /* - EJS Elements - */
         .ejs_menu_bar,
         .ejs_parent>div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),
         #je-loader+.ejs_parent .ejs_menu_bar {
@@ -51,7 +51,7 @@
             display: none !important;
         }
 
-        /* ── Loading Screen ── */
+        /* - Loading Screen - */
         #je-loader {
             position: fixed;
             inset: 0;
@@ -146,7 +146,7 @@
             height: 90px;
         }
 
-        /* ── Shared Dock Styles ── */
+        /* - Shared Dock Styles - */
         .je-bar {
             position: fixed;
             z-index: 90000;
@@ -158,7 +158,7 @@
             pointer-events: none;
         }
 
-        /* ── Top Bar ── */
+        /* - Top Bar - */
         #je-topbar {
             top: 0;
             left: 0;
@@ -215,7 +215,7 @@
             fill: currentColor;
         }
 
-        /* ── Bottom Dock ── */
+        /* - Bottom Dock - */
         #je-dock {
             bottom: 16px;
             left: 50%;
@@ -293,7 +293,7 @@
             flex-shrink: 0;
         }
 
-        /* ── Popup / Modal ── */
+        /* - Popup / Modal - */
         .je-overlay {
             position: fixed;
             inset: 0;
@@ -373,7 +373,7 @@
             flex: 1;
         }
 
-        /* ── Save Slots ── */
+        /* - Save Slots - */
         .je-slot {
             display: flex;
             align-items: center;
@@ -458,7 +458,7 @@
             border-color: rgba(255, 255, 255, .25);
         }
 
-        /* ── Volume ── */
+        /* - Volume - */
         .je-vol-wrap {
             display: flex;
             flex-direction: column;
@@ -490,7 +490,7 @@
             cursor: pointer;
         }
 
-        /* ── Cheats ── */
+        /* - Cheats - */
         .je-cheat-row {
             display: flex;
             align-items: center;
@@ -539,7 +539,7 @@
             resize: none;
         }
 
-        /* ── Toggle Switch ── */
+        /* - Toggle Switch - */
         .je-toggle {
             position: relative;
             width: 40px;
@@ -582,7 +582,7 @@
             transform: translateX(18px);
         }
 
-        /* ── Settings Rows ── */
+        /* - Settings Rows - */
         .je-setting {
             display: flex;
             align-items: center;
@@ -633,7 +633,7 @@
             margin-top: 0;
         }
 
-        /* ── Input Mapping ── */
+        /* - Input Mapping - */
         .je-tabs {
             display: flex;
             gap: 0;
@@ -668,7 +668,7 @@
             display: block;
         }
 
-        /* ── Input Mapping Grid ── */
+        /* - Input Mapping Grid - */
         .je-bind-headers {
             display: grid;
             grid-template-columns: 1fr 90px 90px;
@@ -744,7 +744,7 @@
             margin-bottom: 12px;
         }
 
-        /* ── FPS Counter ── */
+        /* - FPS Counter - */
         #je-fps {
             position: fixed;
             top: 56px;
@@ -766,7 +766,7 @@
             display: block;
         }
 
-        /* ── Dock Minimize ── */
+        /* - Dock Minimize - */
         #je-dock-min {
             position: fixed;
             bottom: 16px;
@@ -814,7 +814,7 @@
             display: none !important;
         }
 
-        /* ── VR/AR Button ── */
+        /* - VR/AR Button - */
         #je-vr-btn {
             display: none;
         }
@@ -832,7 +832,7 @@
             background: rgba(100, 200, 255, .28);
         }
 
-        /* ── Mobile ── */
+        /* - Mobile - */
         @media (max-width: 768px) {
             #je-dock {
                 gap: 2px;
@@ -886,7 +886,7 @@
             }
         }
 
-        /* ── Disc Selector ── */
+        /* - Disc Selector - */
         .je-disc-item {
             display: flex;
             align-items: center;
@@ -1268,12 +1268,27 @@
     <div id="je-fps"></div>
     <div id="game"></div>
     <script>
-        window.JellyEmuConfig = {
-            itemId: '{{ item_id }}',
-            userId: '{{ user_id }}',
-            savePostUrl: '{{ save_post_url }}',
-            activeSlot: {{ active_slot }}
-        };
+        (function () {
+            var token = '';
+            try {
+                var creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
+                var server = (creds.Servers || []).find(function (s) { return s.UserId === '{{ user_id }}'; });
+                token = (server && server.AccessToken) || '';
+            } catch (e) { }
+
+            window._jellyToken = token;
+
+            window.JellyEmuConfig = {
+                itemId: '{{ item_id }}',
+                userId: '{{ user_id }}',
+                savePostUrl: '{{ save_post_url }}',
+                activeSlot: {{ active_slot }},
+                isM3u: {{ is_m3u }},
+                token: token,
+                virtualGamepad: '{{ virtual_gamepad }}',
+                virtualGamepadLefty: '{{ virtual_gamepad_lefty }}'
+            };
+        })();
     </script>
     <script>
         (function () {
@@ -1288,6 +1303,7 @@
     </script>
     <script>
         (function () {
+            var _jellyToken = window._jellyToken || '';
             // Core name map for loading screen badge
             var coreNames = {
                 nes: 'NES', snes: 'SNES', n64: 'N64', gba: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', nds: 'Nintendo DS',
@@ -1441,20 +1457,47 @@
             }, true);
 
             // Popup management
+            function _jeDispatchPopupEvent(name, id) {
+                var event = (typeof CustomEvent === 'function') ?
+                    new CustomEvent(name, { detail: { id: id } }) :
+                    document.createEvent('CustomEvent');
+                if (typeof CustomEvent !== 'function') {
+                    event.initCustomEvent(name, true, true, { id: id });
+                }
+                window.dispatchEvent(event);
+                var callbackName = 'on' + name.charAt(0).toUpperCase() + name.slice(1);
+                if (typeof window[callbackName] === 'function') {
+                    window[callbackName](id);
+                }
+            }
+
             function openPopup(id) {
                 closeAllPopups();
                 var el = document.getElementById(id);
-                if (el) { el.classList.add('je-open'); window._jePopupOpen = true; clearTimeout(hideTimer); }
+                if (el) {
+                    el.classList.add('je-open');
+                    window._jePopupOpen = true;
+                    clearTimeout(hideTimer);
+                    _jeDispatchPopupEvent('jePopupOpened', id);
+                }
             }
             function closePopup(id) {
                 var el = document.getElementById(id);
-                if (el) el.classList.remove('je-open');
-                window._jePopupOpen = false;
-                showDocks();
-                refocusGame();
+                if (el && el.classList.contains('je-open')) {
+                    el.classList.remove('je-open');
+                    window._jePopupOpen = false;
+                    showDocks();
+                    refocusGame();
+                    _jeDispatchPopupEvent('jePopupClosed', id);
+                }
             }
             function closeAllPopups() {
-                document.querySelectorAll('.je-overlay.je-open').forEach(function (el) { el.classList.remove('je-open'); });
+                var openPopups = document.querySelectorAll('.je-overlay.je-open');
+                openPopups.forEach(function (el) {
+                    var id = el.id;
+                    el.classList.remove('je-open');
+                    _jeDispatchPopupEvent('jePopupClosed', id);
+                });
                 window._jePopupOpen = false;
                 refocusGame();
             }
@@ -2094,13 +2137,7 @@
         {{ end }}
 
         {{ if has_saves }}
-        // Read the auth token Jellyfin's web UI already stored in localStorage
-        var _jellyToken = '';
-        try {
-            var _jellyCreds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
-            var _jellyServer = (_jellyCreds.Servers || []).find(function (s) { return s.UserId === '{{ user_id }}'; });
-            _jellyToken = (_jellyServer && _jellyServer.AccessToken) || '';
-        } catch (e) { }
+        var _jellyToken = window._jellyToken || '';
 
         // Mark game as played in Jellyfin when the emulator launches
         fetch('/Users/{{ user_id }}/PlayedItems/{{ item_id }}', {
@@ -2262,20 +2299,25 @@
         });
         {{ end }}
     </script>
-    <script>
-        window.JellyEmuConfig = {
-            itemId: '{{ item_id }}',
-            userId: '{{ user_id }}',
-            savePostUrl: '{{ save_post_url }}',
-            activeSlot: {{ active_slot }},
-            isM3u: {{ is_m3u }},
-            token: typeof _jellyToken !== 'undefined' ? _jellyToken : ''
-        };
-    </script>
+
     <script src="/jellyemu/assets/ejs.input.js"></script>
     <script src="/jellyemu/assets/ejs.save.js"></script>
     <script src="/jellyemu/assets/ejs.xr.js"></script>
     <script src="{{ ejs_base }}/loader.js"></script>
+    <script>
+        window.addEventListener('load', function () {
+            var loadEvent = (typeof CustomEvent === 'function') ?
+                new CustomEvent('jeLoaded') :
+                document.createEvent('CustomEvent');
+            if (typeof CustomEvent !== 'function') {
+                loadEvent.initCustomEvent('jeLoaded', true, true, {});
+            }
+            window.dispatchEvent(loadEvent);
+            if (typeof window.onJeLoaded === 'function') {
+                window.onJeLoaded();
+            }
+        });
+    </script>
 </body>
 
 </html>

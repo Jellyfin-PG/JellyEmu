@@ -44,7 +44,9 @@ namespace JellyEmu.Controllers
                 shader        = prefs.Shader,
                 videoRotation      = prefs.VideoRotation,
                 controls           = prefs.Controls,
-                jeBindings         = prefs.Controls
+                jeBindings         = prefs.Controls,
+                virtualGamepad     = prefs.VirtualGamepad,
+                virtualGamepadLefty= prefs.VirtualGamepadLefty
             });
         }
 
@@ -81,7 +83,9 @@ namespace JellyEmu.Controllers
                     Controls:           Str("jeBindings",         Str("controls",           current.Controls)),
                     ControllerControls: Str("controllerControls", current.ControllerControls),
                     RaUsername:         current.RaUsername,
-                    RaApiKey:           current.RaApiKey);
+                    RaApiKey:           current.RaApiKey,
+                    VirtualGamepad:     Str("virtualGamepad",     current.VirtualGamepad),
+                    VirtualGamepadLefty:Str("virtualGamepadLefty",current.VirtualGamepadLefty));
             }
             catch { return BadRequest("Body must be a JSON object."); }
 
@@ -99,7 +103,9 @@ namespace JellyEmu.Controllers
                 videoRotation      = current.VideoRotation,
                 controls           = current.Controls,
                 controllerControls = current.ControllerControls,
-                jeBindings         = current.Controls
+                jeBindings         = current.Controls,
+                virtualGamepad     = current.VirtualGamepad,
+                virtualGamepadLefty= current.VirtualGamepadLefty
             });
         }
     }
