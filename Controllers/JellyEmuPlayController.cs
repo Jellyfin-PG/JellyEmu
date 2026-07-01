@@ -210,7 +210,9 @@ namespace JellyEmu.Controllers
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,
                 is_m3u = isJ3u,
-                needs_threads = (core == "dos" || core == "psp" || core == "arcade" || core == "mame2003_plus" || core == "amiga" || core == "3do" || core == "segaSaturn" || core == "jaguar")
+                needs_threads = (core == "dos" || core == "psp" || core == "arcade" || core == "mame2003_plus" || core == "amiga" || core == "3do" || core == "segaSaturn" || core == "jaguar"),
+                virtual_gamepad = fullPrefs.VirtualGamepad,
+                virtual_gamepad_lefty = fullPrefs.VirtualGamepadLefty
             });
 
             // When opened as a new tab (threaded cores), these headers make the page
