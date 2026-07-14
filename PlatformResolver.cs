@@ -205,7 +205,6 @@ namespace JellyEmu
         /// </summary>
         public string ResolvePlatform(string? path, string? name)
         {
-            // 1. Check brackets/parentheses in the Name or Filename
             var nameToTarget = name ?? (path != null ? Path.GetFileName(path) : null);
             if (!string.IsNullOrEmpty(nameToTarget))
             {
@@ -213,7 +212,6 @@ namespace JellyEmu
                 if (fromToken != null) return fromToken;
             }
 
-            // 2. Check Folders (if path is provided)
             if (!string.IsNullOrEmpty(path))
             {
                 var normalizedPath = path.Replace(Path.DirectorySeparatorChar == '/' ? '\\' : '/', Path.DirectorySeparatorChar);
@@ -225,7 +223,6 @@ namespace JellyEmu
                 }
             }
 
-            // 3. Check Extension (if path is provided)
             if (!string.IsNullOrEmpty(path))
             {
                 var ext = Path.GetExtension(path);
@@ -233,6 +230,21 @@ namespace JellyEmu
                 {
                     if (UnambiguousExtensions.TryGetValue(ext, out var extTag)) return extTag;
                     if (LibraryOnlyExtensions.TryGetValue(ext, out var libTag)) return libTag;
+                    if (string.Equals(ext, ".zip", StringComparison.OrdinalIgnoreCase) && File.Exists(path))
+                    {
+                        try
+                        {
+                            using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+                            foreach (var entry in zip.Entries)
+                            {
+                                var innerExt = Path.GetExtension(entry.FullName);
+                                if (string.IsNullOrEmpty(innerExt)) continue;
+                                if (UnambiguousExtensions.TryGetValue(innerExt, out var innerTag)) return innerTag;
+                                if (LibraryOnlyExtensions.TryGetValue(innerExt, out var innerLibTag)) return innerLibTag;
+                            }
+                        }
+                        catch { }
+                    }
                 }
             }
 
@@ -437,6 +449,11 @@ namespace JellyEmu
             return result;
         }
 
+        private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp3", ".m4a", ".m4b", ".mp4", ".wav", ".flac", ".ape", ".ogg", ".wma", ".aac", ".opus"
+        };
+
         public static bool IsReferencedByAnyCue(string binPath)
         {
             try
@@ -454,7 +471,14 @@ namespace JellyEmu
         public static string? GetFirstBinPath(string cuePath)
         {
             foreach (var path in GetReferencedFiles(cuePath))
-                if (File.Exists(path)) return path;
+            {
+                if (File.Exists(path))
+                {
+                    var ext = Path.GetExtension(path);
+                    if (!AudioExtensions.Contains(ext))
+                        return path;
+                }
+            }
             return null;
         }
 

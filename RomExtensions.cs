@@ -55,7 +55,14 @@ namespace JellyEmu
         {
             if (string.IsNullOrEmpty(path)) return false;
             var ext = Path.GetExtension(path);
-            if (!string.IsNullOrEmpty(ext)) return PlatformResolver.AllRomExtensions.Contains(ext);
+            if (!string.IsNullOrEmpty(ext))
+            {
+                if (string.Equals(ext, ".cue", StringComparison.OrdinalIgnoreCase))
+                {
+                    return CueParser.HasResolvedBin(path);
+                }
+                return PlatformResolver.AllRomExtensions.Contains(ext);
+            }
             if (Directory.Exists(path))
             {
                 try

@@ -55,5 +55,47 @@ namespace JellyEmu.Tests
             // Assert
             Assert.Equal(expected, result);
         }
+
+        [Fact]
+        public void IsRomPath_AudiobookCue_ShouldReturnFalse()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var mp4Path = Path.Combine(tempDir, "audiobook.mp4");
+                File.WriteAllText(mp4Path, "dummy content");
+
+                var cuePath = Path.Combine(tempDir, "audiobook.cue");
+                File.WriteAllText(cuePath, $"FILE \"{Path.GetFileName(mp4Path)}\" BINARY\n  TRACK 01 AUDIO\n    INDEX 01 00:00:00");
+
+                Assert.False(RomExtensions.IsRomPath(cuePath));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void IsRomPath_GameCue_ShouldReturnTrue()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var binPath = Path.Combine(tempDir, "game.bin");
+                File.WriteAllText(binPath, "dummy content");
+
+                var cuePath = Path.Combine(tempDir, "game.cue");
+                File.WriteAllText(cuePath, $"FILE \"{Path.GetFileName(binPath)}\" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00");
+
+                Assert.True(RomExtensions.IsRomPath(cuePath));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }
