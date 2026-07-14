@@ -126,5 +126,10 @@ namespace JellyEmu
         /// The folder path where downloaded ROMs should be placed.
         /// </summary>
         public string GamesLibraryPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether to use the Loom plugin for UI injection instead of standard file transformation.
+        /// </summary>
+        public bool UseLoomInjector { get; set; } = false;
     }
 }

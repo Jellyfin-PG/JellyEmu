@@ -815,20 +815,24 @@
         }
 
         /* - VR/AR Button - */
-        #je-vr-btn {
+        #je-vr-btn,
+        #je-ar-btn {
             display: none;
         }
 
-        #je-vr-btn.je-vr-available {
+        #je-vr-btn.je-vr-available,
+        #je-ar-btn.je-ar-available {
             display: flex;
         }
 
-        #je-vr-btn.je-vr-active {
+        #je-vr-btn.je-vr-active,
+        #je-ar-btn.je-ar-active {
             color: #7df;
             background: rgba(100, 200, 255, .18);
         }
 
-        #je-vr-btn.je-vr-active:hover {
+        #je-vr-btn.je-vr-active:hover,
+        #je-ar-btn.je-ar-active:hover {
             background: rgba(100, 200, 255, .28);
         }
 
@@ -946,6 +950,12 @@
                         d="M20.5 6H3.5C2.12 6 1 7.12 1 8.5v7C1 16.88 2.12 18 3.5 18h4.1l1.33-1.5h6.14L16.4 18h4.1c1.38 0 2.5-1.12 2.5-2.5v-7C23 7.12 21.88 6 20.5 6zM8 13.5C6.62 13.5 5.5 12.38 5.5 11S6.62 8.5 8 8.5 10.5 9.62 10.5 11 9.38 13.5 8 13.5zm8 0c-1.38 0-2.5-1.12-2.5-2.5S14.62 8.5 16 8.5 18.5 9.62 18.5 11 17.38 13.5 16 13.5z" />
                 </svg>
                 <span id="je-vr-label">VR</span>
+            </button>
+            <button class="je-topbtn" id="je-ar-btn" title="Enter AR">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2 6V2h4v2H4v2H2zm16-4h4v4h-2V4h-2V2zM2 18v4h4v-2H4v-2H2zm16 4h4v-4h-2v2h-2v2zm-10-13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm6 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM19 8.5H5c-.83 0-1.5.67-1.5 1.5v4c0 .83.67 1.5 1.5 1.5h2.5l1-1h7l1 1h2.5c.83 0 1.5-.67 1.5-1.5V10c0-.83-.67-1.5-1.5-1.5z" />
+                </svg>
+                <span id="je-ar-label">AR</span>
             </button>
             <button class="je-topbtn" id="je-exit-btn" title="Exit">
                 <svg viewBox="0 0 24 24">
