@@ -496,7 +496,7 @@
                     <h2 class="sectionTitle">SteamGridDB Images</h2>
                     <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
                         Used for high-quality game grids, heroes, and logos.
-                        Get your API key at <a href="https://www.steamgriddb.com/profile/api" target="_blank"
+                        Get your API key at <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank"
                             style="color: #00a4dc; text-decoration: none;">steamgriddb.com/profile/api</a>.
                     </p>
                     <div class="inputContainer">
@@ -614,6 +614,24 @@
                         <label class="inputLabel inputLabelUnfocused" for="netplayServer">Netplay Server</label>
                         <input id="netplayServer" type="text" class="emby-input"
                             placeholder="e.g. https://192.168.1.100:3000" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">Frontend Injection Method</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Choose the mechanism used to modify jellyfin frontend.
+                        Off will use File Transformation plugin, On will use Loom plugin if installed, Loom is the optimized way to modify frontend ui.
+                    </p>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="useLoomInjector" value="false" />
+                        <button type="button" class="je-toggle-btn" id="useLoomInjectorBtn"
+                            onclick="jeToggle('useLoomInjector')">OFF</button>
+                        <span class="je-toggle-label">
+                            Use Loom Injector (Memory-based middleware)
+                            <small>When active and the Loom plugin is installed, UI injection is managed dynamically by Loom.</small>
+                        </span>
                     </div>
                 </div>
 
@@ -1105,6 +1123,7 @@
                     jeSet('rommPlaytimeReportEnabled', config.RommPlaytimeReportEnabled !== false);
                     jeSet('rommCollectionSyncEnabled', config.RommCollectionSyncEnabled !== false);
                     jeSet('rommScreenshotPushEnabled', config.RommScreenshotPushEnabled !== false);
+                    jeSet('useLoomInjector', config.UseLoomInjector === true);
                     var collRow = page.querySelector('#rommCollectionSyncRow');
                     if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
                     page.querySelector('#netplayServer').value = config.NetplayServer || '';
@@ -1130,6 +1149,7 @@
                     config.RommPlaytimeReportEnabled = page.querySelector('#rommPlaytimeReportEnabled').value === 'true';
                     config.RommCollectionSyncEnabled = page.querySelector('#rommCollectionSyncEnabled').value === 'true';
                     config.RommScreenshotPushEnabled = page.querySelector('#rommScreenshotPushEnabled').value === 'true';
+                    config.UseLoomInjector = page.querySelector('#useLoomInjector').value === 'true';
                     config.NetplayServer = page.querySelector('#netplayServer').value.trim();
                     config.GamesLibraryPath = page.querySelector('#gamesLibraryPath').value;
                     config.MarketplaceFeedUrl = page.querySelector('#marketplaceFeedUrl').value.trim();
