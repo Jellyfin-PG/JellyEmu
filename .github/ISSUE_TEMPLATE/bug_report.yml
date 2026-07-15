@@ -9,7 +9,8 @@ body:
       value: |
         ### Important Rules Before You Submit
         By opening this ticket, you agree to the following community standards:
-        - Responsiveness: You must be able to respond to requests for further information or testing within 48 hours. Failure to do so will result in the ticket being closed.
+        - Responsiveness: You must be able to respond to requests for further information or testing. Failure to do so will result in the ticket being closed.
+        - Thoughtfulness: You should make sure to search existing open and closed issues and confirm this is not a duplicate.
         - Respect Ticket Boundaries: Do not hijack other tickets to discuss separate issues. Keep each issue focused on its original topic.
         - Professionalism: Maintain a respectful tone. Disrespectful, spammy, or repetitive false reports will lead to being blocked from the repository.
   - type: checkboxes
@@ -17,7 +18,7 @@ body:
     attributes:
       label: Acknowledgment
       options:
-        - label: I agree to the 48-hour response policy and agree to maintain professional boundaries in this ticket.
+        - label: I acknowledge that I have read and agree to the rules above.
     validations:
       required: true
   - type: dropdown
