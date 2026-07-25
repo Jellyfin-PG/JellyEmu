@@ -80,10 +80,11 @@ namespace JellyEmu
             {
                 // NES
                 { "nes", "NES" }, { "famicom", "NES" }, { "nintendo", "NES" }, { "nintendo entertainment system", "NES" },
+                { "family computer disk system", "NES" }, { "famicom disk system", "NES" }, { "fds", "NES" },
                 // SNES
                 { "snes", "SNES" }, { "super nintendo", "SNES" }, { "super famicom", "SNES" }, { "supernintendo", "SNES" }, { "super nintendo entertainment system", "SNES" },
                 // N64
-                { "n64", "N64" }, { "nintendo 64", "N64" }, { "nintendo64", "N64" },
+                { "n64", "N64" }, { "nintendo 64", "N64" }, { "nintendo64", "N64" }, { "nintendo 64dd", "N64" }, { "64dd", "N64" },
                 // Game Boy / GBC
                 { "gb", "Game Boy" }, { "game boy", "Game Boy" }, { "gameboy", "Game Boy" },
                 { "gbc", "Game Boy Color" }, { "game boy color", "Game Boy Color" }, { "gameboy color", "Game Boy Color" }, { "gameboycolor", "Game Boy Color" },
@@ -94,13 +95,13 @@ namespace JellyEmu
                 // Virtual Boy
                 { "vb", "Virtual Boy" }, { "virtual boy", "Virtual Boy" }, { "virtualboy", "Virtual Boy" },
                 // Master System
-                { "sms", "Master System" }, { "master system", "Master System" }, { "sega master system", "Master System" }, { "mastersystem", "Master System" },
+                { "sms", "Master System" }, { "master system", "Master System" }, { "sega master system", "Master System" }, { "mastersystem", "Master System" }, { "master system - mark iii", "Master System" },
                 // Game Gear
                 { "gg", "Game Gear" }, { "game gear", "Game Gear" }, { "sega game gear", "Game Gear" }, { "gamegear", "Game Gear" },
                 // Genesis / Mega Drive
-                { "genesis", "Sega Genesis" }, { "sega genesis", "Sega Genesis" }, { "megadrive", "Sega Genesis" }, { "mega drive", "Sega Genesis" }, { "sega mega drive", "Sega Genesis" }, { "md", "Sega Genesis" },
+                { "genesis", "Sega Genesis" }, { "sega genesis", "Sega Genesis" }, { "megadrive", "Sega Genesis" }, { "mega drive", "Sega Genesis" }, { "sega mega drive", "Sega Genesis" }, { "mega drive - genesis", "Sega Genesis" }, { "md", "Sega Genesis" },
                 // Sega CD
-                { "sega cd", "Sega CD" }, { "segacd", "Sega CD" }, { "mega cd", "Sega CD" }, { "sega-cd", "Sega CD" },
+                { "sega cd", "Sega CD" }, { "segacd", "Sega CD" }, { "mega cd", "Sega CD" }, { "sega-cd", "Sega CD" }, { "mega cd - sega cd", "Sega CD" }, { "mega-cd - sega cd", "Sega CD" },
                 // Sega 32X
                 { "32x", "Sega 32X" }, { "sega 32x", "Sega 32X" },
                 // Sega Saturn
@@ -114,6 +115,7 @@ namespace JellyEmu
                 { "ws", "WonderSwan" }, { "wonderswan", "WonderSwan" }, { "wonder swan", "WonderSwan" },
                 // TurboGrafx
                 { "pce", "TurboGrafx-16" }, { "turbografx", "TurboGrafx-16" }, { "turbografx-16", "TurboGrafx-16" }, { "turbografx 16", "TurboGrafx-16" }, { "pc engine", "TurboGrafx-16" }, { "pcengine", "TurboGrafx-16" },
+                { "pc engine - turbografx-16", "TurboGrafx-16" }, { "pc engine cd", "TurboGrafx-16" }, { "pc engine cd - turbografx-cd", "TurboGrafx-16" }, { "turbografx-cd", "TurboGrafx-16" }, { "turbografx cd", "TurboGrafx-16" }, { "supergrafx", "TurboGrafx-16" }, { "pc engine supergrafx", "TurboGrafx-16" },
                 // ColecoVision
                 { "coleco", "ColecoVision" }, { "colecovision", "ColecoVision" },
                 // NeoGeo Pocket
@@ -133,7 +135,7 @@ namespace JellyEmu
                 { "amiga", "Commodore Amiga" }, { "commodore amiga", "Commodore Amiga" },
                 { "c64", "Commodore 64" }, { "commodore 64", "Commodore 64" },
                 // PC-FX
-                { "pc-fx", "PC-FX" }, { "pcfx", "PC-FX" }, { "nec pc-fx", "PC-FX" },
+                { "pc-fx", "PC-FX" }, { "pcfx", "PC-FX" }, { "nec pc-fx", "PC-FX" }, { "pc-fx & pc-fxga", "PC-FX" },
                 // Pico 8
                 { "pico-8", "PICO-8" }, { "pico8", "PICO-8" }, { "pico 8", "PICO-8" }, { "pico", "PICO-8" },
             };
