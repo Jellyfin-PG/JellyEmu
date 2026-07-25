@@ -147,13 +147,15 @@ JellyEmu depends on the **File Transformation** plugin to inject CSS and JavaScr
 
 1. Open your Jellyfin dashboard
 2. Go to **Administration → Plugins → Repositories**
-3. Click **Add** and enter the following URL:
+3. Click **New Repository** and enter the following for the Name and URL:
+   ```
+   Jellyfin-PG
+   ```
+   ```
+   https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifest.json
+   ```
 
-```
-https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifest.json
-```
-
-4. Click **Save**
+4. Click **Add**
 
 ### Step 2 — Install File Transformation
 
@@ -169,6 +171,10 @@ https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifes
 ### Step 4 — Restart Jellyfin
 
 Restart your Jellyfin server. Both plugins must be active at the same time — File Transformation handles the page injection, JellyEmu manages your roms.
+
+1. Go to **Administration → Dashboard**
+2. Click **Restart**
+3. Confirm again by clicking **Restart**
 
 ---
 
