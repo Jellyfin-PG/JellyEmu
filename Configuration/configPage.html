@@ -636,6 +636,23 @@
                 </div>
 
                 <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">Vantage</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Displays an "Open in Vantage" button on game pages and menus to launch games in Vantage.
+                    </p>
+
+                    <div class="je-toggle-row">
+                        <input type="hidden" id="vantageEnabled" value="true" />
+                        <button type="button" class="je-toggle-btn je-on" id="vantageEnabledBtn"
+                            onclick="jeToggle('vantageEnabled')">ON</button>
+                        <span class="je-toggle-label">
+                            Vantage
+                            <small>Toggles whether the "Open in Vantage" button is displayed.</small>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
                     <h2 class="sectionTitle">ROM Download Location</h2>
                     <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
                         Select a Jellyfin library folder where downloaded ROMs will be stored.
@@ -1124,6 +1141,7 @@
                     jeSet('rommCollectionSyncEnabled', config.RommCollectionSyncEnabled !== false);
                     jeSet('rommScreenshotPushEnabled', config.RommScreenshotPushEnabled !== false);
                     jeSet('useLoomInjector', config.UseLoomInjector === true);
+                    jeSet('vantageEnabled', config.VantageEnabled !== false);
                     var collRow = page.querySelector('#rommCollectionSyncRow');
                     if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
                     page.querySelector('#netplayServer').value = config.NetplayServer || '';
@@ -1150,6 +1168,7 @@
                     config.RommCollectionSyncEnabled = page.querySelector('#rommCollectionSyncEnabled').value === 'true';
                     config.RommScreenshotPushEnabled = page.querySelector('#rommScreenshotPushEnabled').value === 'true';
                     config.UseLoomInjector = page.querySelector('#useLoomInjector').value === 'true';
+                    config.VantageEnabled = page.querySelector('#vantageEnabled').value === 'true';
                     config.NetplayServer = page.querySelector('#netplayServer').value.trim();
                     config.GamesLibraryPath = page.querySelector('#gamesLibraryPath').value;
                     config.MarketplaceFeedUrl = page.querySelector('#marketplaceFeedUrl').value.trim();

@@ -102,6 +102,8 @@ namespace JellyEmu.Services
                     window.__jellyEmuLoaded = true;
                     console.log('[JellyEmu] UI injection successful.');
 
+                    const jellyEmuVantageEnabled = __JELLYEMU_VANTAGE_ENABLED__;
+
                     let currentItemId = null;
                     let currentItemIsGame = false;
                     let lastGameCardId = null;
@@ -350,7 +352,7 @@ namespace JellyEmu.Services
                             playFromHereBtn.style.display = 'none';
                         }
 
-                        if (!sheetRoot.querySelector('button[data-jellyemu-vantage]')) {
+                        if (jellyEmuVantageEnabled && !sheetRoot.querySelector('button[data-jellyemu-vantage]')) {
                             const sourceCard = document.querySelector('.card[data-id="' + itemId + '"]');
                             const tags = sourceCard && sourceCard.getAttribute('data-jellyemu-tags')
                                 ? sourceCard.getAttribute('data-jellyemu-tags').split(',')
@@ -631,7 +633,7 @@ namespace JellyEmu.Services
 
                         detailButtonsContainer.insertBefore(btn, detailButtonsContainer.firstChild);
 
-                        if (currentItemId && !detailButtonsContainer.querySelector('#jellyemu-vantage-btn')) {
+                        if (jellyEmuVantageEnabled && currentItemId && !detailButtonsContainer.querySelector('#jellyemu-vantage-btn')) {
                             const vBtn = document.createElement('button');
                             vBtn.type      = 'button';
                             vBtn.id        = 'jellyemu-vantage-btn';
@@ -1878,6 +1880,9 @@ namespace JellyEmu.Services
                 })();
                 </script>
                 """;
+
+                bool vantageEnabled = JellyEmu.Plugin.Instance?.Configuration.VantageEnabled ?? true;
+                injection = injection.Replace("__JELLYEMU_VANTAGE_ENABLED__", vantageEnabled ? "true" : "false");
 
                 string block = "\n" + StartMarker + "\n" + injection + EndMarker + "\n";
                 htmlContent = Regex.Replace(htmlContent, @"(</body>)", block + "$1");

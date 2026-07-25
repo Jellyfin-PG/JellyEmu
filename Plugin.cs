@@ -131,5 +131,10 @@ namespace JellyEmu
         /// Whether to use the Loom plugin for UI injection instead of standard file transformation.
         /// </summary>
         public bool UseLoomInjector { get; set; } = false;
+
+        /// <summary>
+        /// Whether the "Open in Vantage" button is shown in the UI.
+        /// </summary>
+        public bool VantageEnabled { get; set; } = true;
     }
 }
