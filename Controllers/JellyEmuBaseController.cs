@@ -88,7 +88,7 @@ namespace JellyEmu.Controllers
                 { "SNES",             "snes"       },
                 { "N64",              "n64"         },
                 { "Game Boy",         "gb"          },
-                { "Game Boy Color",   "gba"         },
+                { "Game Boy Color",   "gb"          },
                 { "Game Boy Advance", "gba"         },
                 { "Nintendo DS",      "nds"         },
                 { "Virtual Boy",      "vb"          },
@@ -121,6 +121,59 @@ namespace JellyEmu.Controllers
                 { "MAME 2003",        "mame2003_plus" },
                 { "DOS",              "dos"         },
                 { "PICO-8",           "pico8"       },
+            };
+
+        /// <summary>
+        /// Maps ROM file extensions to EmulatorJS core identifiers, used when an
+        /// item carries no recognised console tag.
+        /// https://emulatorjs.org/docs4devs/cores
+        /// </summary>
+        protected static readonly Dictionary<string, string> ExtensionCoreMap =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                // NES
+                { "nes", "nes" }, { "fds", "nes" }, { "unf", "nes" }, { "unif", "nes" },
+                // SNES
+                { "smc", "snes" }, { "sfc", "snes" }, { "swc", "snes" }, { "fig", "snes" },
+                // N64
+                { "z64", "n64" }, { "n64", "n64" }, { "v64", "n64" },
+                // Game Boy / Game Boy Color (both run on the gambatte-backed "gb" core)
+                { "gb", "gb" }, { "gbc", "gb" },
+                // GBA
+                { "gba", "gba" },
+                // NDS
+                { "nds", "nds" },
+                // Virtual Boy
+                { "vb", "vb" },
+                // Sega
+                { "sms", "segaMS" },
+                { "gg",  "segaGG" },
+                { "md",  "segaMD" }, { "smd", "segaMD" }, { "gen", "segaMD" }, { "68k", "segaMD" },
+                { "32x", "sega32x" },
+                // PlayStation
+                { "pbp", "psx" }, { "cue", "psx" }, { "chd", "psx" },
+                // PSP
+                { "cso", "psp" }, { "iso", "psp" },
+                // Atari
+                { "a26", "atari2600" },
+                { "a78", "atari7800" },
+                { "lnx", "lynx" },
+                { "jag", "jaguar" }, { "j64", "jaguar" },
+                // WonderSwan
+                { "ws",  "ws" }, { "wsc", "ws" },
+                // TurboGrafx-16
+                { "pce", "pce" },
+                // ColecoVision
+                { "col", "coleco" }, { "cv", "coleco" },
+                // NeoGeo Pocket
+                { "ngp", "ngp" }, { "ngc", "ngp" },
+                // Commodore 64
+                { "d64", "c64" }, { "t64", "c64" }, { "crt", "c64" },
+                { "tap", "c64" }, { "prg", "c64" },
+                // Amiga
+                { "adf", "amiga" }, { "dms", "amiga" }, { "ipf", "amiga" }, { "adz", "amiga" },
+                // PICO-8
+                { "p8", "pico8" },
             };
 
         /// <summary>
@@ -434,7 +487,13 @@ namespace JellyEmu.Controllers
             }));
         }
 
-        protected static string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item)
+        /// <summary>
+        /// Resolves the EmulatorJS core for an item, preferring its console tag and
+        /// falling back to the file extension.
+        /// Returns <see cref="string.Empty"/> when the platform cannot be determined —
+        /// callers must treat that as a failure rather than guessing a core.
+        /// </summary>
+        protected internal static string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item)
         {
             if (item.Tags != null)
             {
@@ -448,58 +507,12 @@ namespace JellyEmu.Controllers
                 if (item.Path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
                     return "pico8";
 
-                var ext = Path.GetExtension(item.Path).TrimStart('.').ToLowerInvariant();
-                var extMap = new Dictionary<string, string>
-                {
-                    // NES
-                    { "nes", "nes" }, { "fds", "nes" }, { "unf", "nes" }, { "unif", "nes" },
-                    // SNES
-                    { "smc", "snes" }, { "sfc", "snes" }, { "swc", "snes" }, { "fig", "snes" },
-                    // N64
-                    { "z64", "n64" }, { "n64", "n64" }, { "v64", "n64" },
-                    // Game Boy / GBC
-                    { "gb", "gb" }, { "gbc", "gbc" },
-                    // GBA
-                    { "gba", "gba" },
-                    // NDS
-                    { "nds", "nds" },
-                    // Virtual Boy
-                    { "vb", "vb" },
-                    // Sega
-                    { "sms", "segaMS" },
-                    { "gg",  "segaGG" },
-                    { "md",  "segaMD" }, { "smd", "segaMD" }, { "gen", "segaMD" }, { "68k", "segaMD" },
-                    { "32x", "sega32x" },
-                    // PlayStation
-                    { "pbp", "psx" }, { "cue", "psx" }, { "chd", "psx" },
-                    // PSP
-                    { "cso", "psp" }, { "iso", "psp" },
-                    // Atari
-                    { "a26", "atari2600" },
-                    { "a78", "atari7800" },
-                    { "lnx", "lynx" },
-                    { "jag", "jaguar" }, { "j64", "jaguar" },
-                    // WonderSwan
-                    { "ws",  "ws" }, { "wsc", "ws" },
-                    // TurboGrafx-16
-                    { "pce", "pce" },
-                    // ColecoVision
-                    { "col", "coleco" }, { "cv", "coleco" },
-                    // NeoGeo Pocket
-                    { "ngp", "ngp" }, { "ngc", "ngp" },
-                    // Commodore 64
-                    { "d64", "c64" }, { "t64", "c64" }, { "crt", "c64" },
-                    { "tap", "c64" }, { "prg", "c64" },
-                    // Amiga
-                    { "adf", "amiga" }, { "dms", "amiga" }, { "ipf", "amiga" }, { "adz", "amiga" },
-                    // PICO-8
-                    { "p8", "pico8" },
-                };
-                if (extMap.TryGetValue(ext, out var extCore))
+                var ext = Path.GetExtension(item.Path).TrimStart('.');
+                if (ExtensionCoreMap.TryGetValue(ext, out var extCore))
                     return extCore;
             }
 
-            return "nes";
+            return string.Empty;
         }
 
         protected static CoreInfo ResolveCoreInfo(MediaBrowser.Controller.Entities.BaseItem item)

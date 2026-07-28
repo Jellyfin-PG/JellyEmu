@@ -122,6 +122,7 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         public async Task<IActionResult> PlayEjs(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
@@ -133,6 +134,14 @@ namespace JellyEmu.Controllers
             }
 
             var core = ResolveCore(item);
+            if (string.IsNullOrEmpty(core))
+            {
+                Logger.LogWarning("[JellyEmu] Play: could not resolve a core for {Name} ({ItemId}), path={Path}",
+                    item.Name, itemId, item.Path);
+                return UnprocessableEntity(
+                    $"JellyEmu could not determine which emulator core to use for \"{item.Name}\". " +
+                    "Tag the item with its console name (e.g. \"SNES\") or rename the ROM to use a recognised file extension.");
+            }
             var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".zip";
             var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
             var cleanFilename = CleanCosmeticFilename(filename);
