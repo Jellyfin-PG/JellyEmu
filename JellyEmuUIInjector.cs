@@ -181,7 +181,7 @@ namespace JellyEmu.Services
                                 .catch(function() {});
                         }
 
-                        fetch('/jellyemu/core/' + itemId)
+                        fetch('/jellyemu/core/' + itemId + (userId ? '?userId=' + userId : ''))
                             .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
                             .catch(function() { return { needsThreads: false }; })
                             .then(function(info) {

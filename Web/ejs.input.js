@@ -26,6 +26,27 @@
         28: 'REWIND',          29: 'SLOW MOTION'
     };
 
+    var n64InputMap = {
+        0:  'N64 B BUTTON',   1:  'C-BUTTON LEFT',   2:  'Z-TRIGGER (Alt)',3:  'START',
+        4:  'D-PAD UP',       5:  'D-PAD DOWN',      6:  'D-PAD LEFT',     7:  'D-PAD RIGHT',
+        8:  'N64 A BUTTON',   9:  'C-BUTTON DOWN',   10: 'L SHOULDER',     11: 'R SHOULDER',
+        12: 'Z-TRIGGER',      13: 'C-BUTTON RIGHT',  14: 'C-BUTTON UP',    15: 'R3',
+        16: 'STICK RIGHT',    17: 'STICK LEFT',      18: 'STICK DOWN',     19: 'STICK UP',
+        20: 'C-BUTTON RIGHT', 21: 'C-BUTTON LEFT',   22: 'C-BUTTON DOWN',  23: 'C-BUTTON UP',
+        24: 'QUICK SAVE',     25: 'QUICK LOAD',      26: 'CHANGE SLOT',   27: 'FAST FORWARD',
+        28: 'REWIND',          29: 'SLOW MOTION'
+    };
+
+    function _jeIsN64() {
+        var core = (window.EJS_core || '').toLowerCase();
+        var platform = (window.EJS_platformTag || '').toUpperCase();
+        return platform === 'N64' || core === 'mupen64plus_next' || core === 'parallel_n64' || core === 'n64';
+    }
+
+    function getActiveInputMap() {
+        return _jeIsN64() ? n64InputMap : inputMap;
+    }
+
     // - Hotkey handlers -
     var _jeActiveSlot = activeSlot;
 
@@ -174,14 +195,61 @@
         29: { kb1:109, kb2:0, gp1:'', gp2:'' }
     };
 
+    var _jeN64DefaultBindings = {
+        0:  { kb1:67,  kb2:0, gp1:'BUTTON_2',              gp2:'BUTTON_3' },
+        1:  { kb1:0,   kb2:0, gp1:'RIGHT_STICK_X:-1',      gp2:'' },
+        2:  { kb1:0,   kb2:0, gp1:'',                      gp2:'' },
+        3:  { kb1:13,  kb2:0, gp1:'START',                 gp2:'' },
+        4:  { kb1:38,  kb2:0, gp1:'DPAD_UP',               gp2:'' },
+        5:  { kb1:40,  kb2:0, gp1:'DPAD_DOWN',             gp2:'' },
+        6:  { kb1:37,  kb2:0, gp1:'DPAD_LEFT',             gp2:'' },
+        7:  { kb1:39,  kb2:0, gp1:'DPAD_RIGHT',            gp2:'' },
+        8:  { kb1:88,  kb2:0, gp1:'BUTTON_1',              gp2:'' },
+        9:  { kb1:0,   kb2:0, gp1:'RIGHT_STICK_Y:+1',      gp2:'' },
+        10: { kb1:81,  kb2:0, gp1:'LEFT_TOP_SHOULDER',     gp2:'' },
+        11: { kb1:69,  kb2:0, gp1:'RIGHT_TOP_SHOULDER',    gp2:'' },
+        12: { kb1:90,  kb2:0, gp1:'LEFT_BOTTOM_SHOULDER',  gp2:'RIGHT_BOTTOM_SHOULDER' },
+        13: { kb1:0,   kb2:0, gp1:'RIGHT_STICK_X:+1',      gp2:'' },
+        14: { kb1:0,   kb2:0, gp1:'RIGHT_STICK_Y:-1',      gp2:'BUTTON_4' },
+        15: { kb1:0,   kb2:0, gp1:'LEFT_STICK',            gp2:'' },
+        16: { kb1:76,  kb2:0, gp1:'LEFT_STICK_X:+1',       gp2:'' },
+        17: { kb1:74,  kb2:0, gp1:'LEFT_STICK_X:-1',       gp2:'' },
+        18: { kb1:75,  kb2:0, gp1:'LEFT_STICK_Y:+1',       gp2:'' },
+        19: { kb1:73,  kb2:0, gp1:'LEFT_STICK_Y:-1',       gp2:'' },
+        20: { kb1:0,   kb2:0, gp1:'',                      gp2:'' },
+        21: { kb1:83,  kb2:0, gp1:'',                      gp2:'' },
+        22: { kb1:65,  kb2:0, gp1:'',                      gp2:'' },
+        23: { kb1:87,  kb2:0, gp1:'',                      gp2:'' },
+        24: { kb1:49,  kb2:0, gp1:'', gp2:'' },
+        25: { kb1:50,  kb2:0, gp1:'', gp2:'' },
+        26: { kb1:51,  kb2:0, gp1:'', gp2:'' },
+        27: { kb1:107, kb2:0, gp1:'', gp2:'' },
+        28: { kb1:32,  kb2:0, gp1:'', gp2:'' },
+        29: { kb1:109, kb2:0, gp1:'', gp2:'' }
+    };
+
     // - Live binding map -
     var _jeBindings = {};
     function _jeLoadBindings(serverPrefs) {
+        var defaults = _jeIsN64() ? _jeN64DefaultBindings : _jeDefaultBindings;
         try {
             var saved = serverPrefs && serverPrefs.jeBindings ? JSON.parse(serverPrefs.jeBindings) : null;
-            _jeBindings = saved || JSON.parse(JSON.stringify(_jeDefaultBindings));
+            _jeBindings = saved || JSON.parse(JSON.stringify(defaults));
         } catch (e) {
-            _jeBindings = JSON.parse(JSON.stringify(_jeDefaultBindings));
+            _jeBindings = JSON.parse(JSON.stringify(defaults));
+        }
+
+        if (_jeIsN64()) {
+            if (!_jeBindings[16] || !_jeBindings[16].gp1) _jeBindings[16] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[16]));
+            if (!_jeBindings[17] || !_jeBindings[17].gp1) _jeBindings[17] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[17]));
+            if (!_jeBindings[18] || !_jeBindings[18].gp1) _jeBindings[18] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[18]));
+            if (!_jeBindings[19] || !_jeBindings[19].gp1) _jeBindings[19] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[19]));
+
+            [4, 5, 6, 7].forEach(function (i) {
+                if (_jeBindings[i] && _jeBindings[i].gp2 && _jeBindings[i].gp2.indexOf('LEFT_STICK') !== -1) {
+                    _jeBindings[i].gp2 = '';
+                }
+            });
         }
     }
     _jeLoadBindings(null);
@@ -203,13 +271,30 @@
             .catch(function (err) { console.warn('[JellyEmu] Failed to load bindings:', err); });
     }
 
+    var _jeSimulatedState = {};
+
     // - simulateInput bridge -
     function _jeSimulate(idx, pressed) {
         if (idx >= 24) { if (pressed) _jeHotkeyAction(idx); return; }
         var g = gm();
-        if (!g) { console.warn('[JellyEmu] _jeSimulate: gm() is null'); return; }
-        if (typeof g.simulateInput !== 'function') { console.warn('[JellyEmu] _jeSimulate: simulateInput not a function'); return; }
-        g.simulateInput(0, idx, pressed ? 1 : 0);
+        if (!g) { console.warn('[JellyEmu Input] gm() is null'); return; }
+        if (typeof g.simulateInput !== 'function') { console.warn('[JellyEmu Input] simulateInput not a function'); return; }
+
+        var boolPressed = !!pressed;
+        if (_jeSimulatedState[idx] === boolPressed) {
+            return;
+        }
+        _jeSimulatedState[idx] = boolPressed;
+
+        var mapName = getActiveInputMap()[idx] || idx;
+        console.log('[JellyEmu Input] _jeSimulate | Index:', idx, '(' + mapName + ') | Pressed:', boolPressed);
+
+        if (_jeIsN64() && idx >= 16 && idx <= 19) {
+            try { g.simulateInput(0, idx, boolPressed ? 32767 : 0); } catch (e) {}
+            return;
+        }
+
+        g.simulateInput(0, idx, boolPressed ? 1 : 0);
     }
 
     function _jeFindBindingsForGp(gpStr) {
@@ -310,6 +395,7 @@
 
             registerOn.call(gh, 'buttondown', function (ev) {
                 var label = ev.label;
+                console.log('[JellyEmu Gamepad] buttondown | Label:', label, '| Ev:', ev);
                 var matched = _jeFindBindingsForGp(label);
                 if (matched.length > 0) {
                     if (!_jeGpActiveState[label]) {
@@ -323,6 +409,7 @@
 
             registerOn.call(gh, 'buttonup', function (ev) {
                 var label = ev.label;
+                console.log('[JellyEmu Gamepad] buttonup | Label:', label);
                 var matched = _jeFindBindingsForGp(label);
                 if (matched.length > 0) {
                     if (_jeGpActiveState[label]) {
@@ -337,41 +424,42 @@
             registerOn.call(gh, 'axischanged', function (ev) {
                 var axisName = ev.axis;
                 var newVal   = ev.value;
-                var label    = ev.label;
 
-                if (label) {
-                    var matched = _jeFindBindingsForGp(label);
-                    if (matched.length > 0) {
-                        if (!_jeGpActiveState[label]) {
-                            _jeGpActiveState[label] = true;
-                            matched.forEach(function (idx) { _jeSimulate(idx, true); });
-                        }
-                        var oppositeDir = newVal > 0 ? ':-1' : ':+1';
-                        var oppositeLabel = axisName + oppositeDir;
-                        if (_jeGpActiveState[oppositeLabel]) {
-                            _jeGpActiveState[oppositeLabel] = false;
-                            _jeFindBindingsForGp(oppositeLabel).forEach(function (idx) {
-                                _jeSimulate(idx, false);
-                            });
-                        }
-                        return;
+                if (Math.abs(newVal) > 0.25) {
+                    var isPos = newVal > 0;
+                    var posLabel = axisName + ':+1';
+                    var negLabel = axisName + ':-1';
+                    var activeLabel = isPos ? posLabel : negLabel;
+                    var inactiveLabel = isPos ? negLabel : posLabel;
+
+                    if (!_jeGpActiveState[activeLabel]) {
+                        _jeGpActiveState[activeLabel] = true;
+                        var activeBinds = _jeFindBindingsForGp(activeLabel);
+                        activeBinds.forEach(function (idx) {
+                            _jeSimulate(idx, true);
+                        });
                     }
-                }
 
-                [':+1', ':-1'].forEach(function (dir) {
-                    var checkLabel = axisName + dir;
-                    if (_jeGpActiveState[checkLabel]) {
-                        _jeGpActiveState[checkLabel] = false;
-                        _jeFindBindingsForGp(checkLabel).forEach(function (idx) {
+                    if (_jeGpActiveState[inactiveLabel]) {
+                        _jeGpActiveState[inactiveLabel] = false;
+                        _jeFindBindingsForGp(inactiveLabel).forEach(function (idx) {
                             _jeSimulate(idx, false);
                         });
                     }
-                });
+                } else {
+                    [':+1', ':-1'].forEach(function (dir) {
+                        var checkLabel = axisName + dir;
+                        if (_jeGpActiveState[checkLabel]) {
+                            _jeGpActiveState[checkLabel] = false;
+                            _jeFindBindingsForGp(checkLabel).forEach(function (idx) {
+                                _jeSimulate(idx, false);
+                            });
+                        }
+                    });
+                }
 
-                var anyBound = _jeFindBindingsForGp(axisName + ':+1').length > 0 ||
-                               _jeFindBindingsForGp(axisName + ':-1').length > 0;
-                if (!anyBound && ejsAxisChange) {
-                    ejsAxisChange(ev);
+                if (ejsAxisChange) {
+                    try { ejsAxisChange(ev); } catch (e) {}
                 }
             });
 
@@ -460,6 +548,7 @@
 
     function buildKeyboardBinds() {
         var panel = document.getElementById('je-tab-kb');
+        var activeMap = getActiveInputMap();
         panel.innerHTML =
             '<div class="je-bind-headers">' +
                 '<span>Action</span>' +
@@ -467,7 +556,7 @@
                 '<span>KB 2</span>' +
             '</div>';
 
-        Object.keys(inputMap).forEach(function (keyStr) {
+        Object.keys(activeMap).forEach(function (keyStr) {
             var idx = parseInt(keyStr, 10);
             var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
             var row = document.createElement('div');
@@ -475,7 +564,7 @@
 
             var label = document.createElement('span');
             label.className = 'je-bind-label';
-            label.textContent = inputMap[idx];
+            label.textContent = activeMap[idx];
             row.appendChild(label);
 
             ['kb1', 'kb2'].forEach(function (field) {
@@ -492,6 +581,7 @@
         var e  = window.EJS_emulator;
         var gh = e && e.gamepad;
         var gp = gh && gh.gamepads && gh.gamepads[0];
+        var activeMap = getActiveInputMap();
 
         document.getElementById('je-gp-status').textContent = gp
             ? ('Detected: ' + gp.id)
@@ -505,7 +595,7 @@
                 '<span>GP 2</span>' +
             '</div>';
 
-        Object.keys(inputMap).forEach(function (keyStr) {
+        Object.keys(activeMap).forEach(function (keyStr) {
             var idx = parseInt(keyStr, 10);
             var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
             var row = document.createElement('div');
@@ -513,7 +603,7 @@
 
             var label = document.createElement('span');
             label.className = 'je-bind-label';
-            label.textContent = inputMap[idx];
+            label.textContent = activeMap[idx];
             row.appendChild(label);
 
             ['gp1', 'gp2'].forEach(function (field) {
