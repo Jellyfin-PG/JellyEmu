@@ -4,7 +4,7 @@ To ensure our project remains a constructive and efficient environment, we expec
 
 ## Expectations
 
-* **Responsiveness:** If you open an issue, you are expected to monitor it and respond to requests for clarification or logs within 48 hours. If we do not hear from you, the ticket will be closed.
+* **Responsiveness:** If you open an issue, you are expected to monitor it and respond to requests for clarification or logs promptly. If we do not hear from you, the ticket can be closed.
 
 * **Stay On-Topic:** Please do not hijack existing tickets to discuss unrelated problems. Open a new issue if your issue is not exactly the same as the one currently being discussed.
 
