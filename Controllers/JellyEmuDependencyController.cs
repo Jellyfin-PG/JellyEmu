@@ -165,6 +165,12 @@ namespace JellyEmu.Controllers
 
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
+            if (path.Equals("cores/azahar-thread-legacy-wasm.data", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("cores/azahar-legacy-wasm.data", StringComparison.OrdinalIgnoreCase))
+            {
+                path = "cores/azahar-thread-wasm.data";
+            }
+
             if (_ejsManager.IsReady)
             {
                 var localPath = Path.Combine(_ejsManager.LocalRoot, path.Replace('/', Path.DirectorySeparatorChar));
@@ -176,9 +182,13 @@ namespace JellyEmu.Controllers
                 Logger.LogWarning("[JellyEmu] EJS asset missing from local cache, proxying: {Path}", path);
             }
 
-            // Fall back to CDN proxy
-            var cdnUrl = $"{JellyEmuEjsManager.CdnBase}/{path}";
-            Logger.LogDebug("[JellyEmu] Proxying EJS asset from CDN: {Url}", cdnUrl);
+            // Fall back to CDN proxy: use nightly CDN channel for azahar (3DS core)
+            var baseUrl = path.Contains("azahar", StringComparison.OrdinalIgnoreCase)
+                ? "https://cdn.emulatorjs.org/nightly/data"
+                : JellyEmuEjsManager.CdnBase.TrimEnd('/');
+
+            var cdnUrl = $"{baseUrl}/{path}";
+            Logger.LogInformation("[JellyEmu] Proxying EJS asset from CDN: {Url}", cdnUrl);
 
             try
             {
@@ -198,6 +208,19 @@ namespace JellyEmu.Controllers
                 Logger.LogError(ex, "[JellyEmu] Failed to proxy EJS asset from CDN: {Url}", cdnUrl);
                 return StatusCode(502);
             }
+        }
+
+        /// <summary>
+        /// Forces a background or synchronous re-download of EmulatorJS assets based on configured channel.
+        /// Path: POST /jellyemu/ejs/redownload
+        /// </summary>
+        [HttpPost("/jellyemu/ejs/redownload")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> RedownloadEjs()
+        {
+            Logger.LogInformation("[JellyEmu] Manual trigger to re-download EmulatorJS assets for channel {Channel}", JellyEmuEjsManager.CurrentChannel);
+            _ = Task.Run(async () => await _ejsManager.RedownloadAsync());
+            return Ok(new { success = true, channel = JellyEmuEjsManager.CurrentChannel, message = $"Started re-downloading EmulatorJS assets for channel '{JellyEmuEjsManager.CurrentChannel}' in background." });
         }
     }
 }

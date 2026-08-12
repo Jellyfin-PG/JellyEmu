@@ -193,7 +193,7 @@ namespace JellyEmu.Tests
                     Scale: "fit", Mute: "false", Controller: "auto", Haptics: "true", Autosave: "true",
                     Shader: "", VideoRotation: 0, Controls: "", ControllerControls: "", RaUsername: "", RaApiKey: "",
                     VirtualGamepad: "false", VirtualGamepadLefty: "false",
-                    PlatformCores: "{\"PlayStation\":\"mednafen_psx\"}",
+                    PlatformCores: "{\"PlayStation\":\"mednafen_psx_hw\"}",
                     GameCores: "{}"
                 );
 
@@ -202,7 +202,7 @@ namespace JellyEmu.Tests
                 var resolvedCore = controller.TestResolveCore(item, userId);
                 var resolvedInfo = controller.TestResolveCoreInfo(item, userId);
 
-                Assert.Equal("mednafen_psx", resolvedCore);
+                Assert.Equal("mednafen_psx_hw", resolvedCore);
                 Assert.True(resolvedInfo.NeedsThreads);
             }
             finally
@@ -232,8 +232,8 @@ namespace JellyEmu.Tests
                     Scale: "fit", Mute: "false", Controller: "auto", Haptics: "true", Autosave: "true",
                     Shader: "", VideoRotation: 0, Controls: "", ControllerControls: "", RaUsername: "", RaApiKey: "",
                     VirtualGamepad: "false", VirtualGamepadLefty: "false",
-                    PlatformCores: "{\"PlayStation\":\"psx\"}",
-                    GameCores: $"{{\"{(itemId.ToString("N"))}\":\"mednafen_psx\"}}"
+                    PlatformCores: "{\"PlayStation\":\"pcsx_rearmed\"}",
+                    GameCores: $"{{\"{(itemId.ToString("N"))}\":\"mednafen_psx_hw\"}}"
                 );
 
                 controller.TestSaveUserPrefs(userId, prefs);
@@ -241,8 +241,38 @@ namespace JellyEmu.Tests
                 var resolvedCore = controller.TestResolveCore(item, userId);
                 var resolvedInfo = controller.TestResolveCoreInfo(item, userId);
 
-                Assert.Equal("mednafen_psx", resolvedCore);
+                Assert.Equal("mednafen_psx_hw", resolvedCore);
                 Assert.True(resolvedInfo.NeedsThreads);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DefaultCoreResolution_Nintendo3DS_ReturnsAzaharAndIsSupported()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "Nintendo 3DS" },
+                    Path = "C:\\Games\\3DS\\Zelda.3ds"
+                };
+
+                var resolvedCore = controller.TestResolveCore(item);
+                var resolvedInfo = controller.TestResolveCoreInfo(item);
+                var availableCores = controller.TestGetAvailableCores(item);
+
+                Assert.Equal("azahar", resolvedCore);
+                Assert.True(resolvedInfo.NeedsThreads);
+                Assert.True(PlatformResolver.IsEjsSupported("Nintendo 3DS"));
+                Assert.Contains(availableCores, c => c.Id == "azahar");
             }
             finally
             {

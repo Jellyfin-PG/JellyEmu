@@ -636,6 +636,29 @@
                 </div>
 
                 <div class="verticalSection" style="margin-top: 1.8em;">
+                    <h2 class="sectionTitle">EmulatorJS Distribution Channel</h2>
+                    <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+                        Select the EmulatorJS release channel. <strong>Stable</strong> is recommended for most platforms.
+                        <strong>Nightly</strong> is required for experimental cores such as Nintendo 3DS (Azahar).
+                    </p>
+                    <div class="selectContainer" style="margin-bottom: 1.2em;">
+                        <label class="selectLabel" for="ejsChannel">EmulatorJS Release Channel</label>
+                        <select id="ejsChannel" class="emby-select" style="width:100%; box-sizing:border-box; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 10px; color: #fff;">
+                            <option value="stable">Stable (Default)</option>
+                            <option value="latest">Latest / Beta</option>
+                            <option value="nightly">Nightly (Includes 3DS / Azahar core)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button type="button" id="btnRedownloadEjs" is="emby-button" class="emby-button"
+                            style="padding: 6px 16px; font-size: 0.85em; background: rgba(0, 164, 220, 0.15); border: 1px solid rgba(0, 164, 220, 0.25);">
+                            <span>Force Re-download EmulatorJS Assets</span>
+                        </button>
+                        <span id="ejsRedownloadStatus" style="font-size: 0.82em; color: #aaa;"></span>
+                    </div>
+                </div>
+
+                <div class="verticalSection" style="margin-top: 1.8em;">
                     <h2 class="sectionTitle">ROM Download Location</h2>
                     <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
                         Select a Jellyfin library folder where downloaded ROMs will be stored.
@@ -1127,6 +1150,8 @@
                     var collRow = page.querySelector('#rommCollectionSyncRow');
                     if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
                     page.querySelector('#netplayServer').value = config.NetplayServer || '';
+                    var ejsSel = page.querySelector('#ejsChannel');
+                    if (ejsSel) ejsSel.value = (config.EjsChannel || 'stable').toLowerCase();
                     page.querySelector('#marketplaceFeedUrl').value = config.MarketplaceFeedUrl || '';
                     loadLibraryFolders(config.GamesLibraryPath || '');
                 }).catch(function (err) {
@@ -1150,6 +1175,8 @@
                     config.RommCollectionSyncEnabled = page.querySelector('#rommCollectionSyncEnabled').value === 'true';
                     config.RommScreenshotPushEnabled = page.querySelector('#rommScreenshotPushEnabled').value === 'true';
                     config.UseLoomInjector = page.querySelector('#useLoomInjector').value === 'true';
+                    var ejsSel = page.querySelector('#ejsChannel');
+                    if (ejsSel) config.EjsChannel = ejsSel.value;
                     config.NetplayServer = page.querySelector('#netplayServer').value.trim();
                     config.GamesLibraryPath = page.querySelector('#gamesLibraryPath').value;
                     config.MarketplaceFeedUrl = page.querySelector('#marketplaceFeedUrl').value.trim();
@@ -1586,6 +1613,29 @@
                 if (btnSave) {
                     btnSave.addEventListener('click', function () {
                         saveConfig(page);
+                    });
+                }
+
+                var btnRedownload = page.querySelector('#btnRedownloadEjs');
+                if (btnRedownload) {
+                    btnRedownload.addEventListener('click', function() {
+                        var statusEl = page.querySelector('#ejsRedownloadStatus');
+                        statusEl.textContent = 'Triggering re-download…';
+                        statusEl.style.color = '#aaa';
+                        var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+                        fetch('/jellyemu/ejs/redownload', {
+                            method: 'POST',
+                            headers: { 'Authorization': authHeader }
+                        })
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            statusEl.textContent = d.message || 'Started downloading!';
+                            statusEl.style.color = '#52B54B';
+                        })
+                        .catch(function(err) {
+                            statusEl.textContent = 'Failed: ' + err;
+                            statusEl.style.color = '#FF4444';
+                        });
                     });
                 }
 

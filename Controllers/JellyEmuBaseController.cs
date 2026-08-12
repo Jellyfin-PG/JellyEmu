@@ -146,6 +146,11 @@ namespace JellyEmu.Controllers
                         new("melonds", "melonDS (Threaded)", true)
                     }
                 },
+                { "Nintendo 3DS", new List<CoreOption>
+                    {
+                        new("azahar", "Azahar (Threaded)", true)
+                    }
+                },
                 { "Sega Genesis", new List<CoreOption>
                     {
                         new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
@@ -257,6 +262,7 @@ namespace JellyEmu.Controllers
                 { "Game Boy Color",   "gambatte"      },
                 { "Game Boy Advance", "mgba"          },
                 { "Nintendo DS",      "desmume"       },
+                { "Nintendo 3DS",     "azahar"        },
                 { "Virtual Boy",      "beetle_vb"     },
                 { "Master System",    "genesis_plus_gx" },
                 { "Game Gear",        "genesis_plus_gx" },
@@ -303,6 +309,7 @@ namespace JellyEmu.Controllers
                 { "Game Boy Color",   "Nintendo - Game Boy Color"                      },
                 { "Game Boy Advance", "Nintendo - Game Boy Advance"                    },
                 { "Nintendo DS",      "Nintendo - Nintendo DS"                         },
+                { "Nintendo 3DS",     "Nintendo - Nintendo 3DS"                        },
                 { "Virtual Boy",      "Nintendo - Virtual Boy"                         },
                 { "Master System",    "Sega - Master System - Mark III"                },
                 { "Game Gear",        "Sega - Game Gear"                               },
@@ -642,6 +649,7 @@ namespace JellyEmu.Controllers
                 "arcade" => "fbneo",
                 "vb" => "beetle_vb",
                 "mednafen_psx" => "mednafen_psx_hw",
+                "3ds" or "citra" or "citra_canary" => "azahar",
                 _ => core
             };
         }
@@ -742,7 +750,7 @@ namespace JellyEmu.Controllers
         protected string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item, string? userId = null, string? queryCoreOverride = null)
         {
             if (!string.IsNullOrWhiteSpace(queryCoreOverride))
-                return queryCoreOverride;
+                return MapLegacyCore(queryCoreOverride);
 
             if (!string.IsNullOrWhiteSpace(userId))
             {
@@ -751,12 +759,12 @@ namespace JellyEmu.Controllers
 
                 var gameCores = ParseCoreDictionary(prefs.GameCores);
                 if (gameCores.TryGetValue(itemIdStr, out var gameCore) && !string.IsNullOrWhiteSpace(gameCore))
-                    return gameCore;
+                    return MapLegacyCore(gameCore);
 
                 var platformTag = ResolvePlatformTag(item);
                 var platformCores = ParseCoreDictionary(prefs.PlatformCores);
                 if (platformCores.TryGetValue(platformTag, out var platformCore) && !string.IsNullOrWhiteSpace(platformCore))
-                    return platformCore;
+                    return MapLegacyCore(platformCore);
             }
 
             return ResolveCoreDefault(item);
@@ -789,8 +797,10 @@ namespace JellyEmu.Controllers
                     { "gb", "gambatte" }, { "gbc", "gambatte" },
                     // GBA
                     { "gba", "mgba" },
-                    // NDS
+                    // Nintendo DS
                     { "nds", "desmume" },
+                    // Nintendo 3DS
+                    { "3ds", "azahar" }, { "cci", "azahar" }, { "cia", "azahar" },
                     // Virtual Boy
                     { "vb", "beetle_vb" },
                     // Sega
