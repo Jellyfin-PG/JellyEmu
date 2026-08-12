@@ -131,5 +131,10 @@ namespace JellyEmu
         /// Whether to use the Loom plugin for UI injection instead of standard file transformation.
         /// </summary>
         public bool UseLoomInjector { get; set; } = false;
+
+        /// <summary>
+        /// EmulatorJS CDN distribution channel: "stable", "latest", or "nightly".
+        /// </summary>
+        public string EjsChannel { get; set; } = "stable";
     }
 }

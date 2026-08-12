@@ -31,10 +31,10 @@ namespace JellyEmu.Services
     /// </summary>
     public class JellyEmuEjsManager
     {
+        public static string CurrentChannel => (Plugin.Instance?.Configuration.EjsChannel ?? "stable").ToLowerInvariant();
+
         /// <summary>CDN base used as fallback when local assets are not ready.</summary>
-        /// Using "stable" instead of "latest" — the latest/beta channel omits
-        /// cores/reports/*.json which causes EJS to fall back to the legacy wasm variant.
-        public const string CdnBase = "https://cdn.emulatorjs.org/stable/data/";
+        public static string CdnBase => $"https://cdn.emulatorjs.org/{CurrentChannel}/data/";
 
         private readonly IApplicationPaths _appPaths;
         private readonly ILogger<JellyEmuEjsManager> _logger;
@@ -67,14 +67,21 @@ namespace JellyEmu.Services
             if (LocalAssetsValid())
             {
                 _isReady = true;
-                _logger.LogInformation("[JellyEmu] EmulatorJS assets present at {Root}", EjsRoot);
+                _logger.LogInformation("[JellyEmu] EmulatorJS assets present at {Root} (channel: {Channel})", EjsRoot, CurrentChannel);
                 return;
             }
 
             _logger.LogInformation(
-                "[JellyEmu] EmulatorJS assets missing or outdated — downloading in background...");
+                "[JellyEmu] EmulatorJS assets missing or outdated — downloading channel {Channel} in background...", CurrentChannel);
 
             _ = Task.Run(DownloadFromCdnAsync);
+        }
+
+        public async Task RedownloadAsync()
+        {
+            _isReady = false;
+            _logger.LogInformation("[JellyEmu] Force re-downloading EmulatorJS assets for channel {Channel}...", CurrentChannel);
+            await DownloadFromCdnAsync();
         }
 
         private bool LocalAssetsValid()
@@ -82,7 +89,7 @@ namespace JellyEmu.Services
             if (!Directory.Exists(EjsRoot)) return false;
             if (!File.Exists(StampFile)) return false;
             var stamp = File.ReadAllText(StampFile).Trim();
-            if (stamp != "cdn-stable") return false;
+            if (stamp != $"cdn-{CurrentChannel}") return false;
             if (!File.Exists(Path.Combine(EjsRoot, "loader.js"))) return false;
             return true;
         }
@@ -94,7 +101,7 @@ namespace JellyEmu.Services
                 var client = _httpClientFactory.CreateClient("JellyEmuEjs");
                 var downloadQueue = new List<(string Url, string LocalPath)>();
 
-                _logger.LogInformation("[JellyEmu] Scraping EmulatorJS CDN directory listing...");
+                _logger.LogInformation("[JellyEmu] Scraping EmulatorJS CDN directory listing for channel {Channel}...", CurrentChannel);
 
                 if (Directory.Exists(EjsRoot))
                     Directory.Delete(EjsRoot, recursive: true);
@@ -132,10 +139,10 @@ namespace JellyEmu.Services
 
                 await Task.WhenAll(tasks);
 
-                await File.WriteAllTextAsync(StampFile, "cdn-stable");
+                await File.WriteAllTextAsync(StampFile, $"cdn-{CurrentChannel}");
 
                 _isReady = true;
-                _logger.LogInformation("[JellyEmu] CDN download complete! Assets are ready at {Root}", EjsRoot);
+                _logger.LogInformation("[JellyEmu] CDN download complete! Assets are ready at {Root} (stamp: cdn-{Channel})", EjsRoot, CurrentChannel);
             }
             catch (Exception ex)
             {

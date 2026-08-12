@@ -134,6 +134,8 @@ namespace JellyEmu
                 { "c64", "Commodore 64" }, { "commodore 64", "Commodore 64" },
                 // PC-FX
                 { "pc-fx", "PC-FX" }, { "pcfx", "PC-FX" }, { "nec pc-fx", "PC-FX" },
+                // Nintendo 3DS
+                { "3ds", "Nintendo 3DS" }, { "nintendo 3ds", "Nintendo 3DS" }, { "nintendo3ds", "Nintendo 3DS" },
                 // Pico 8
                 { "pico-8", "PICO-8" }, { "pico8", "PICO-8" }, { "pico 8", "PICO-8" }, { "pico", "PICO-8" },
             };
@@ -151,6 +153,7 @@ namespace JellyEmu
                 { ".jag", "Atari Jaguar" }, { ".j64", "Atari Jaguar" }, { ".ws",  "WonderSwan" }, { ".wsc", "WonderSwan" },
                 { ".pce", "TurboGrafx-16" }, { ".col", "ColecoVision" }, { ".cv", "ColecoVision" },
                 { ".ngp", "NeoGeo Pocket" }, { ".ngc", "NeoGeo Pocket" }, { ".cso", "PSP" }, { ".p8", "PICO-8" },
+                { ".3ds", "Nintendo 3DS" }, { ".cci", "Nintendo 3DS" }, { ".cia", "Nintendo 3DS" },
             };
 
         public static readonly Dictionary<string, string> LibraryOnlyAliases =
@@ -163,7 +166,6 @@ namespace JellyEmu
                 { "gamecube", "GameCube" }, { "nintendo gamecube", "GameCube" }, { "gc", "GameCube" },
                 { "wii", "Wii" }, { "nintendo wii", "Wii" }, { "wii u", "Wii U" }, { "wiiu", "Wii U" },
                 { "switch", "Nintendo Switch" }, { "nintendo switch", "Nintendo Switch" },
-                { "3ds", "Nintendo 3DS" }, { "nintendo 3ds", "Nintendo 3DS" },
                 { "psvita", "PlayStation Vita" }, { "ps vita", "PlayStation Vita" }, { "playstation vita", "PlayStation Vita" }, { "play station vita", "PlayStation Vita" },
                 { "windows", "Windows" }, { "gog", "Windows" },
             };
@@ -171,7 +173,6 @@ namespace JellyEmu
         private static readonly Dictionary<string, string> LibraryOnlyExtensions =
             new(StringComparer.OrdinalIgnoreCase)
             {
-                { ".3ds", "Nintendo 3DS" }, { ".cci", "Nintendo 3DS" }, { ".cia", "Nintendo 3DS" },
                 { ".gcm", "GameCube" }, { ".gcz", "GameCube" }, { ".rvz", "Wii" },
                 { ".wbfs", "Wii" }, { ".wad", "Wii" }, { ".xex", "Xbox 360" },
                 { ".xiso", "Xbox" }, { ".vpk", "PlayStation Vita" },

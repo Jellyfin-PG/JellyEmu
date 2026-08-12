@@ -39,7 +39,7 @@ namespace JellyEmu.Controllers
         protected readonly JellyEmuSessionService SessionService;
         protected readonly IHttpClientFactory HttpClientFactory;
 
-        protected record CoreInfo(string Core, bool NeedsThreads, string Launcher);
+        public record CoreInfo(string Core, bool NeedsThreads, string Launcher);
 
         protected JellyEmuBaseController(
             ILibraryManager libraryManager,
@@ -57,9 +57,9 @@ namespace JellyEmu.Controllers
             HttpClientFactory = httpClientFactory;
         }
 
-        protected record UserPrefs(int Slot, string Shader, int VideoRotation);
+        public record UserPrefs(int Slot, string Shader, int VideoRotation);
 
-        protected record UserFullPrefs(
+        public record UserFullPrefs(
             string Scale,
             string Mute,
             string Controller,
@@ -72,10 +72,181 @@ namespace JellyEmu.Controllers
             string RaUsername,
             string RaApiKey,
             string VirtualGamepad,
-            string VirtualGamepadLefty);
+            string VirtualGamepadLefty,
+            string PlatformCores = "{}",
+            string GameCores = "{}");
 
         protected static readonly UserFullPrefs DefaultFullPrefs =
-            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty, "false", "false");
+            new("fit", "false", "auto", "true", "true", string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty, "false", "false", "{}", "{}");
+
+        public record CoreOption(string Id, string Name, bool NeedsThreads);
+
+        public static readonly Dictionary<string, List<CoreOption>> PlatformCoreRegistry =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "PlayStation", new List<CoreOption>
+                    {
+                        new("pcsx_rearmed", "PCSX ReARMed (Threaded)", true),
+                        new("mednafen_psx_hw", "Beetle PSX HW (Threaded)", true)
+                    }
+                },
+                { "Arcade", new List<CoreOption>
+                    {
+                        new("fbneo", "FinalBurn Neo (Threaded)", true),
+                        new("mame2003_plus", "MAME 2003-Plus (Threaded)", true)
+                    }
+                },
+                { "MAME 2003", new List<CoreOption>
+                    {
+                        new("mame2003_plus", "MAME 2003-Plus (Threaded)", true),
+                        new("mame2003", "MAME 2003 (Threaded)", true),
+                        new("fbneo", "FinalBurn Neo (Threaded)", true)
+                    }
+                },
+                { "SNES", new List<CoreOption>
+                    {
+                        new("snes9x", "Snes9x (Threaded)", true),
+                        new("snes9x2010", "Snes9x 2010 (Threaded)", true),
+                        new("snes9x2005", "Snes9x 2005 (Threaded)", true)
+                    }
+                },
+                { "NES", new List<CoreOption>
+                    {
+                        new("nestopia", "Nestopia (Threaded)", true),
+                        new("fceumm", "FCEUmm (Threaded)", true)
+                    }
+                },
+                { "N64", new List<CoreOption>
+                    {
+                        new("mupen64plus_next", "Mupen64Plus Next (Threaded)", true),
+                        new("parallel_n64", "ParaLLEl N64 (Threaded)", true)
+                    }
+                },
+                { "Game Boy Advance", new List<CoreOption>
+                    {
+                        new("mgba", "mGBA (Threaded)", true),
+                        new("vba_next", "VBA Next (Threaded)", true)
+                    }
+                },
+                { "Game Boy", new List<CoreOption>
+                    {
+                        new("gambatte", "Gambatte (Threaded)", true),
+                        new("sameboy", "SameBoy (Threaded)", true)
+                    }
+                },
+                { "Game Boy Color", new List<CoreOption>
+                    {
+                        new("gambatte", "Gambatte (Threaded)", true),
+                        new("sameboy", "SameBoy (Threaded)", true)
+                    }
+                },
+                { "Nintendo DS", new List<CoreOption>
+                    {
+                        new("desmume", "DeSmuME (Threaded)", true),
+                        new("melonds", "melonDS (Threaded)", true)
+                    }
+                },
+                { "Nintendo 3DS", new List<CoreOption>
+                    {
+                        new("azahar", "Azahar (Threaded)", true)
+                    }
+                },
+                { "Sega Genesis", new List<CoreOption>
+                    {
+                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
+                        new("picodrive", "PicoDrive (Threaded)", true)
+                    }
+                },
+                { "Sega CD", new List<CoreOption>
+                    {
+                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
+                        new("picodrive", "PicoDrive (Threaded)", true)
+                    }
+                },
+                { "Sega 32X", new List<CoreOption>
+                    {
+                        new("picodrive", "PicoDrive (Threaded)", true)
+                    }
+                },
+                { "Master System", new List<CoreOption>
+                    {
+                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
+                        new("smsplus", "SMS Plus (Threaded)", true)
+                    }
+                },
+                { "Game Gear", new List<CoreOption>
+                    {
+                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
+                        new("smsplus", "SMS Plus (Threaded)", true)
+                    }
+                },
+                { "Sega Saturn", new List<CoreOption>
+                    {
+                        new("yabause", "Yabause (Threaded)", true)
+                    }
+                },
+                { "PSP", new List<CoreOption>
+                    {
+                        new("ppsspp", "PPSSPP (Threaded)", true)
+                    }
+                },
+                { "3DO", new List<CoreOption>
+                    {
+                        new("opera", "Opera (Threaded)", true)
+                    }
+                },
+                { "Atari 2600", new List<CoreOption>
+                    {
+                        new("stella2014", "Stella 2014 (Threaded)", true)
+                    }
+                },
+                { "Atari 5200", new List<CoreOption>
+                    {
+                        new("a5200", "Atari 5200 (Threaded)", true)
+                    }
+                },
+                { "Atari 7800", new List<CoreOption>
+                    {
+                        new("prosystem", "ProSystem (Threaded)", true)
+                    }
+                },
+                { "Atari Lynx", new List<CoreOption>
+                    {
+                        new("handy", "Handy (Threaded)", true)
+                    }
+                },
+                { "Atari Jaguar", new List<CoreOption>
+                    {
+                        new("virtualjaguar", "Virtual Jaguar (Threaded)", true)
+                    }
+                },
+                { "DOS", new List<CoreOption>
+                    {
+                        new("dosbox_pure", "DOSBox Pure (Threaded)", true)
+                    }
+                },
+                { "Commodore Amiga", new List<CoreOption>
+                    {
+                        new("puae", "PUAE (Threaded)", true)
+                    }
+                },
+                { "Commodore 64", new List<CoreOption>
+                    {
+                        new("vice_x64", "VICE x64 (Threaded)", true),
+                        new("vice_x64sc", "VICE x64sc (Threaded)", true)
+                    }
+                },
+                { "Virtual Boy", new List<CoreOption>
+                    {
+                        new("beetle_vb", "Beetle VB (Threaded)", true)
+                    }
+                },
+                { "PICO-8", new List<CoreOption>
+                    {
+                        new("pico8", "Lexaloffle HTML5", false)
+                    }
+                }
+            };
 
         /// <summary>
         /// Maps Jellyfin console tag names to EmulatorJS core identifiers.
@@ -84,43 +255,44 @@ namespace JellyEmu.Controllers
         protected static readonly Dictionary<string, string> CoreMap =
             new(StringComparer.OrdinalIgnoreCase)
             {
-                { "NES",              "nes"        },
-                { "SNES",             "snes"       },
-                { "N64",              "n64"         },
-                { "Game Boy",         "gb"          },
-                { "Game Boy Color",   "gba"         },
-                { "Game Boy Advance", "gba"         },
-                { "Nintendo DS",      "nds"         },
-                { "Virtual Boy",      "vb"          },
-                { "Master System",    "segaMS"      },
-                { "Game Gear",        "segaGG"      },
-                { "Sega Genesis",     "segaMD"      },
-                { "Sega CD",          "segaCD"      },
-                { "Sega 32X",         "sega32x"     },
-                { "Sega Saturn",      "segaSaturn"  },
-                { "PlayStation",      "psx"         },
-                { "PSP",              "psp"         },
-                { "3DO",              "3do"         },
-                { "Atari 2600",       "atari2600"   },
-                { "Atari 5200",       "a5200"       },
-                { "Atari 7800",       "atari7800"   },
-                { "Atari Lynx",       "lynx"        },
-                { "Atari Jaguar",     "jaguar"      },
-                { "WonderSwan",       "ws"          },
-                { "TurboGrafx-16",    "pce"         },
-                { "PC-FX",            "pcfx"        },
-                { "ColecoVision",     "coleco"      },
-                { "NeoGeo Pocket",    "ngp"         },
-                { "Commodore 64",     "c64"         },
-                { "Commodore 128",    "c128"        },
-                { "Commodore Amiga",  "amiga"       },
-                { "Commodore PET",    "pet"         },
-                { "Commodore Plus/4", "plus4"       },
-                { "Commodore VIC-20", "vic20"       },
-                { "Arcade",           "arcade"      },
+                { "NES",              "nestopia"      },
+                { "SNES",             "snes9x"        },
+                { "N64",              "mupen64plus_next" },
+                { "Game Boy",         "gambatte"      },
+                { "Game Boy Color",   "gambatte"      },
+                { "Game Boy Advance", "mgba"          },
+                { "Nintendo DS",      "desmume"       },
+                { "Nintendo 3DS",     "azahar"        },
+                { "Virtual Boy",      "beetle_vb"     },
+                { "Master System",    "genesis_plus_gx" },
+                { "Game Gear",        "genesis_plus_gx" },
+                { "Sega Genesis",     "genesis_plus_gx" },
+                { "Sega CD",          "genesis_plus_gx" },
+                { "Sega 32X",         "picodrive"     },
+                { "Sega Saturn",      "yabause"       },
+                { "PlayStation",      "pcsx_rearmed"  },
+                { "PSP",              "ppsspp"        },
+                { "3DO",              "opera"         },
+                { "Atari 2600",       "stella2014"    },
+                { "Atari 5200",       "a5200"         },
+                { "Atari 7800",       "prosystem"     },
+                { "Atari Lynx",       "handy"         },
+                { "Atari Jaguar",     "virtualjaguar" },
+                { "WonderSwan",       "mednafen_wswan"},
+                { "TurboGrafx-16",    "mednafen_pce"  },
+                { "PC-FX",            "mednafen_pcfx" },
+                { "ColecoVision",     "gearcoleco"    },
+                { "NeoGeo Pocket",    "mednafen_ngp"  },
+                { "Commodore 64",     "vice_x64"      },
+                { "Commodore 128",    "vice_x128"     },
+                { "Commodore Amiga",  "puae"          },
+                { "Commodore PET",    "vice_xpet"     },
+                { "Commodore Plus/4", "vice_xplus4"   },
+                { "Commodore VIC-20", "vice_xvic"     },
+                { "Arcade",           "fbneo"         },
                 { "MAME 2003",        "mame2003_plus" },
-                { "DOS",              "dos"         },
-                { "PICO-8",           "pico8"       },
+                { "DOS",              "dosbox_pure"   },
+                { "PICO-8",           "pico8"         },
             };
 
         /// <summary>
@@ -137,6 +309,7 @@ namespace JellyEmu.Controllers
                 { "Game Boy Color",   "Nintendo - Game Boy Color"                      },
                 { "Game Boy Advance", "Nintendo - Game Boy Advance"                    },
                 { "Nintendo DS",      "Nintendo - Nintendo DS"                         },
+                { "Nintendo 3DS",     "Nintendo - Nintendo 3DS"                        },
                 { "Virtual Boy",      "Nintendo - Virtual Boy"                         },
                 { "Master System",    "Sega - Master System - Mark III"                },
                 { "Game Gear",        "Sega - Game Gear"                               },
@@ -404,7 +577,9 @@ namespace JellyEmu.Controllers
                     RaUsername:         Str("raUsername",         DefaultFullPrefs.RaUsername),
                     RaApiKey:           Str("raApiKey",           DefaultFullPrefs.RaApiKey),
                     VirtualGamepad:     Str("virtualGamepad",     DefaultFullPrefs.VirtualGamepad),
-                    VirtualGamepadLefty:Str("virtualGamepadLefty",DefaultFullPrefs.VirtualGamepadLefty));
+                    VirtualGamepadLefty:Str("virtualGamepadLefty",DefaultFullPrefs.VirtualGamepadLefty),
+                    PlatformCores:      Str("platformCores",      DefaultFullPrefs.PlatformCores),
+                    GameCores:          Str("gameCores",          DefaultFullPrefs.GameCores));
             }
             catch (Exception ex)
             {
@@ -430,17 +605,178 @@ namespace JellyEmu.Controllers
                 raUsername         = prefs.RaUsername,
                 raApiKey           = prefs.RaApiKey,
                 virtualGamepad     = prefs.VirtualGamepad,
-                virtualGamepadLefty= prefs.VirtualGamepadLefty
+                virtualGamepadLefty= prefs.VirtualGamepadLefty,
+                platformCores      = prefs.PlatformCores,
+                gameCores          = prefs.GameCores
             }));
         }
 
-        protected static string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item)
+        protected static bool IsThreadedCore(string core)
+        {
+            var lower = (core ?? string.Empty).ToLowerInvariant();
+            if (lower == "pico8") return false;
+            return true;
+        }
+
+        protected static string MapLegacyCore(string core)
+        {
+            var lower = (core ?? string.Empty).ToLowerInvariant();
+            return lower switch
+            {
+                "psx" => "pcsx_rearmed",
+                "snes" => "snes9x",
+                "nes" => "nestopia",
+                "n64" => "mupen64plus_next",
+                "gba" => "mgba",
+                "gb" => "gambatte",
+                "gbc" => "gambatte",
+                "nds" => "desmume",
+                "segamd" => "genesis_plus_gx",
+                "segacd" => "genesis_plus_gx",
+                "sega32x" => "picodrive",
+                "segams" => "genesis_plus_gx",
+                "segagg" => "genesis_plus_gx",
+                "segasaturn" => "yabause",
+                "psp" => "ppsspp",
+                "3do" => "opera",
+                "atari2600" => "stella2014",
+                "atari7800" => "prosystem",
+                "lynx" => "handy",
+                "jaguar" => "virtualjaguar",
+                "dos" => "dosbox_pure",
+                "amiga" => "puae",
+                "c64" => "vice_x64",
+                "arcade" => "fbneo",
+                "vb" => "beetle_vb",
+                "mednafen_psx" => "mednafen_psx_hw",
+                "3ds" or "citra" or "citra_canary" => "azahar",
+                _ => core
+            };
+        }
+
+        protected static string ResolvePlatformTag(MediaBrowser.Controller.Entities.BaseItem item)
+        {
+            var resolver = new PlatformResolver(null!);
+
+            if (item.Tags != null)
+            {
+                foreach (var tag in item.Tags)
+                {
+                    if (PlatformCoreRegistry.ContainsKey(tag))
+                        return tag;
+
+                    if (PlatformResolver.Aliases.TryGetValue(tag, out var canonical) && PlatformCoreRegistry.ContainsKey(canonical))
+                        return canonical;
+
+                    if (CoreMap.TryGetValue(tag, out _))
+                    {
+                        var resolvedFromTag = resolver.ResolvePlatform(item.Path ?? string.Empty, tag);
+                        if (!string.IsNullOrEmpty(resolvedFromTag) && resolvedFromTag != "Unknown")
+                            return resolvedFromTag;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(item.Path))
+            {
+                var platform = resolver.ResolvePlatform(item.Path, item.Name);
+                if (!string.IsNullOrEmpty(platform) && platform != "Unknown")
+                    return platform;
+            }
+
+            return "Unknown";
+        }
+
+        protected static List<CoreOption> GetAvailableCoresForPlatform(string platformTag)
+        {
+            if (PlatformCoreRegistry.TryGetValue(platformTag, out var list))
+                return list;
+
+            if (CoreMap.TryGetValue(platformTag, out var defaultCore))
+            {
+                return new List<CoreOption> { new(defaultCore, $"{platformTag} Default", IsThreadedCore(defaultCore)) };
+            }
+
+            return new List<CoreOption> { new("nes", "NES Default", false) };
+        }
+
+        protected static List<CoreOption> GetAvailableCoresForItem(MediaBrowser.Controller.Entities.BaseItem item)
+        {
+            var platformTag = ResolvePlatformTag(item);
+            var list = GetAvailableCoresForPlatform(platformTag);
+            var defaultCore = ResolveCoreDefault(item);
+
+            if (list.Count <= 1 && !string.IsNullOrEmpty(defaultCore))
+            {
+                foreach (var entry in PlatformCoreRegistry.Values)
+                {
+                    if (entry.Any(c => string.Equals(c.Id, defaultCore, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return entry;
+                    }
+                }
+            }
+
+            if (!list.Any(c => string.Equals(c.Id, defaultCore, StringComparison.OrdinalIgnoreCase)))
+            {
+                var updatedList = new List<CoreOption>(list)
+                {
+                    new(defaultCore, $"{defaultCore} (Default)", IsThreadedCore(defaultCore))
+                };
+                return updatedList;
+            }
+
+            return list;
+        }
+
+        protected static Dictionary<string, string> ParseCoreDictionary(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                return dict != null
+                    ? new Dictionary<string, string>(dict, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        protected string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item, string? userId = null, string? queryCoreOverride = null)
+        {
+            if (!string.IsNullOrWhiteSpace(queryCoreOverride))
+                return MapLegacyCore(queryCoreOverride);
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                var prefs = ReadFullPrefs(userId);
+                var itemIdStr = item.Id.ToString("N");
+
+                var gameCores = ParseCoreDictionary(prefs.GameCores);
+                if (gameCores.TryGetValue(itemIdStr, out var gameCore) && !string.IsNullOrWhiteSpace(gameCore))
+                    return MapLegacyCore(gameCore);
+
+                var platformTag = ResolvePlatformTag(item);
+                var platformCores = ParseCoreDictionary(prefs.PlatformCores);
+                if (platformCores.TryGetValue(platformTag, out var platformCore) && !string.IsNullOrWhiteSpace(platformCore))
+                    return MapLegacyCore(platformCore);
+            }
+
+            return ResolveCoreDefault(item);
+        }
+
+        protected static string ResolveCoreDefault(MediaBrowser.Controller.Entities.BaseItem item)
         {
             if (item.Tags != null)
             {
                 foreach (var tag in item.Tags)
                     if (CoreMap.TryGetValue(tag, out var core))
-                        return core;
+                        return MapLegacyCore(core);
             }
 
             if (!string.IsNullOrEmpty(item.Path))
@@ -452,72 +788,70 @@ namespace JellyEmu.Controllers
                 var extMap = new Dictionary<string, string>
                 {
                     // NES
-                    { "nes", "nes" }, { "fds", "nes" }, { "unf", "nes" }, { "unif", "nes" },
+                    { "nes", "nestopia" }, { "fds", "nestopia" }, { "unf", "nestopia" }, { "unif", "nestopia" },
                     // SNES
-                    { "smc", "snes" }, { "sfc", "snes" }, { "swc", "snes" }, { "fig", "snes" },
+                    { "smc", "snes9x" }, { "sfc", "snes9x" }, { "swc", "snes9x" }, { "fig", "snes9x" },
                     // N64
-                    { "z64", "n64" }, { "n64", "n64" }, { "v64", "n64" },
+                    { "z64", "mupen64plus_next" }, { "n64", "mupen64plus_next" }, { "v64", "mupen64plus_next" },
                     // Game Boy / GBC
-                    { "gb", "gb" }, { "gbc", "gbc" },
+                    { "gb", "gambatte" }, { "gbc", "gambatte" },
                     // GBA
-                    { "gba", "gba" },
-                    // NDS
-                    { "nds", "nds" },
+                    { "gba", "mgba" },
+                    // Nintendo DS
+                    { "nds", "desmume" },
+                    // Nintendo 3DS
+                    { "3ds", "azahar" }, { "cci", "azahar" }, { "cia", "azahar" },
                     // Virtual Boy
-                    { "vb", "vb" },
+                    { "vb", "beetle_vb" },
                     // Sega
-                    { "sms", "segaMS" },
-                    { "gg",  "segaGG" },
-                    { "md",  "segaMD" }, { "smd", "segaMD" }, { "gen", "segaMD" }, { "68k", "segaMD" },
-                    { "32x", "sega32x" },
+                    { "sms", "genesis_plus_gx" },
+                    { "gg",  "genesis_plus_gx" },
+                    { "md",  "genesis_plus_gx" }, { "smd", "genesis_plus_gx" }, { "gen", "genesis_plus_gx" }, { "68k", "genesis_plus_gx" },
+                    { "32x", "picodrive" },
                     // PlayStation
-                    { "pbp", "psx" }, { "cue", "psx" }, { "chd", "psx" },
+                    { "pbp", "pcsx_rearmed" }, { "cue", "pcsx_rearmed" }, { "chd", "pcsx_rearmed" }, { "bin", "pcsx_rearmed" }, { "img", "pcsx_rearmed" }, { "iso", "pcsx_rearmed" },
                     // PSP
-                    { "cso", "psp" }, { "iso", "psp" },
+                    { "cso", "ppsspp" },
                     // Atari
-                    { "a26", "atari2600" },
-                    { "a78", "atari7800" },
-                    { "lnx", "lynx" },
-                    { "jag", "jaguar" }, { "j64", "jaguar" },
-                    // WonderSwan
-                    { "ws",  "ws" }, { "wsc", "ws" },
-                    // TurboGrafx-16
-                    { "pce", "pce" },
-                    // ColecoVision
-                    { "col", "coleco" }, { "cv", "coleco" },
-                    // NeoGeo Pocket
-                    { "ngp", "ngp" }, { "ngc", "ngp" },
-                    // Commodore 64
-                    { "d64", "c64" }, { "t64", "c64" }, { "crt", "c64" },
-                    { "tap", "c64" }, { "prg", "c64" },
-                    // Amiga
-                    { "adf", "amiga" }, { "dms", "amiga" }, { "ipf", "amiga" }, { "adz", "amiga" },
+                    { "a26", "stella2014" }, { "a78", "prosystem" }, { "lnx", "handy" }, { "jag", "virtualjaguar" }, { "j64", "virtualjaguar" },
+                    // Commodore
+                    { "d64", "vice_x64" }, { "t64", "vice_x64" }, { "crt", "vice_x64" }, { "prg", "vice_x64" }, { "adf", "puae" },
+                    // DOS
+                    { "exe", "dosbox_pure" }, { "com", "dosbox_pure" }, { "bat", "dosbox_pure" },
                     // PICO-8
-                    { "p8", "pico8" },
+                    { "p8", "pico8" }
                 };
+
                 if (extMap.TryGetValue(ext, out var extCore))
-                    return extCore;
+                    return MapLegacyCore(extCore);
             }
 
-            return "nes";
+            var platformTag = ResolvePlatformTag(item);
+            if (CoreMap.TryGetValue(platformTag, out var fallbackCore))
+                return MapLegacyCore(fallbackCore);
+
+            return "nestopia";
+        }
+
+        protected static string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item)
+        {
+            return ResolveCoreDefault(item);
         }
 
         protected static CoreInfo ResolveCoreInfo(MediaBrowser.Controller.Entities.BaseItem item)
         {
-            var core = ResolveCore(item);
-            return core switch
-            {
-                "pico8"    => new CoreInfo(core, false, "pico8"),
-                "dos"      => new CoreInfo(core, true,  "ejs"),
-                "psp"      => new CoreInfo(core, true,  "ejs"),
-                "arcade"        => new CoreInfo(core, true,  "ejs"),
-                "mame2003_plus" => new CoreInfo(core, true,  "ejs"),
-                "amiga"         => new CoreInfo(core, true,  "ejs"),
-                "3do"           => new CoreInfo(core, true,  "ejs"),
-                "segaSaturn"    => new CoreInfo(core, true,  "ejs"),
-                "jaguar"        => new CoreInfo(core, true,  "ejs"),
-                _               => new CoreInfo(core, false, "ejs"),
-            };
+            var core = ResolveCoreDefault(item);
+            var needsThreads = IsThreadedCore(core);
+            var launcher = core == "pico8" ? "pico8" : "ejs";
+            return new CoreInfo(core, needsThreads, launcher);
+        }
+
+        protected CoreInfo ResolveCoreInfo(MediaBrowser.Controller.Entities.BaseItem item, string? userId = null, string? queryCoreOverride = null)
+        {
+            var core = ResolveCore(item, userId, queryCoreOverride);
+            var needsThreads = IsThreadedCore(core);
+            var launcher = core == "pico8" ? "pico8" : "ejs";
+            return new CoreInfo(core, needsThreads, launcher);
         }
 
         protected static string RommInstanceUrl =>
