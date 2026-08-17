@@ -48,6 +48,10 @@
   <a href="assets/screen05.png">
     <img src="assets/screen05.png" width="45%" alt="Jellyemu pico8 emulator" />
   </a>
+
+  <a href="assets/screen06.png">
+    <img src="assets/screen06.png" width="45%" alt="Jellyemu community tab" />
+  </a>
 </p>
 <p align="center">
   <em>Click on an image to view it full size.</em>
