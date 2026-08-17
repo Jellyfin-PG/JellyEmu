@@ -110,6 +110,11 @@ namespace JellyEmu.Services
             var config = Plugin.Instance?.Configuration;
             var feedUrl = config?.MarketplaceFeedUrl;
 
+            if (string.IsNullOrWhiteSpace(feedUrl))
+            {
+                return new List<ScraperProvider>();
+            }
+
             try
             {
                 var client = GetClient();

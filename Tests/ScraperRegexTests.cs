@@ -118,54 +118,51 @@ namespace JellyEmu.Tests
         }
 
         [Fact]
-        public void SearchScraperRegex_ShouldMatchVimmSearchResultRowsWithMetadata()
+        public void SearchScraperRegex_ShouldMatchVimmSearchResultRowsWithDecoyLinks()
         {
             // Arrange
             var html = @"
-            <tr><td style=""width:80px; text-align:center"">GBC</td><td style=""width:auto""><a href=""""></a><a href= ""/vault/4232"" onmouseover=""buildTooltip(this, 4232, 320, 288)"">Pokemon: Silver Version</a>&nbsp; <b class=""redBorder"" style=""cursor:default"" title=""Demo"">D</b>&nbsp; <a href=""/manual/3145""><img src=""/images/manual_1.gif"" style=""vertical-align:bottom"" width=""17"" height=""16"" title=""Read the manual"" alt=""Read the manual""></a></td><td style=""width:65px; text-align:center""><div style=""display:flex; flex-wrap:wrap; justify-content:center; gap:3px""><img src=""/images/flags/usa.png"" class=""flag"" title=""USA""><img src=""/images/flags/europe.png"" class=""flag"" title=""Europe""></div></td><td style=""width:85px; text-align:center"">1.0</td><td style=""width:110px; text-align:center; font-size:10pt"" class=""responsive"">-</td></tr>
+            <tr><td style=""width:80px; text-align:center"">GBA</td><td style=""width:auto""><a href=""/vault/999999"" style=""display:  none"">9</a><a href= ""/vault/48075"">2 Games in 1: Dr. Mario + Puzzle League</a></td><td style=""width:65px; text-align:center""><div style=""display:flex; flex-wrap:wrap; justify-content:center; gap:3px""><img src=""/images/flags/europe.png"" class=""flag"" title=""Europe""></div></td><td style=""width:85px; text-align:center"">1.0</td><td style=""width:110px; text-align:center; font-size:10pt"" class=""responsive"">de en es fr it</td></tr>
+            <tr><td style=""width:80px; text-align:center"">GBA</td><td style=""width:auto""><a href=""/vault/999999"" style=""display:  none"">9</a><a href= ""/vault/5267"" onmouseover=""buildTooltip(this, 5267, 240, 160)"">2 Games in One! Dr. Mario + Puzzle League</a></td><td style=""width:65px; text-align:center""><div style=""display:flex; flex-wrap:wrap; justify-content:center; gap:3px""><img src=""/images/flags/usa.png"" class=""flag"" title=""USA""></div></td><td style=""width:85px; text-align:center"">1.0</td><td style=""width:110px; text-align:center; font-size:10pt"" class=""responsive"">-</td></tr>
             ";
 
-            var pattern = @"<td[^>]*>(?<system>[^<]+)</td>\s*<td[^>]*>(?:<a href\s*=\s*""[^""]*""></a>\s*)?<a href\s*=\s*""(?<url>/vault/(?<id>\d+))""[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\s*<td[^>]*>(?<regions>.*?)</td>\s*<td[^>]*>(?<version>[^<]*)</td>\s*<td[^>]*>(?<languages>[^<]*)</td>)?";
+            var pattern = @"<td[^>]*>(?<system>[^<]+)</td>\s*<td[^>]*>(?:<a href=""[^""]*""[^>]*style=""display:\s*none""[^>]*>.*?</a>\s*|<a href\s*=\s*""[^""]*""></a>\s*)?<a href\s*=\s*""(?<url>/vault/(?<id>\d+))""[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\s*<td[^>]*>(?<regions>.*?)</td>\s*<td[^>]*>(?<version>[^<]*)</td>\s*<td[^>]*>(?<languages>[^<]*)</td>)?";
 
             // Act
             var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             // Assert
-            Assert.Single(matches);
-            Assert.Equal("GBC", matches[0].Groups["system"].Value.Trim());
-            Assert.Equal("/vault/4232", matches[0].Groups["url"].Value);
-            Assert.Equal("4232", matches[0].Groups["id"].Value);
-            Assert.Equal("Pokemon: Silver Version", matches[0].Groups["title"].Value.Trim());
-            Assert.Contains("Demo", matches[0].Groups["extra"].Value);
-            Assert.Contains("manual", matches[0].Groups["extra"].Value);
-            Assert.Contains("USA", matches[0].Groups["regions"].Value);
-            Assert.Contains("Europe", matches[0].Groups["regions"].Value);
-            Assert.Equal("1.0", matches[0].Groups["version"].Value.Trim());
-            Assert.Equal("-", matches[0].Groups["languages"].Value.Trim());
+            Assert.Equal(2, matches.Count);
+            
+            Assert.Equal("GBA", matches[0].Groups["system"].Value.Trim());
+            Assert.Equal("/vault/48075", matches[0].Groups["url"].Value);
+            Assert.Equal("48075", matches[0].Groups["id"].Value);
+            Assert.Equal("2 Games in 1: Dr. Mario + Puzzle League", matches[0].Groups["title"].Value.Trim());
+
+            Assert.Equal("GBA", matches[1].Groups["system"].Value.Trim());
+            Assert.Equal("/vault/5267", matches[1].Groups["url"].Value);
+            Assert.Equal("5267", matches[1].Groups["id"].Value);
+            Assert.Equal("2 Games in One! Dr. Mario + Puzzle League", matches[1].Groups["title"].Value.Trim());
         }
 
         [Fact]
-        public void BrowseScraperRegex_ShouldMatchVimmBrowseAnchorTagsWithMetadata()
+        public void BrowseScraperRegex_ShouldMatchVimmBrowseAnchorTagsWithDecoyLinks()
         {
             // Arrange
             var html = @"
-            <tr><td style=""width:auto""><a href=""""></a><a href= ""/vault/10"" onmouseover=""buildTooltip(this, 10, 256, 224)"">Abadox: The Deadly Inner War</a>&nbsp; <b class=""redBorder"" style=""cursor:default"" title=""Prototype"">P</b></td><td style=""width:65px; text-align:center""><div style=""display:flex; flex-wrap:wrap; justify-content:center; gap:3px""><img src=""/images/flags/usa.png"" class=""flag"" title=""USA""></div></td><td style=""width:85px; text-align:center"">1.0</td><td style=""width:110px; text-align:center; font-size:10pt"" class=""responsive"">-</td><td style=""width:50px; text-align:center"" class=""responsive""><a href=""/vault/?p=rating&amp;id=10"">6.8</a></td></tr>
+            <tr><td style=""width:auto""><a href=""/vault/999999"" style=""display:  none"">9</a><a href= ""/vault/583"" onmouseover=""buildTooltip(this, 583, 256, 224)"">Monster Party</a></td><td style=""width:65px; text-align:center""><div style=""display:flex; flex-wrap:wrap; justify-content:center; gap:3px""><img src=""/images/flags/usa.png"" class=""flag"" title=""USA""></div></td><td style=""width:85px; text-align:center"">1.0</td><td style=""width:110px; text-align:center; font-size:10pt"" class=""responsive"">-</td><td style=""width:50px; text-align:center"" class=""responsive""><a href=""/vault/?p=rating&amp;id=583"">7.5</a></td></tr>
             ";
 
-            var pattern = @"<a href\s*=\s*""(?<url>/vault/(?<id>\d+))""[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\s*<td[^>]*>(?<regions>.*?)</td>\s*<td[^>]*>(?<version>[^<]*)</td>\s*<td[^>]*>(?<languages>[^<]*)</td>)?";
+            var pattern = @"<td[^>]*>(?:<a href=""[^""]*""[^>]*style=""display:\s*none""[^>]*>.*?</a>\s*|<a href\s*=\s*""[^""]*""></a>\s*)?<a href\s*=\s*""(?<url>/vault/(?<id>\d+))""[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\s*<td[^>]*>(?<regions>.*?)</td>\s*<td[^>]*>(?<version>[^<]*)</td>\s*<td[^>]*>(?<languages>[^<]*)</td>)?";
 
             // Act
             var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             // Assert
             Assert.Single(matches);
-            Assert.Equal("/vault/10", matches[0].Groups["url"].Value);
-            Assert.Equal("10", matches[0].Groups["id"].Value);
-            Assert.Equal("Abadox: The Deadly Inner War", matches[0].Groups["title"].Value.Trim());
-            Assert.Contains("Prototype", matches[0].Groups["extra"].Value);
-            Assert.Contains("USA", matches[0].Groups["regions"].Value);
-            Assert.Equal("1.0", matches[0].Groups["version"].Value.Trim());
-            Assert.Equal("-", matches[0].Groups["languages"].Value.Trim());
+            Assert.Equal("/vault/583", matches[0].Groups["url"].Value);
+            Assert.Equal("583", matches[0].Groups["id"].Value);
+            Assert.Equal("Monster Party", matches[0].Groups["title"].Value.Trim());
         }
     }
 }

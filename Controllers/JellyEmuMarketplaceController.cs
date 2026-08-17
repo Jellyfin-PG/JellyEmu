@@ -230,16 +230,17 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/marketplace/search")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] string? system = null, [FromQuery] string? letter = null)
+        public async Task<IActionResult> Search([FromQuery(Name = "query")] string? query = null, [FromQuery(Name = "q")] string? q = null, [FromQuery] string? system = null, [FromQuery] string? letter = null)
         {
-            if (string.IsNullOrWhiteSpace(q))
+            var searchTerm = !string.IsNullOrWhiteSpace(query) ? query : q;
+            if (string.IsNullOrWhiteSpace(searchTerm))
             {
-                return BadRequest(new { message = "Search query parameter 'q' is required." });
+                return BadRequest(new { message = "Search query parameter 'query' or 'q' is required." });
             }
 
             try
             {
-                var results = await _marketplaceService.SearchAsync(q, system ?? "", letter ?? "");
+                var results = await _marketplaceService.SearchAsync(searchTerm, system ?? "", letter ?? "");
                 return Ok(results);
             }
             catch (Exception ex)

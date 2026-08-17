@@ -8,6 +8,8 @@ using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 using MediaBrowser.Controller.Providers;
 
+using System.Xml.Serialization;
+
 namespace JellyEmu
 {
     /// <summary>
@@ -27,7 +29,7 @@ namespace JellyEmu
         public override Guid Id => Guid.Parse("9bab105e-9af0-4e25-a87d-876713b60962");
 
         public static Plugin? Instance { get; private set; }
- 
+
         public IEnumerable<PluginPageInfo> GetPages() => new[]
         {
             new PluginPageInfo
@@ -136,5 +138,43 @@ namespace JellyEmu
         /// EmulatorJS CDN distribution channel: "stable", "latest", or "nightly".
         /// </summary>
         public string EjsChannel { get; set; } = "stable";
+
+        /// <summary>
+        /// Custom folder path where system BIOS files are stored. Defaults to {DataPath}/jellyemu-bios if empty.
+        /// </summary>
+        public string BiosPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// JSON string storing manual BIOS file assignments per system tag or core name.
+        /// </summary>
+        public string BiosAssignmentsJson { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Manual BIOS file assignments per system tag or core name (ignored by XmlSerializer).
+        /// </summary>
+        [XmlIgnore]
+        public Dictionary<string, string> BiosAssignments
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(BiosAssignmentsJson))
+                {
+                    return new(StringComparer.OrdinalIgnoreCase);
+                }
+                try
+                {
+                    var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(BiosAssignmentsJson);
+                    return dict != null ? new Dictionary<string, string>(dict, StringComparer.OrdinalIgnoreCase) : new(StringComparer.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                    return new(StringComparer.OrdinalIgnoreCase);
+                }
+            }
+            set
+            {
+                BiosAssignmentsJson = System.Text.Json.JsonSerializer.Serialize(value ?? new());
+            }
+        }
     }
 }
