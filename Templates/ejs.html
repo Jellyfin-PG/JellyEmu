@@ -1304,6 +1304,10 @@
 
             window.EJS_core = '{{ core }}';
             window.EJS_platformTag = '{{ platform_tag }}';
+            var biosUrl = '{{ bios_url }}';
+            if (biosUrl && biosUrl.length > 0) {
+                window.EJS_biosUrl = biosUrl.startsWith('http') ? biosUrl : (window.location.origin + biosUrl);
+            }
             try {
                 var rawCoresJson = document.getElementById('je-available-cores-json').textContent || '[]';
                 window.EJS_availableCores = JSON.parse(rawCoresJson);

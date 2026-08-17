@@ -198,6 +198,10 @@ namespace JellyEmu.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Error parsing EJS Scriban template.");
             }
 
+            var biosService = HttpContext.RequestServices.GetService(typeof(JellyEmuBiosService)) as JellyEmuBiosService;
+            var relBios = biosService?.ResolveBiosRelativePath(platformTag, resolvedCore);
+            var biosUrl = !string.IsNullOrEmpty(relBios) ? $"/jellyemu/bios/file/{relBios}" : string.Empty;
+
             var html = template.Render(new
             {
                 game_name = gameName,
@@ -208,6 +212,7 @@ namespace JellyEmu.Controllers
                 ejs_base = ejsBase,
                 item_id = itemId,
                 user_id = userId,
+                bios_url = biosUrl,
                 active_slot = activeSlot,
                 slot_value = slot ?? 0,
                 has_saves = hasSaves,

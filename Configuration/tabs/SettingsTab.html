@@ -1,0 +1,254 @@
+<div class="je-tab-content active">
+    <div class="verticalSection">
+        <h2 class="sectionTitle">IGDB Metadata (via Twitch)</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Used for game descriptions, release dates, and cover art.
+            Register your app at <a href="https://dev.twitch.tv/console/apps" target="_blank"
+                style="color: #00a4dc; text-decoration: none;">dev.twitch.tv/console/apps</a>
+            and set the OAuth redirect to <code>http://localhost</code>.
+        </p>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="igdbClientId">Twitch Client ID</label>
+            <input id="igdbClientId" type="text" class="emby-input"
+                placeholder="e.g. 7imyo6cfhtx5pzsoq3lnd7ochv6kle" autocomplete="off" />
+        </div>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="igdbClientSecret">Twitch Client Secret</label>
+            <input id="igdbClientSecret" type="password" class="emby-input"
+                placeholder="Your Twitch client secret" autocomplete="off" />
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">RAWG Metadata</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Used as a fallback provider for game metadata and screenshots.
+            Get your free API key at <a href="https://rawg.io/apidocs" target="_blank"
+                style="color: #00a4dc; text-decoration: none;">rawg.io/apidocs</a>.
+        </p>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="rawgApiKey">RAWG API Key</label>
+            <input id="rawgApiKey" type="password" class="emby-input"
+                placeholder="Your RAWG API key" autocomplete="off" />
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">SteamGridDB Images</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Used for high-quality game grids, heroes, and logos.
+            Get your API key at <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank"
+                style="color: #00a4dc; text-decoration: none;">steamgriddb.com/profile/api</a>.
+        </p>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="steamGridDbApiKey">SteamGridDB API Key</label>
+            <input id="steamGridDbApiKey" type="password" class="emby-input"
+                placeholder="Your SteamGridDB API key" autocomplete="off" />
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">Romm Integration <span
+                style="font-size: 0.65em; vertical-align: middle; background: rgba(255,255,255,0.08); color: #ccc; border-radius: 4px; padding: 2px 7px; margin-left: 6px; font-weight: 500;">Disabled
+                by default</span></h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Connects to your self-hosted Romm instance for metadata, cover art, save-state cloud sync, playtime reporting, collection sync, and screenshot push.
+            Requires Romm v3.4 or later.
+        </p>
+
+        <div class="je-toggle-row">
+            <input type="hidden" id="rommEnabled" value="false" />
+            <button type="button" class="je-toggle-btn" id="rommEnabledBtn"
+                onclick="jeToggle('rommEnabled')">OFF</button>
+            <span class="je-toggle-label">
+                Enable Romm integration
+                <small>Enables metadata, cover art, save sync, playtime reporting, collection sync and screenshot push.</small>
+            </span>
+        </div>
+
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="rommInstanceUrl">Romm Instance URL</label>
+            <input id="rommInstanceUrl" type="text" class="emby-input"
+                placeholder="e.g. https://romm.example.com" autocomplete="off" />
+        </div>
+        <div style="margin: -0.5em 0 1em 0; display: flex; align-items: center; gap: 10px;">
+            <button type="button" id="btnRommHealth" is="emby-button" class="emby-button"
+                style="padding: 5px 14px; font-size: 0.82em; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                Test Connection
+            </button>
+            <span id="rommHealthStatus" style="font-size: 0.82em; color: #aaa;"></span>
+        </div>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="rommUsername">Romm Username</label>
+            <input id="rommUsername" type="text" class="emby-input"
+                placeholder="Your Romm username" autocomplete="off" />
+        </div>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="rommPassword">Romm Password</label>
+            <input id="rommPassword" type="password" class="emby-input"
+                placeholder="Your Romm password" autocomplete="off" />
+        </div>
+        <p style="color: #777; font-size: 0.82em; margin-top: 0.25em;">
+            Credentials are sent as HTTP Basic Auth on every request to your Romm instance. A secure HTTPS connection is strongly recommended.
+        </p>
+
+        <div style="margin-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.5em;">
+            <p style="color: #ccc; font-size: 0.9em; margin-bottom: 1.2em; font-weight: 600;">Romm Features (requires Romm enabled above)</p>
+
+            <div class="je-toggle-row">
+                <input type="hidden" id="rommSaveSyncEnabled" value="true" />
+                <button type="button" class="je-toggle-btn je-on" id="rommSaveSyncEnabledBtn"
+                    onclick="jeToggle('rommSaveSyncEnabled')">ON</button>
+                <span class="je-toggle-label">
+                    Save-state sync
+                    <small>Pull save from Romm on launch if it's newer; push to Romm after each save.</small>
+                </span>
+            </div>
+
+            <div class="je-toggle-row">
+                <input type="hidden" id="rommPlaytimeReportEnabled" value="true" />
+                <button type="button" class="je-toggle-btn je-on" id="rommPlaytimeReportEnabledBtn"
+                    onclick="jeToggle('rommPlaytimeReportEnabled')">ON</button>
+                <span class="je-toggle-label">
+                    Playtime reporting
+                    <small>Send session playtime to Romm when a game session ends.</small>
+                </span>
+            </div>
+
+            <div class="je-toggle-row">
+                <input type="hidden" id="rommCollectionSyncEnabled" value="true" />
+                <button type="button" class="je-toggle-btn je-on" id="rommCollectionSyncEnabledBtn"
+                    onclick="jeToggle('rommCollectionSyncEnabled')">ON</button>
+                <span class="je-toggle-label">
+                    Collection sync
+                    <small>Import Romm collections as Jellyfin collections.</small>
+                </span>
+            </div>
+            <div id="rommCollectionSyncRow" style="margin: -0.25em 0 1em 104px;">
+                <button id="btnRommSyncCollections" is="emby-button" type="button" class="raised emby-button"
+                    style="padding: 6px 16px; font-size: 0.85em; background: rgba(0, 164, 220, 0.15); border: 1px solid rgba(0, 164, 220, 0.25);">
+                    <span>Sync Collections Now</span>
+                </button>
+                <span id="rommCollectionSyncStatus"
+                    style="margin-left: 10px; font-size: 0.82em; color: #aaa;"></span>
+            </div>
+
+            <div class="je-toggle-row">
+                <input type="hidden" id="rommScreenshotPushEnabled" value="true" />
+                <button type="button" class="je-toggle-btn je-on" id="rommScreenshotPushEnabledBtn"
+                    onclick="jeToggle('rommScreenshotPushEnabled')">ON</button>
+                <span class="je-toggle-label">
+                    Screenshot push
+                    <small>Send in-game screenshots to Romm when you take one.</small>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">Netplay</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Provide your netplay server address to enable multiplayer via EmulatorJS.
+            Leave blank to disable netplay. Requires a running EmulatorJS netplay server.
+        </p>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="netplayServer">Netplay Server</label>
+            <input id="netplayServer" type="text" class="emby-input"
+                placeholder="e.g. https://192.168.1.100:3000" autocomplete="off" />
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">Frontend Injection Method</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Choose the mechanism used to modify jellyfin frontend.
+            Off will use File Transformation plugin, On will use Loom plugin if installed, Loom is the optimized way to modify frontend ui.
+        </p>
+
+        <div class="je-toggle-row">
+            <input type="hidden" id="useLoomInjector" value="false" />
+            <button type="button" class="je-toggle-btn" id="useLoomInjectorBtn"
+                onclick="jeToggle('useLoomInjector')">OFF</button>
+            <span class="je-toggle-label">
+                Use Loom Injector (Memory-based middleware)
+                <small>When active and the Loom plugin is installed, UI injection is managed dynamically by Loom.</small>
+            </span>
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">EmulatorJS Distribution Channel</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Select the EmulatorJS release channel. <strong>Stable</strong> is recommended for most platforms.
+            <strong>Nightly</strong> is required for experimental cores such as Nintendo 3DS (Azahar).
+        </p>
+        <div class="selectContainer" style="margin-bottom: 1.2em;">
+            <label class="selectLabel" for="ejsChannel">EmulatorJS Release Channel</label>
+            <select id="ejsChannel" class="emby-select" style="width:100%; box-sizing:border-box; background: #000000 !important; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 10px; color: #fff;">
+                <option value="stable" style="background:#000000; color:#fff;">Stable (Default)</option>
+                <option value="latest" style="background:#000000; color:#fff;">Latest / Beta</option>
+                <option value="nightly" style="background:#000000; color:#fff;">Nightly (Includes 3DS / Azahar core)</option>
+            </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button type="button" id="btnRedownloadEjs" is="emby-button" class="emby-button"
+                style="padding: 6px 16px; font-size: 0.85em; background: rgba(0, 164, 220, 0.15); border: 1px solid rgba(0, 164, 220, 0.25);">
+                <span>Force Re-download EmulatorJS Assets</span>
+            </button>
+            <span id="ejsRedownloadStatus" style="font-size: 0.82em; color: #aaa;"></span>
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">ROM Download Location</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Select a Jellyfin library folder where downloaded ROMs will be stored.
+        </p>
+        <div class="selectContainer" style="margin-bottom: 1.5em;">
+            <label class="selectLabel" for="gamesLibraryPath">Select Jellyfin Library Folder</label>
+            <select id="gamesLibraryPath" class="emby-select" style="width:100%; box-sizing:border-box; background: #000000 !important; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 10px; color: #fff;"></select>
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">Marketplace Feed URL</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Provide a URL pointing to a Scraper JSON file containing metadata sources.
+        </p>
+        <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="marketplaceFeedUrl">Scraper Feed URL</label>
+            <input id="marketplaceFeedUrl" type="text" class="emby-input" placeholder="e.g. https://raw.githubusercontent.com/Jellyfin-PG/JellyEmu-Resources/refs/heads/main/providers.json" autocomplete="off" />
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 1.8em;">
+        <h2 class="sectionTitle">System BIOS Folder</h2>
+        <p style="color: #aaa; margin-bottom: 1em; font-size: 0.92em; line-height: 1.4;">
+            Folder location for system BIOS files (e.g. <code>scph5501.bin</code> for PS1, <code>gba_bios.bin</code> for GBA, <code>disksys.rom</code> for FDS). Leave empty to use default folder.
+        </p>
+        <div class="inputContainer" style="margin-bottom: 1.2em;">
+            <label class="inputLabel inputLabelUnfocused" for="biosPath">Custom BIOS Path</label>
+            <input id="biosPath" type="text" class="emby-input" placeholder="Default: {Jellyfin DataPath}/jellyemu-bios" autocomplete="off" />
+        </div>
+        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-weight: 600; font-size: 0.9em; color: #fff;">Detected System BIOS Files</span>
+                <button type="button" id="btnRefreshBios" class="emby-button" style="padding: 4px 12px; font-size: 0.8em; background: rgba(255,255,255,0.08);">Refresh</button>
+            </div>
+            <div id="biosFolderDisplay" style="font-size: 0.8em; color: #888; margin-bottom: 10px; word-break: break-all;"></div>
+            <div id="biosListContainer" style="font-size: 0.85em; max-height: 180px; overflow-y: auto;">
+                <div style="color: #aaa;">Loading BIOS list…</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 2em;">
+        <button id="btnSaveConfig" is="emby-button" type="button"
+            class="raised button-submit block emby-button"
+            style="background: #00a4dc; color: #fff; padding: 10px 24px; font-weight: 600;">
+            <span>Save Settings</span>
+        </button>
+    </div>
+
+    <p id="saveStatus" style="margin-top: 1em; color: #52B54B; display: none; text-align: center; font-weight: 500;"></p>
+</div>
