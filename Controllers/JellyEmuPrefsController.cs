@@ -36,17 +36,19 @@ namespace JellyEmu.Controllers
             return Ok(new
             {
                 userId,
-                scale         = prefs.Scale,
-                mute          = prefs.Mute,
-                controller    = prefs.Controller,
-                haptics       = prefs.Haptics,
-                autosave      = prefs.Autosave,
-                shader        = prefs.Shader,
+                scale              = prefs.Scale,
+                mute               = prefs.Mute,
+                controller         = prefs.Controller,
+                haptics            = prefs.Haptics,
+                autosave           = prefs.Autosave,
+                shader             = prefs.Shader,
                 videoRotation      = prefs.VideoRotation,
                 controls           = prefs.Controls,
                 jeBindings         = prefs.Controls,
                 virtualGamepad     = prefs.VirtualGamepad,
-                virtualGamepadLefty= prefs.VirtualGamepadLefty
+                virtualGamepadLefty= prefs.VirtualGamepadLefty,
+                platformCores      = prefs.PlatformCores,
+                gameCores          = prefs.GameCores
             });
         }
 
@@ -85,7 +87,9 @@ namespace JellyEmu.Controllers
                     RaUsername:         current.RaUsername,
                     RaApiKey:           current.RaApiKey,
                     VirtualGamepad:     Str("virtualGamepad",     current.VirtualGamepad),
-                    VirtualGamepadLefty:Str("virtualGamepadLefty",current.VirtualGamepadLefty));
+                    VirtualGamepadLefty:Str("virtualGamepadLefty",current.VirtualGamepadLefty),
+                    PlatformCores:      Str("platformCores",      current.PlatformCores),
+                    GameCores:          Str("gameCores",          current.GameCores));
             }
             catch { return BadRequest("Body must be a JSON object."); }
 
@@ -105,7 +109,9 @@ namespace JellyEmu.Controllers
                 controllerControls = current.ControllerControls,
                 jeBindings         = current.Controls,
                 virtualGamepad     = current.VirtualGamepad,
-                virtualGamepadLefty= current.VirtualGamepadLefty
+                virtualGamepadLefty= current.VirtualGamepadLefty,
+                platformCores      = current.PlatformCores,
+                gameCores          = current.GameCores
             });
         }
     }

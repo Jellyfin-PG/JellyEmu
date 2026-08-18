@@ -1,0 +1,96 @@
+<div class="je-tab-content active">
+    <div class="verticalSection">
+        <h2 class="sectionTitle" style="margin-bottom: 0.5em; font-size: 1.25em; font-weight: 600;">RetroArch Integration</h2>
+        <p style="color: #aaa; margin-bottom: 1.5em; font-size: 0.92em; line-height: 1.4;">
+            Endpoints exposed for RetroArch system streaming and playlist auto-generation.
+        </p>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raPlaylistUrl">/jellyemu/retroarch/playlist</span>
+            </div>
+            <p class="je-api-desc">Downloads <code>JellyEmu.lpl</code>, the full library playlist. Copy it to your RetroArch <code>playlists/</code> folder to stream ROMs directly over HTTP.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raPlaylistSystemUrl">/jellyemu/retroarch/playlist/{system}</span>
+            </div>
+            <p class="je-api-desc">Downloads a per-system playlist <code>JellyEmu-{system}.lpl</code>. Replace <code>{system}</code> with a platform tag like <code>NES</code> or <code>SNES</code>.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raLaunchUrl">/jellyemu/retroarch/launch/{itemId}</span>
+            </div>
+            <p class="je-api-desc">Deep-link launch handler. Opening this endpoint on a system with RetroArch installed initiates the game directly.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raInfoUrl">/jellyemu/retroarch/info</span>
+            </div>
+            <p class="je-api-desc">Returns a JSON summary of all detected systems, total game counts, and playlist configuration details.</p>
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 2.5em;">
+        <h2 class="sectionTitle" style="margin-bottom: 0.5em; font-size: 1.25em; font-weight: 600;">Core File Delivery</h2>
+        <p style="color: #aaa; margin-bottom: 1.5em; font-size: 0.92em; line-height: 1.4;">
+            Endpoints managing direct game ROM delivery and packaging.
+        </p>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raRomUrl">/jellyemu/rom/{itemId}</span>
+            </div>
+            <p class="je-api-desc">Streams the raw game ROM binary file. Used for RetroArch playback and download routing.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path">/jellyemu/rom/download-zip/{itemId}</span>
+            </div>
+            <p class="je-api-desc">Builds and streams a ZIP file packaging all multi-part installer files (designed for Windows/GOG installer packages).</p>
+        </div>
+    </div>
+
+    <div class="verticalSection" style="margin-top: 2.5em;">
+        <h2 class="sectionTitle" style="margin-bottom: 0.5em; font-size: 1.25em; font-weight: 600;">Saves &amp; Preferences</h2>
+        <p style="color: #aaa; margin-bottom: 1.5em; font-size: 0.92em; line-height: 1.4;">
+            Endpoints managing cloud saves, SRAM, state states, and settings.
+        </p>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path">/jellyemu/saves/{itemId}/slots</span>
+            </div>
+            <p class="je-api-desc">Retrieves a list of saved state slots, modified dates, and active emulator details for the given game.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-method post" style="margin-left: 4px;">POST</span>
+                <span class="je-api-path" style="margin-left: 4px;">/jellyemu/saves/{itemId}/slots/{slot}</span>
+            </div>
+            <p class="je-api-desc">Downloads (GET) or uploads (POST) the save state file for the specified slot. Slot 100 corresponds to auto-saves, and slot 99 corresponds to disc-swapping saves.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-method post" style="margin-left: 4px;">POST</span>
+                <span class="je-api-path" style="margin-left: 4px;">/jellyemu/saves/{itemId}/prefs</span>
+            </div>
+            <p class="je-api-desc">Downloads (GET) or uploads (POST) EmulatorJS controller mapping and preferences JSON.</p>
+        </div>
+    </div>
+</div>

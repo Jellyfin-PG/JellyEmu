@@ -1,0 +1,90 @@
+<div class="je-tab-content active">
+    <div class="verticalSection" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 1.8em; margin-bottom: 2em; backdrop-filter: blur(10px);">
+        <h2 style="color: #fff; margin: 0 0 4px 0; font-size: 1.4em; font-weight: 600;">ROM Providers</h2>
+        <p style="color: #888; font-size: 0.88em; margin: 0 0 1.5em 0;">Manage external scraper sources configured in your Marketplace Feed. Enable or disable individual scraper targets.</p>
+
+        <!-- Active Providers List -->
+        <div style="margin-top: 1em;">
+            <div id="activeProvidersList" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ROM Search & Explorer -->
+    <div class="verticalSection" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 1.8em; backdrop-filter: blur(10px);">
+        <h2 style="color: #fff; margin: 0 0 4px 0; font-size: 1.4em; font-weight: 600;">ROM Explorer</h2>
+        <p style="color: #888; font-size: 0.88em; margin: 0 0 1.5em 0;">Search, browse, and download ROMs directly into your games folder.</p>
+
+        <!-- Search Input and Action -->
+        <div style="display: flex; gap: 10px; margin-bottom: 1.5em;">
+            <input id="marketplaceQuery" type="text" class="emby-input" placeholder="Search game title..." style="flex: 1; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 8px 12px; color: #fff;" />
+            <button id="btnSearchMarketplace" type="button" class="raised emby-button" style="background: #00a4dc; color: #fff; padding: 8px 24px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; height: 38px;">
+                <span class="material-icons" style="font-size: 18px;">search</span>
+                <span>Search</span>
+            </button>
+        </div>
+
+        <!-- System Filter Grid -->
+        <div style="margin-bottom: 1.5em;">
+            <span style="color: #aaa; font-size: 0.82em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 10px;">Filter by System</span>
+            <div class="je-console-grid">
+                <button type="button" class="je-console-card active" data-system="" onclick="jeSetSystemFilter('')">All</button>
+                <button type="button" class="je-console-card nes" data-system="NES" onclick="jeSetSystemFilter('NES')">NES</button>
+                <button type="button" class="je-console-card snes" data-system="SNES" onclick="jeSetSystemFilter('SNES')">SNES</button>
+                <button type="button" class="je-console-card n64" data-system="N64" onclick="jeSetSystemFilter('N64')">N64</button>
+                <button type="button" class="je-console-card genesis" data-system="Sega Genesis" onclick="jeSetSystemFilter('Sega Genesis')">Genesis</button>
+                <button type="button" class="je-console-card gba" data-system="Game Boy Advance" onclick="jeSetSystemFilter('Game Boy Advance')">GBA</button>
+                <button type="button" class="je-console-card gbc" data-system="Game Boy Color" onclick="jeSetSystemFilter('Game Boy Color')">GBC</button>
+                <button type="button" class="je-console-card nds" data-system="Nintendo DS" onclick="jeSetSystemFilter('Nintendo DS')">NDS</button>
+                <button type="button" class="je-console-card ps1" data-system="PlayStation" onclick="jeSetSystemFilter('PlayStation')">PS1</button>
+                <button type="button" class="je-console-card pico8" data-system="PICO-8" onclick="jeSetSystemFilter('PICO-8')">PICO-8</button>
+            </div>
+        </div>
+
+        <!-- Alphabet Filter Row -->
+        <div style="margin-bottom: 2em; overflow-x: auto; white-space: nowrap; padding-bottom: 6px;">
+            <span style="color: #aaa; font-size: 0.82em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Filter by Starting Letter</span>
+            <div class="je-letter-row">
+                <button type="button" class="je-letter-btn active" data-letter="" onclick="jeSetLetterFilter('')">ALL</button>
+                <button type="button" class="je-letter-btn" data-letter="#" onclick="jeSetLetterFilter('#')">#</button>
+                <button type="button" class="je-letter-btn" data-letter="A" onclick="jeSetLetterFilter('A')">A</button>
+                <button type="button" class="je-letter-btn" data-letter="B" onclick="jeSetLetterFilter('B')">B</button>
+                <button type="button" class="je-letter-btn" data-letter="C" onclick="jeSetLetterFilter('C')">C</button>
+                <button type="button" class="je-letter-btn" data-letter="D" onclick="jeSetLetterFilter('D')">D</button>
+                <button type="button" class="je-letter-btn" data-letter="E" onclick="jeSetLetterFilter('E')">E</button>
+                <button type="button" class="je-letter-btn" data-letter="F" onclick="jeSetLetterFilter('F')">F</button>
+                <button type="button" class="je-letter-btn" data-letter="G" onclick="jeSetLetterFilter('G')">G</button>
+                <button type="button" class="je-letter-btn" data-letter="H" onclick="jeSetLetterFilter('H')">H</button>
+                <button type="button" class="je-letter-btn" data-letter="I" onclick="jeSetLetterFilter('I')">I</button>
+                <button type="button" class="je-letter-btn" data-letter="J" onclick="jeSetLetterFilter('J')">J</button>
+                <button type="button" class="je-letter-btn" data-letter="K" onclick="jeSetLetterFilter('K')">K</button>
+                <button type="button" class="je-letter-btn" data-letter="L" onclick="jeSetLetterFilter('L')">L</button>
+                <button type="button" class="je-letter-btn" data-letter="M" onclick="jeSetLetterFilter('M')">M</button>
+                <button type="button" class="je-letter-btn" data-letter="N" onclick="jeSetLetterFilter('N')">N</button>
+                <button type="button" class="je-letter-btn" data-letter="O" onclick="jeSetLetterFilter('O')">O</button>
+                <button type="button" class="je-letter-btn" data-letter="P" onclick="jeSetLetterFilter('P')">P</button>
+                <button type="button" class="je-letter-btn" data-letter="Q" onclick="jeSetLetterFilter('Q')">Q</button>
+                <button type="button" class="je-letter-btn" data-letter="R" onclick="jeSetLetterFilter('R')">R</button>
+                <button type="button" class="je-letter-btn" data-letter="S" onclick="jeSetLetterFilter('S')">S</button>
+                <button type="button" class="je-letter-btn" data-letter="T" onclick="jeSetLetterFilter('T')">T</button>
+                <button type="button" class="je-letter-btn" data-letter="U" onclick="jeSetLetterFilter('U')">U</button>
+                <button type="button" class="je-letter-btn" data-letter="V" onclick="jeSetLetterFilter('V')">V</button>
+                <button type="button" class="je-letter-btn" data-letter="W" onclick="jeSetLetterFilter('W')">W</button>
+                <button type="button" class="je-letter-btn" data-letter="X" onclick="jeSetLetterFilter('X')">X</button>
+                <button type="button" class="je-letter-btn" data-letter="Y" onclick="jeSetLetterFilter('Y')">Y</button>
+                <button type="button" class="je-letter-btn" data-letter="Z" onclick="jeSetLetterFilter('Z')">Z</button>
+            </div>
+        </div>
+
+        <!-- Marketplace Results Status -->
+        <div id="marketplaceStatus" style="color: #aaa; text-align: center; padding: 2em; display: none;">
+            <!-- Loading spinner or message -->
+        </div>
+
+        <!-- ROM Results Grid -->
+        <div id="marketplaceResults" class="je-rom-grid">
+            <!-- Dynamically populated card grid -->
+        </div>
+    </div>
+</div>
