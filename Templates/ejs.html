@@ -1272,11 +1272,14 @@
                     </select></div>
                 <div class="je-setting"><span class="je-setting-label">Show FPS</span><label class="je-toggle"><input
                             type="checkbox" id="je-set-fps"><span class="je-toggle-track"></span></label></div>
+                <div class="je-section-title">Emulator Core</div>
+                <div class="je-setting"><span class="je-setting-label">Loaded Core</span><select id="je-set-core"></select></div>
             </div>
         </div>
     </div>
     <div id="je-fps"></div>
     <div id="game"></div>
+    <script id="je-available-cores-json" type="application/json">{{ available_cores_json }}</script>
     <script>
         (function () {
             var token = '';
@@ -1298,6 +1301,20 @@
                 virtualGamepad: '{{ virtual_gamepad }}',
                 virtualGamepadLefty: '{{ virtual_gamepad_lefty }}'
             };
+
+            window.EJS_core = '{{ core }}';
+            window.EJS_platformTag = '{{ platform_tag }}';
+            var biosUrl = '{{ bios_url }}';
+            if (biosUrl && biosUrl.length > 0) {
+                window.EJS_biosUrl = biosUrl.startsWith('http') ? biosUrl : (window.location.origin + biosUrl);
+            }
+            try {
+                var rawCoresJson = document.getElementById('je-available-cores-json').textContent || '[]';
+                window.EJS_availableCores = JSON.parse(rawCoresJson);
+            } catch (e) {
+                console.error('[JellyEmu] Error parsing available cores JSON:', e);
+                window.EJS_availableCores = [];
+            }
         })();
     </script>
     <script>
@@ -1316,11 +1333,19 @@
             var _jellyToken = window._jellyToken || '';
             // Core name map for loading screen badge
             var coreNames = {
-                nes: 'NES', snes: 'SNES', n64: 'N64', gb: 'Game Boy', gba: 'Game Boy Advance', nds: 'Nintendo DS',
-                vb: 'Virtual Boy', segaMD: 'Sega Genesis', segaGG: 'Game Gear', segaMS: 'Master System', segaCD: 'Sega CD',
-                sega32x: 'Sega 32X', psx: 'PlayStation', psp: 'PSP', atari2600: 'Atari 2600', atari7800: 'Atari 7800', lynx: 'Atari Lynx',
-                pce: 'TurboGrafx-16', coleco: 'ColecoVision', ngp: 'Neo Geo Pocket', arcade: 'Arcade', dos: 'DOS',
-                '3do': '3DO', jaguar: 'Atari Jaguar', mame2003_plus: 'MAME', ws: 'WonderSwan', segaSaturn: 'Sega Saturn'
+                nestopia: 'NES', fceumm: 'NES', snes9x: 'SNES', snes9x2010: 'SNES', snes9x2005: 'SNES',
+                mupen64plus_next: 'N64', parallel_n64: 'N64',
+                gambatte: 'Game Boy', sameboy: 'Game Boy', mgba: 'Game Boy Advance', vba_next: 'Game Boy Advance',
+                desmume: 'Nintendo DS', melonds: 'Nintendo DS', azahar: 'Nintendo 3DS', beetle_vb: 'Virtual Boy',
+                genesis_plus_gx: 'Sega Genesis', picodrive: 'Sega 32X', smsplus: 'Master System', yabause: 'Sega Saturn',
+                pcsx_rearmed: 'PlayStation', mednafen_psx_hw: 'PlayStation', ppsspp: 'PSP', opera: '3DO',
+                stella2014: 'Atari 2600', a5200: 'Atari 5200', prosystem: 'Atari 7800', handy: 'Atari Lynx',
+                virtualjaguar: 'Atari Jaguar', mednafen_pce: 'TurboGrafx-16', mednafen_pcfx: 'PC-FX',
+                mednafen_wswan: 'WonderSwan', mednafen_ngp: 'Neo Geo Pocket', gearcoleco: 'ColecoVision',
+                vice_x64: 'Commodore 64', vice_x64sc: 'Commodore 64', vice_x128: 'Commodore 128',
+                vice_xpet: 'Commodore PET', vice_xplus4: 'Commodore Plus/4', vice_xvic: 'Commodore VIC-20',
+                puae: 'Commodore Amiga', fbneo: 'Arcade', mame2003: 'MAME', mame2003_plus: 'MAME',
+                dosbox_pure: 'DOS', pico8: 'PICO-8'
             };
             var sysEl = document.getElementById('je-loader-system');
             if (sysEl) { var cn = coreNames[window.EJS_core] || window.EJS_core || ''; sysEl.textContent = cn; }
@@ -2090,11 +2115,102 @@
                     dockMinBtn.classList.remove('je-hidden');
                 }
             };
+            // Core selection handling
+            function getAvailableCores() {
+                if (window.EJS_availableCores && window.EJS_availableCores.length > 0) {
+                    return window.EJS_availableCores;
+                }
+                try {
+                    var el = document.getElementById('je-available-cores-json');
+                    if (el && el.textContent) {
+                        return JSON.parse(el.textContent);
+                    }
+                } catch (e) { }
+                return [];
+            }
+
+            function populateCoreSelect() {
+                var coreSelect = document.getElementById('je-set-core');
+                if (!coreSelect) return;
+
+                var availableCores = getAvailableCores();
+                var currentCore = window.EJS_core || '{{ core }}';
+
+                coreSelect.innerHTML = '';
+                availableCores.forEach(function (c) {
+                    var opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    if (c.id === currentCore) opt.selected = true;
+                    coreSelect.appendChild(opt);
+                });
+            }
+
+            populateCoreSelect();
+
+            var settingsBtn = document.getElementById('je-btn-settings');
+            if (settingsBtn) {
+                settingsBtn.addEventListener('click', populateCoreSelect);
+            }
+
+            var coreSelectEl = document.getElementById('je-set-core');
+            if (coreSelectEl) {
+                coreSelectEl.addEventListener('change', function () {
+                    var newCore = this.value;
+                    var currentCore = window.EJS_core || '{{ core }}';
+                    if (newCore === currentCore) return;
+
+                    var itemId = '{{ item_id }}';
+                    var userId = '{{ user_id }}';
+
+                    var headers = { 'Content-Type': 'application/json' };
+                    if (typeof _jellyToken !== 'undefined' && _jellyToken) {
+                        headers['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
+                    }
+
+                    fetch('/jellyemu/prefs/' + userId, { headers: headers })
+                        .then(function (r) { return r.ok ? r.json() : {}; })
+                        .catch(function () { return {}; })
+                        .then(function (currentPrefs) {
+                            var platformCores = {};
+                            var gameCores = {};
+
+                            try {
+                                platformCores = JSON.parse(currentPrefs.platformCores || '{}');
+                            } catch (e) { }
+                            try {
+                                gameCores = JSON.parse(currentPrefs.gameCores || '{}');
+                            } catch (e) { }
+
+                            gameCores[itemId] = newCore;
+
+                            var payload = {
+                                platformCores: JSON.stringify(platformCores),
+                                gameCores: JSON.stringify(gameCores)
+                            };
+
+                            return fetch('/jellyemu/prefs/' + userId, {
+                                method: 'POST',
+                                headers: headers,
+                                body: JSON.stringify(payload)
+                            });
+                        })
+                        .then(function () {
+                            var availableCores = getAvailableCores();
+                            var selectedObj = availableCores.find(function (c) { return c.id === newCore; });
+                            var label = selectedObj ? selectedObj.name : newCore;
+                            alert('Core updated to ' + label + '. Reloading emulator...');
+                            location.reload();
+                        })
+                        .catch(function (err) {
+                            console.error('[JellyEmu] Failed to update core preference:', err);
+                        });
+                });
+            }
         })();
     </script>
     <script>
         window.EJS_player = '#game';
-        window.EJS_core = '{{ core }}';
         window.EJS_gameUrl = '{{ rom_url }}';
         window.EJS_gameName = '{{ game_name }}';
         window.EJS_pathtodata = '{{ ejs_base }}/';

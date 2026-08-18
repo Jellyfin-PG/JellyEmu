@@ -102,6 +102,8 @@ namespace JellyEmu.Services
                     window.__jellyEmuLoaded = true;
                     console.log('[JellyEmu] UI injection successful.');
 
+                    const jellyEmuVantageEnabled = __JELLYEMU_VANTAGE_ENABLED__;
+
                     let currentItemId = null;
                     let currentItemIsGame = false;
                     let lastGameCardId = null;
@@ -122,7 +124,8 @@ namespace JellyEmu.Services
                         "d64","t64","crt","tap","prg",
                         "adf","dms","ipf","adz",
                         "dsk",
-                        "bin"
+                        "bin",
+                        "3ds","cci","cia"
                     ]);
 
                     const knownRegions = new Set([
@@ -136,7 +139,7 @@ namespace JellyEmu.Services
                     const ejsUnsupportedPlatforms = new Set([
                         "Dreamcast","PlayStation 2","PlayStation 3",
                         "Xbox","Xbox 360",
-                        "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
+                        "GameCube","Wii","Wii U","Nintendo Switch",
                         "PlayStation Vita","Windows","Unsupported"
                     ]);
 
@@ -181,7 +184,7 @@ namespace JellyEmu.Services
                                 .catch(function() {});
                         }
 
-                        fetch('/jellyemu/core/' + itemId)
+                        fetch('/jellyemu/core/' + itemId + (userId ? '?userId=' + userId : ''))
                             .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
                             .catch(function() { return { needsThreads: false }; })
                             .then(function(info) {
@@ -350,7 +353,7 @@ namespace JellyEmu.Services
                             playFromHereBtn.style.display = 'none';
                         }
 
-                        if (!sheetRoot.querySelector('button[data-jellyemu-vantage]')) {
+                        if (jellyEmuVantageEnabled && !sheetRoot.querySelector('button[data-jellyemu-vantage]')) {
                             const sourceCard = document.querySelector('.card[data-id="' + itemId + '"]');
                             const tags = sourceCard && sourceCard.getAttribute('data-jellyemu-tags')
                                 ? sourceCard.getAttribute('data-jellyemu-tags').split(',')
@@ -631,7 +634,7 @@ namespace JellyEmu.Services
 
                         detailButtonsContainer.insertBefore(btn, detailButtonsContainer.firstChild);
 
-                        if (currentItemId && !detailButtonsContainer.querySelector('#jellyemu-vantage-btn')) {
+                        if (jellyEmuVantageEnabled && currentItemId && !detailButtonsContainer.querySelector('#jellyemu-vantage-btn')) {
                             const vBtn = document.createElement('button');
                             vBtn.type      = 'button';
                             vBtn.id        = 'jellyemu-vantage-btn';
@@ -1878,6 +1881,9 @@ namespace JellyEmu.Services
                 })();
                 </script>
                 """;
+
+                bool vantageEnabled = JellyEmu.Plugin.Instance?.Configuration.VantageEnabled ?? true;
+                injection = injection.Replace("__JELLYEMU_VANTAGE_ENABLED__", vantageEnabled ? "true" : "false");
 
                 string block = "\n" + StartMarker + "\n" + injection + EndMarker + "\n";
                 htmlContent = Regex.Replace(htmlContent, @"(</body>)", block + "$1");

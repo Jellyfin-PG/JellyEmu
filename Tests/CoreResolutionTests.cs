@@ -1,66 +1,361 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using JellyEmu.Controllers;
+using JellyEmu.Services;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace JellyEmu.Tests
 {
+    [NonController]
+    public class CoreResolutionTestController : JellyEmuBaseController
+    {
+        public CoreResolutionTestController(IApplicationPaths appPaths)
+            : base(
+                null!,
+                appPaths,
+                NullLogger<CoreResolutionTestController>.Instance,
+                null!,
+                null!,
+                null!)
+        {
+        }
+
+        [NonAction]
+        public string TestResolveCore(BaseItem item, string? userId = null, string? queryCoreOverride = null)
+        {
+            return ResolveCore(item, userId, queryCoreOverride);
+        }
+
+        [NonAction]
+        public CoreInfo TestResolveCoreInfo(BaseItem item, string? userId = null, string? queryCoreOverride = null)
+        {
+            return ResolveCoreInfo(item, userId, queryCoreOverride);
+        }
+
+        [NonAction]
+        public List<CoreOption> TestGetAvailableCores(BaseItem item)
+        {
+            return GetAvailableCoresForItem(item);
+        }
+
+        [NonAction]
+        public void TestSaveUserPrefs(string userId, UserFullPrefs prefs)
+        {
+            WriteFullPrefs(userId, prefs);
+        }
+    }
+
+    public class MockAppPaths : IApplicationPaths
+    {
+        public MockAppPaths(string dataPath)
+        {
+            DataPath = dataPath;
+            PluginsPath = dataPath;
+            PluginConfigurationsPath = dataPath;
+            LogDirectoryPath = dataPath;
+            ConfigurationDirectoryPath = dataPath;
+            SystemConfigurationFilePath = dataPath;
+            CachePath = dataPath;
+            WebPath = dataPath;
+
+            ProgramDataPath = dataPath;
+            ProgramSystemPath = dataPath;
+            ImageCachePath = dataPath;
+        }
+
+        public string ProgramDataPath { get; }
+        public string ProgramSystemPath { get; }
+        public string DataPath { get; }
+        public string PluginsPath { get; }
+        public string PluginConfigurationsPath { get; }
+        public string LogDirectoryPath { get; }
+        public string ConfigurationDirectoryPath { get; }
+        public string SystemConfigurationFilePath { get; }
+        public string CachePath { get; }
+        public string WebPath { get; }
+        public string ImageCachePath { get; }
+        public string VirtualInternalPath => DataPath;
+        public string TempDirectory => DataPath;
+        public string VirtualDataPath => DataPath;
+        public string TrickplayPath => DataPath;
+        public string BackupPath => DataPath;
+
+        public void MakeSanityCheckOrThrow() { }
+        public void CreateAndCheckMarker(string p1, string p2, bool b) { }
+    }
+
     public class CoreResolutionTests
     {
-        private static BaseItem MakeItem(string? path = null, params string[] tags)
+        [Fact]
+        public void DefaultCoreResolution_PlayStation_ReturnsPsx()
         {
-            return new Book
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
             {
-                Path = path,
-                Tags = tags,
-            };
-        }
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "PlayStation" },
+                    Path = "C:\\Games\\PlayStation\\Crash.cue"
+                };
 
-        [Theory]
-        [InlineData("Game Boy Color", "gb")]
-        [InlineData("Game Boy", "gb")]
-        [InlineData("Game Boy Advance", "gba")]
-        [InlineData("SNES", "snes")]
-        [InlineData("Sega Saturn", "segaSaturn")]
-        [InlineData("Atari 2600", "atari2600")]
-        [InlineData("Atari 7800", "atari7800")]
-        public void ResolveCore_ConsoleTag_ResolvesExpectedCore(string tag, string expected)
-        {
-            var item = MakeItem("game.bin", tag);
+                var core = controller.TestResolveCore(item);
+                var info = controller.TestResolveCoreInfo(item);
 
-            Assert.Equal(expected, JellyEmuBaseController.ResolveCore(item));
-        }
-
-        [Theory]
-        [InlineData("Pokemon Crystal (USA).gbc", "gb")]
-        [InlineData("Tetris (World).gb", "gb")]
-        [InlineData("Super Mario World (USA).sfc", "snes")]
-        [InlineData("Sonic the Hedgehog (Japan).md", "segaMD")]
-        public void ResolveCore_Extension_ResolvesExpectedCore(string path, string expected)
-        {
-            var item = MakeItem(path);
-
-            Assert.Equal(expected, JellyEmuBaseController.ResolveCore(item));
+                Assert.Equal("pcsx_rearmed", core);
+                Assert.True(info.NeedsThreads);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
         }
 
         [Fact]
-        public void ResolveCore_GbcTagAndExtension_AgreeOnGbCore()
+        public void AvailableCores_PlayStation_ReturnsMultipleCores()
         {
-            var tagged = MakeItem("Pokemon Crystal (USA).gbc", "Game Boy Color");
-            var untagged = MakeItem("Pokemon Crystal (USA).gbc");
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "PlayStation" },
+                    Path = "C:\\Games\\PlayStation\\Crash.cue"
+                };
 
-            Assert.Equal("gb", JellyEmuBaseController.ResolveCore(tagged));
-            Assert.Equal("gb", JellyEmuBaseController.ResolveCore(untagged));
+                var cores = controller.TestGetAvailableCores(item);
+
+                Assert.Equal(2, cores.Count);
+                Assert.Contains(cores, c => c.Id == "pcsx_rearmed");
+                Assert.Contains(cores, c => c.Id == "mednafen_psx_hw");
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void AvailableCores_PlayStationAliasTag_ReturnsFullCoresList()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "psx" },
+                    Path = "C:\\ROMS\\Spyro.cue"
+                };
+
+                var cores = controller.TestGetAvailableCores(item);
+
+                Assert.Equal(2, cores.Count);
+                Assert.Contains(cores, c => c.Id == "pcsx_rearmed");
+                Assert.Contains(cores, c => c.Id == "mednafen_psx_hw");
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void UserPlatformCorePreference_OverridesDefault()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var userId = "user123";
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "PlayStation" },
+                    Path = "C:\\Games\\PlayStation\\Crash.cue"
+                };
+
+                var prefs = new JellyEmuBaseController.UserFullPrefs(
+                    Scale: "fit", Mute: "false", Controller: "auto", Haptics: "true", Autosave: "true",
+                    Shader: "", VideoRotation: 0, Controls: "", ControllerControls: "", RaUsername: "", RaApiKey: "",
+                    VirtualGamepad: "false", VirtualGamepadLefty: "false",
+                    PlatformCores: "{\"PlayStation\":\"mednafen_psx_hw\"}",
+                    GameCores: "{}"
+                );
+
+                controller.TestSaveUserPrefs(userId, prefs);
+
+                var resolvedCore = controller.TestResolveCore(item, userId);
+                var resolvedInfo = controller.TestResolveCoreInfo(item, userId);
+
+                Assert.Equal("mednafen_psx_hw", resolvedCore);
+                Assert.True(resolvedInfo.NeedsThreads);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void UserGameCorePreference_TakesPrecedenceOverPlatformPreference()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var userId = "user456";
+                var itemId = Guid.NewGuid();
+                var item = new Book
+                {
+                    Id = itemId,
+                    Tags = new[] { "PlayStation" },
+                    Path = "C:\\Games\\PlayStation\\Tekken.cue"
+                };
+
+                var prefs = new JellyEmuBaseController.UserFullPrefs(
+                    Scale: "fit", Mute: "false", Controller: "auto", Haptics: "true", Autosave: "true",
+                    Shader: "", VideoRotation: 0, Controls: "", ControllerControls: "", RaUsername: "", RaApiKey: "",
+                    VirtualGamepad: "false", VirtualGamepadLefty: "false",
+                    PlatformCores: "{\"PlayStation\":\"pcsx_rearmed\"}",
+                    GameCores: $"{{\"{(itemId.ToString("N"))}\":\"mednafen_psx_hw\"}}"
+                );
+
+                controller.TestSaveUserPrefs(userId, prefs);
+
+                var resolvedCore = controller.TestResolveCore(item, userId);
+                var resolvedInfo = controller.TestResolveCoreInfo(item, userId);
+
+                Assert.Equal("mednafen_psx_hw", resolvedCore);
+                Assert.True(resolvedInfo.NeedsThreads);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void DefaultCoreResolution_Nintendo3DS_ReturnsAzaharAndIsSupported()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "Nintendo 3DS" },
+                    Path = "C:\\Games\\3DS\\Zelda.3ds"
+                };
+
+                var resolvedCore = controller.TestResolveCore(item);
+                var resolvedInfo = controller.TestResolveCoreInfo(item);
+                var availableCores = controller.TestGetAvailableCores(item);
+
+                Assert.Equal("azahar", resolvedCore);
+                Assert.True(resolvedInfo.NeedsThreads);
+                Assert.True(PlatformResolver.IsEjsSupported("Nintendo 3DS"));
+                Assert.Contains(availableCores, c => c.Id == "azahar");
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        private static void WithController(Action<CoreResolutionTestController> body)
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                body(new CoreResolutionTestController(new MockAppPaths(tempDir)));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Theory]
+        [InlineData("Game Boy", "gambatte")]
+        [InlineData("Game Boy Color", "gambatte")]
+        [InlineData("Game Boy Advance", "mgba")]
+        [InlineData("SNES", "snes9x")]
+        [InlineData("Sega Saturn", "yabause")]
+        [InlineData("Atari 2600", "stella2014")]
+        [InlineData("Atari 7800", "prosystem")]
+        public void ResolveCore_ConsoleTag_ResolvesExpectedCore(string tag, string expected)
+        {
+            WithController(controller =>
+            {
+                var item = new Book { Id = Guid.NewGuid(), Tags = new[] { tag }, Path = "game.bin" };
+
+                Assert.Equal(expected, controller.TestResolveCore(item));
+            });
+        }
+
+        [Theory]
+        [InlineData("Pokemon Crystal (USA).gbc", "gambatte")]
+        [InlineData("Tetris (World).gb", "gambatte")]
+        [InlineData("Super Mario World (USA).sfc", "snes9x")]
+        [InlineData("Sonic the Hedgehog (Japan).md", "genesis_plus_gx")]
+        public void ResolveCore_Extension_ResolvesExpectedCore(string path, string expected)
+        {
+            WithController(controller =>
+            {
+                var item = new Book { Id = Guid.NewGuid(), Path = path };
+
+                Assert.Equal(expected, controller.TestResolveCore(item));
+            });
+        }
+
+        [Fact]
+        public void ResolveCore_GbcTagAndExtension_AgreeOnGambatte()
+        {
+            WithController(controller =>
+            {
+                var tagged = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "Game Boy Color" },
+                    Path = "Pokemon Crystal (USA).gbc"
+                };
+                var untagged = new Book { Id = Guid.NewGuid(), Path = "Pokemon Crystal (USA).gbc" };
+
+                Assert.Equal("gambatte", controller.TestResolveCore(tagged));
+                Assert.Equal("gambatte", controller.TestResolveCore(untagged));
+            });
         }
 
         [Theory]
         [InlineData("mystery.xyz")]
-        [InlineData("untagged.bin")]
         [InlineData(null)]
-        public void ResolveCore_Unresolvable_ReturnsEmpty(string? path)
+        public void ResolveCore_Unresolvable_ReturnsEmptyRatherThanGuessing(string? path)
         {
-            var item = MakeItem(path);
+            WithController(controller =>
+            {
+                var item = new Book { Id = Guid.NewGuid(), Path = path };
 
-            Assert.Equal(string.Empty, JellyEmuBaseController.ResolveCore(item));
+                Assert.Equal(string.Empty, controller.TestResolveCore(item));
+            });
         }
     }
 }
