@@ -135,6 +135,11 @@ namespace JellyEmu
         public bool UseLoomInjector { get; set; } = false;
 
         /// <summary>
+        /// Whether the "Open in Vantage" button is shown in the UI.
+        /// </summary>
+        public bool VantageEnabled { get; set; } = true;
+
+        /// <summary>
         /// EmulatorJS CDN distribution channel: "stable", "latest", or "nightly".
         /// </summary>
         public string EjsChannel { get; set; } = "stable";

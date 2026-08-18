@@ -339,7 +339,8 @@
             jeSet('rommCollectionSyncEnabled', config.RommCollectionSyncEnabled !== false);
             jeSet('rommScreenshotPushEnabled', config.RommScreenshotPushEnabled !== false);
             jeSet('useLoomInjector', config.UseLoomInjector === true);
-            
+            jeSet('vantageEnabled', config.VantageEnabled !== false);
+
             var collRow = page.querySelector('#rommCollectionSyncRow');
             if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
             
@@ -391,6 +392,8 @@
             
             var loom = page.querySelector('#useLoomInjector');
             if (loom) config.UseLoomInjector = loom.value === 'true';
+            var vantage = page.querySelector('#vantageEnabled');
+            if (vantage) config.VantageEnabled = vantage.value === 'true';
             var ejsSel = page.querySelector('#ejsChannel');
             if (ejsSel) config.EjsChannel = ejsSel.value;
             var np = page.querySelector('#netplayServer');
