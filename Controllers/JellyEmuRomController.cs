@@ -166,13 +166,13 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult GetCore(string itemId)
+        public IActionResult GetCore(string itemId, [FromQuery] string? userId)
         {
             var item = LibraryManager.GetItemById(itemId);
             if (item == null)
                 return NotFound();
 
-            var info = ResolveCoreInfo(item);
+            var info = ResolveCoreInfo(item, userId);
             return Ok(new { core = info.Core, needsThreads = info.NeedsThreads, launcher = info.Launcher });
         }
 

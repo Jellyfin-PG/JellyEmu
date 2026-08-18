@@ -1,0 +1,25 @@
+<div class="je-tab-content active">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5em; margin-bottom: 2.5em;">
+        <div class="paperList" style="padding: 1.5em; text-align: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 120px; box-shadow: none;">
+            <p style="margin: 0; color: #999; font-size: 0.9em; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">ROMs Scanned</p>
+            <h1 id="romCountDisplay" style="font-size: 3.2em; font-weight: 700; color: #00a4dc; margin: 6px 0 4px; line-height: 1.1;">...</h1>
+            <p style="color: #666; font-size: 0.8em; margin: 0; max-width: 220px;">
+                Tagged Book items with the JellyEmu tag.
+            </p>
+        </div>
+        <div class="paperList" style="padding: 1.5em; text-align: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 120px; box-shadow: none;">
+            <p style="margin: 0; color: #999; font-size: 0.9em; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">Unsupported ROMs</p>
+            <h1 id="unsupportedCountDisplay" style="font-size: 3.2em; font-weight: 700; color: #aaa; margin: 6px 0 4px; line-height: 1.1;">...</h1>
+            <p style="color: #666; font-size: 0.8em; margin: 0; max-width: 220px;">
+                Games on platforms not supported by EmulatorJS.
+            </p>
+        </div>
+    </div>
+
+    <div class="verticalSection">
+        <h2 class="sectionTitle" style="margin-bottom: 1em; font-size: 1.25em; font-weight: 600; color: #fff;">Console Distribution</h2>
+        <div id="je-stats-console-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2em;">
+            <!-- Dynamically populated in JavaScript -->
+        </div>
+    </div>
+</div>

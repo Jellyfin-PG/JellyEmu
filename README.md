@@ -48,6 +48,10 @@
   <a href="assets/screen05.png">
     <img src="assets/screen05.png" width="45%" alt="Jellyemu pico8 emulator" />
   </a>
+
+  <a href="assets/screen06.png">
+    <img src="assets/screen06.png" width="45%" alt="Jellyemu community tab" />
+  </a>
 </p>
 <p align="center">
   <em>Click on an image to view it full size.</em>
@@ -147,13 +151,15 @@ JellyEmu depends on the **File Transformation** plugin to inject CSS and JavaScr
 
 1. Open your Jellyfin dashboard
 2. Go to **Administration → Plugins → Repositories**
-3. Click **Add** and enter the following URL:
+3. Click **New Repository** and enter the following for the Name and URL:
+   ```
+   Jellyfin-PG
+   ```
+   ```
+   https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifest.json
+   ```
 
-```
-https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifest.json
-```
-
-4. Click **Save**
+4. Click **Add**
 
 ### Step 2 — Install File Transformation
 
@@ -169,6 +175,10 @@ https://raw.githubusercontent.com/Jellyfin-PG/Repository/refs/heads/main/manifes
 ### Step 4 — Restart Jellyfin
 
 Restart your Jellyfin server. Both plugins must be active at the same time — File Transformation handles the page injection, JellyEmu manages your roms.
+
+1. Go to **Administration → Dashboard**
+2. Click **Restart**
+3. Confirm again by clicking **Restart**
 
 ---
 

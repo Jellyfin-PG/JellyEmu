@@ -124,7 +124,8 @@ namespace JellyEmu.Services
                         "d64","t64","crt","tap","prg",
                         "adf","dms","ipf","adz",
                         "dsk",
-                        "bin"
+                        "bin",
+                        "3ds","cci","cia"
                     ]);
 
                     const knownRegions = new Set([
@@ -138,7 +139,7 @@ namespace JellyEmu.Services
                     const ejsUnsupportedPlatforms = new Set([
                         "Dreamcast","PlayStation 2","PlayStation 3",
                         "Xbox","Xbox 360",
-                        "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
+                        "GameCube","Wii","Wii U","Nintendo Switch",
                         "PlayStation Vita","Windows","Unsupported"
                     ]);
 
@@ -183,7 +184,7 @@ namespace JellyEmu.Services
                                 .catch(function() {});
                         }
 
-                        fetch('/jellyemu/core/' + itemId)
+                        fetch('/jellyemu/core/' + itemId + (userId ? '?userId=' + userId : ''))
                             .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
                             .catch(function() { return { needsThreads: false }; })
                             .then(function(info) {

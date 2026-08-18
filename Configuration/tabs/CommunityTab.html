@@ -1,0 +1,208 @@
+<div class="je-tab-content active">
+    <!-- Header Section -->
+    <div class="verticalSection" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 1.8em; margin-bottom: 2em; backdrop-filter: blur(10px);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;">
+            <div>
+                <h2 style="color: #fff; margin: 0 0 4px 0; font-size: 1.4em; font-weight: 600;">JellyEmu Community</h2>
+                <p style="color: #888; font-size: 0.88em; margin: 0;">Connect with the community, propose feature ideas, participate in Q&amp;A, and vote directly on discussions.</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button type="button" id="btnNewDiscussion" class="emby-button" style="padding: 6px 14px; font-size: 0.85em; background: #00a4dc; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="material-icons" style="font-size: 16px;">add</span>
+                    <span>New Discussion</span>
+                </button>
+                <a href="https://github.com/Jellyfin-PG/JellyEmu/discussions" target="_blank" class="raised emby-button" style="padding: 6px 14px; font-size: 0.85em; background: rgba(0, 164, 220, 0.15); border: 1px solid rgba(0, 164, 220, 0.25); color: #00a4dc; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border-radius: 6px;">
+                    <span class="material-icons" style="font-size: 16px;">open_in_new</span>
+                    <span>GitHub</span>
+                </a>
+                <button type="button" id="btnRefreshDiscussions" class="emby-button" style="padding: 6px 12px; font-size: 0.85em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #ccc; border-radius: 6px; cursor: pointer;">
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- GitHub Authentication Status Banner -->
+        <div style="margin-top: 1.2em; padding-top: 1.2em; border-top: 1px solid rgba(255,255,255,0.06);">
+            <!-- Logged Out Banner -->
+            <div id="jeGithubLoggedOutBox" style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="material-icons" style="color: #aaa; font-size: 20px;">account_circle</span>
+                    <span style="font-size: 0.88em; color: #aaa;">Connect your GitHub Account token to vote, comment, and submit new feature ideas.</span>
+                </div>
+                <button type="button" id="btnJeConnectGithub" style="background: #52B54B; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                    <span>Connect GitHub Account</span>
+                </button>
+            </div>
+
+            <!-- Logged In Banner -->
+            <div id="jeGithubLoggedInBox" style="display: none; align-items: center; justify-content: space-between; background: rgba(82, 181, 75, 0.08); border: 1px solid rgba(82, 181, 75, 0.25); border-radius: 8px; padding: 10px 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img id="jeGithubUserAvatar" src="https://github.githubassets.com/favicons/favicon.png" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" alt="Avatar" />
+                    <span style="font-size: 0.88em; color: #52B54B; font-weight: 600;">Connected to GitHub: <span id="jeGithubUserHandle">@user</span></span>
+                </div>
+                <button type="button" id="btnJeDisconnectGithub" style="background: rgba(255,68,68,0.15); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); padding: 4px 12px; border-radius: 6px; font-size: 0.8em; font-weight: 600; cursor: pointer;">
+                    Disconnect
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Filter Pill Bar -->
+    <div style="margin-bottom: 1.5em; overflow-x: auto; white-space: nowrap; padding-bottom: 4px;">
+        <span style="color: #aaa; font-size: 0.82em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Categories</span>
+        <div class="je-letter-row">
+            <button type="button" class="je-letter-btn je-community-pill active" data-cat="" onclick="jeFilterDiscussions('')">All</button>
+            <button type="button" class="je-letter-btn je-community-pill" data-cat="Announcements" onclick="jeFilterDiscussions('Announcements')">Announcements</button>
+            <button type="button" class="je-letter-btn je-community-pill" data-cat="General" onclick="jeFilterDiscussions('General')">General</button>
+            <button type="button" class="je-letter-btn je-community-pill" data-cat="Ideas" onclick="jeFilterDiscussions('Ideas')">Ideas</button>
+            <button type="button" class="je-letter-btn je-community-pill" data-cat="Polls" onclick="jeFilterDiscussions('Polls')">Polls</button>
+            <button type="button" class="je-letter-btn je-community-pill" data-cat="Q&A" onclick="jeFilterDiscussions('Q&A')">Q&amp;A</button>
+            <button type="button" class="je-letter-btn je-community-pill" data-cat="Show and Tell" onclick="jeFilterDiscussions('Show and Tell')">Show and Tell</button>
+        </div>
+    </div>
+
+    <!-- Loading / Status Container -->
+    <div id="jeDiscussionsStatus" style="color: #aaa; text-align: center; padding: 2em; display: none;"></div>
+
+    <!-- Discussions List Grid -->
+    <div id="jeDiscussionsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;"></div>
+
+    <!-- GitHub Token Modal -->
+    <div id="jeGithubAuthModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #181818; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; max-width: 480px; width: 100%; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #fff; font-size: 1.2em; font-weight: 600;">Connect GitHub Account</h3>
+                <button type="button" id="btnCloseGithubAuthModal" style="background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer;">&times;</button>
+            </div>
+            <p style="color: #aaa; font-size: 0.88em; margin: 0; line-height: 1.4;">
+                Enter a GitHub Personal Access Token (with <code>public_repo</code> scope) to enable upvoting and posting directly from JellyEmu.
+                Generate one at <a href="https://github.com/settings/tokens" target="_blank" style="color: #00a4dc;">github.com/settings/tokens</a>.
+            </p>
+            <div class="inputContainer" style="margin: 0;">
+                <label class="inputLabel inputLabelUnfocused" for="jeGithubTokenInput">GitHub Personal Access Token</label>
+                <input id="jeGithubTokenInput" type="password" class="emby-input" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" />
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+                <button type="button" id="btnSaveGithubToken" style="background: #00a4dc; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">Save Token</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Discussion Modal -->
+    <div id="jeNewDiscussionModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #181818; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; max-width: 580px; width: 100%; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #fff; font-size: 1.2em; font-weight: 600;">Start a New Discussion</h3>
+                <button type="button" id="btnCloseNewDiscussionModal" style="background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer;">&times;</button>
+            </div>
+
+            <div class="selectContainer">
+                <label class="selectLabel" for="jeNewDiscCategory">Category</label>
+                <select id="jeNewDiscCategory" class="emby-select" style="width:100%; box-sizing:border-box; background: #000000 !important; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 10px; color: #fff;">
+                    <option value="General" style="background:#000; color:#fff;">General</option>
+                    <option value="Ideas" style="background:#000; color:#fff;">Ideas</option>
+                    <option value="Q&A" style="background:#000; color:#fff;">Q&amp;A</option>
+                    <option value="Announcements" style="background:#000; color:#fff;">Announcements</option>
+                    <option value="Polls" style="background:#000; color:#fff;">Polls</option>
+                    <option value="Show and Tell" style="background:#000; color:#fff;">Show and Tell</option>
+                </select>
+            </div>
+
+            <div class="inputContainer" style="margin: 0;">
+                <label class="inputLabel inputLabelUnfocused" for="jeNewDiscTitle">Discussion Title</label>
+                <input id="jeNewDiscTitle" type="text" class="emby-input" placeholder="Summarize your feature request or discussion topic..." autocomplete="off" />
+            </div>
+
+            <div id="jePollOptionsContainer" style="display: none; flex-direction: column; gap: 8px; background: rgba(0, 164, 220, 0.05); border: 1px solid rgba(0, 164, 220, 0.2); border-radius: 8px; padding: 12px;">
+                <label style="color: #00a4dc; font-size: 0.88em; font-weight: 600;">Poll Options</label>
+                <input type="text" class="emby-input je-poll-opt-input" placeholder="Option 1..." autocomplete="off" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); padding: 8px; color: #fff; border-radius: 4px;" />
+                <input type="text" class="emby-input je-poll-opt-input" placeholder="Option 2..." autocomplete="off" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); padding: 8px; color: #fff; border-radius: 4px;" />
+                <button type="button" id="btnAddPollOptionInput" style="background: rgba(255,255,255,0.06); color: #ccc; border: 1px solid rgba(255,255,255,0.12); padding: 6px 12px; border-radius: 4px; font-size: 0.8em; cursor: pointer; align-self: flex-start;">+ Add Option</button>
+            </div>
+
+            <div class="inputContainer" style="margin: 0;">
+                <label class="inputLabel inputLabelUnfocused" for="jeNewDiscBody">Body / Description</label>
+                <div style="display: flex; flex-direction: column;">
+                    <div class="je-md-toolbar" style="display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-bottom: none; border-radius: 6px 6px 0 0; padding: 4px 8px;">
+                        <button type="button" class="je-md-btn" title="Bold" onclick="jeApplyMarkdown(this, 'bold')"><span class="material-icons" style="font-size: 16px;">format_bold</span></button>
+                        <button type="button" class="je-md-btn" title="Italic" onclick="jeApplyMarkdown(this, 'italic')"><span class="material-icons" style="font-size: 16px;">format_italic</span></button>
+                        <button type="button" class="je-md-btn" title="Code" onclick="jeApplyMarkdown(this, 'code')"><span class="material-icons" style="font-size: 16px;">code</span></button>
+                        <button type="button" class="je-md-btn" title="Link" onclick="jeApplyMarkdown(this, 'link')"><span class="material-icons" style="font-size: 16px;">link</span></button>
+                        <button type="button" class="je-md-btn" title="List" onclick="jeApplyMarkdown(this, 'list')"><span class="material-icons" style="font-size: 16px;">format_list_bulleted</span></button>
+                        <button type="button" class="je-md-btn" title="Quote" onclick="jeApplyMarkdown(this, 'quote')"><span class="material-icons" style="font-size: 16px;">format_quote</span></button>
+                    </div>
+                    <textarea id="jeNewDiscBody" class="emby-input" rows="5" placeholder="Provide context, design details, or explanations..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 0 0 6px 6px; padding: 10px; color: #fff; font-family: inherit; resize: vertical;"></textarea>
+                </div>
+            </div>
+
+            <div class="inputContainer" style="margin: 0;">
+                <label class="inputLabel inputLabelUnfocused" for="jeNewDiscImageUrl">Image URL (Optional)</label>
+                <input id="jeNewDiscImageUrl" type="url" class="emby-input" placeholder="https://example.com/screenshot.png" autocomplete="off" />
+            </div>
+
+            <div id="jeNewDiscStatus" style="font-size: 0.85em; color: #aaa;"></div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+                <button type="button" id="btnSubmitNewDiscussion" style="background: #00a4dc; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">Post Discussion</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discussion Detail / Comment Reader Modal -->
+    <div id="jeDiscussionDetailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); z-index: 9999; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto;">
+        <div style="background: #181818; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; max-width: 680px; width: 100%; max-height: calc(100vh - 80px); padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; box-sizing: border-box; margin: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                <div>
+                    <span id="jeDetailCategoryBadge" style="font-size: 0.72em; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(0, 164, 220, 0.15); color: #00a4dc; border: 1px solid rgba(0, 164, 220, 0.3); text-transform: uppercase;">Category</span>
+                    <h2 id="jeDetailTitle" style="margin: 8px 0 4px; color: #fff; font-size: 1.3em; font-weight: 600;">Discussion Title</h2>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img id="jeDetailAuthorAvatar" src="https://github.githubassets.com/favicons/favicon.png" style="width: 20px; height: 20px; border-radius: 50%;" />
+                        <span id="jeDetailAuthorHandle" style="font-size: 0.85em; color: #aaa;">@author</span>
+                    </div>
+                </div>
+                <button type="button" id="btnCloseDetailModal" style="background: none; border: none; color: #aaa; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+
+            <!-- Full Discussion Body -->
+            <div id="jeDetailBody" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; color: #ddd; font-size: 0.92em; line-height: 1.5; white-space: pre-wrap; word-break: break-word;"></div>
+
+            <!-- Poll Container (If Discussion is a Poll) -->
+            <div id="jeDetailPollContainer" style="display: none; background: rgba(0, 164, 220, 0.05); border: 1px solid rgba(0, 164, 220, 0.2); border-radius: 10px; padding: 16px;"></div>
+
+            <!-- Replies / Comments Header -->
+            <h4 style="margin: 12px 0 0; color: #fff; font-size: 1em; font-weight: 600;">Comments &amp; Replies</h4>
+            <div id="jeDetailCommentsContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
+
+            <!-- In-App Reply Container -->
+            <div id="jeReplySectionContainer" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
+                <!-- Logged In Reply Form -->
+                <div id="jeReplyForm" style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <div class="je-md-toolbar" style="display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-bottom: none; border-radius: 6px 6px 0 0; padding: 4px 8px;">
+                            <button type="button" class="je-md-btn" title="Bold" onclick="jeApplyMarkdown(this, 'bold')"><span class="material-icons" style="font-size: 16px;">format_bold</span></button>
+                            <button type="button" class="je-md-btn" title="Italic" onclick="jeApplyMarkdown(this, 'italic')"><span class="material-icons" style="font-size: 16px;">format_italic</span></button>
+                            <button type="button" class="je-md-btn" title="Code" onclick="jeApplyMarkdown(this, 'code')"><span class="material-icons" style="font-size: 16px;">code</span></button>
+                            <button type="button" class="je-md-btn" title="Link" onclick="jeApplyMarkdown(this, 'link')"><span class="material-icons" style="font-size: 16px;">link</span></button>
+                            <button type="button" class="je-md-btn" title="List" onclick="jeApplyMarkdown(this, 'list')"><span class="material-icons" style="font-size: 16px;">format_list_bulleted</span></button>
+                            <button type="button" class="je-md-btn" title="Quote" onclick="jeApplyMarkdown(this, 'quote')"><span class="material-icons" style="font-size: 16px;">format_quote</span></button>
+                        </div>
+                        <textarea id="jeReplyBody" class="emby-input" rows="3" placeholder="Write a reply..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 0 0 6px 6px; padding: 10px; color: #fff; font-family: inherit; resize: vertical;"></textarea>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span id="jeReplyStatus" style="font-size: 0.82em; color: #aaa;"></span>
+                        <button type="button" id="btnSubmitReply" style="background: #00a4dc; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">Post Reply</button>
+                    </div>
+                </div>
+
+                <!-- Logged Out Auth Prompt -->
+                <div id="jeReplyAuthPrompt" style="display: none; background: rgba(0, 164, 220, 0.08); border: 1px solid rgba(0, 164, 220, 0.2); border-radius: 8px; padding: 12px 16px; align-items: center; justify-content: space-between; gap: 12px;">
+                    <span style="display: flex; align-items: center; gap: 8px; font-size: 0.88em; color: #aaa;">
+                        <span class="material-icons" style="color: #00a4dc; font-size: 18px;">lock</span>
+                        Connect your GitHub account to reply to this discussion.
+                    </span>
+                    <button type="button" id="btnConnectFromReplyPrompt" style="background: #00a4dc; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 600; cursor: pointer; white-space: nowrap;">Connect GitHub</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

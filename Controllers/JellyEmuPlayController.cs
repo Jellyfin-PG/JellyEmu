@@ -27,18 +27,18 @@ namespace JellyEmu.Controllers
             : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory) { }
 
         [HttpGet("/jellyemu/play/{itemId}")]
-        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
+        public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot, [FromQuery] string? core,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
             var item = LibraryManager.GetItemById(itemId);
             if (item == null) return NotFound();
 
-            var core = ResolveCore(item);
+            var resolvedCore = ResolveCore(item, userId, core);
 
-            return core switch
+            return resolvedCore switch
             {
                 "pico8" => PlayPico8(itemId),
-                _       => await PlayEjs(itemId, userId, slot, httpClientFactory)
+                _       => await PlayEjs(itemId, userId, slot, core, httpClientFactory)
             };
         }
 
@@ -122,7 +122,7 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> PlayEjs(string itemId, [FromQuery] string? userId, [FromQuery] int? slot,
+        public async Task<IActionResult> PlayEjs(string itemId, [FromQuery] string? userId, [FromQuery] int? slot, [FromQuery] string? core,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
             var item = LibraryManager.GetItemById(itemId);
@@ -132,7 +132,15 @@ namespace JellyEmu.Controllers
                 return NotFound();
             }
 
-            var core = ResolveCore(item);
+            var resolvedCore = ResolveCore(item, userId, core);
+            var platformTag = ResolvePlatformTag(item);
+            var availableCores = GetAvailableCoresForItem(item);
+            var availableCoresJson = System.Text.Json.JsonSerializer.Serialize(availableCores.Select(c => new
+            {
+                id = c.Id,
+                name = c.Name,
+                needsThreads = c.NeedsThreads
+            }));
             var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".zip";
             var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
             var cleanFilename = CleanCosmeticFilename(filename);
@@ -190,14 +198,21 @@ namespace JellyEmu.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Error parsing EJS Scriban template.");
             }
 
+            var biosService = HttpContext.RequestServices.GetService(typeof(JellyEmuBiosService)) as JellyEmuBiosService;
+            var relBios = biosService?.ResolveBiosRelativePath(platformTag, resolvedCore);
+            var biosUrl = !string.IsNullOrEmpty(relBios) ? $"/jellyemu/bios/file/{relBios}" : string.Empty;
+
             var html = template.Render(new
             {
                 game_name = gameName,
-                core = core,
+                core = resolvedCore,
+                platform_tag = platformTag,
+                available_cores_json = availableCoresJson,
                 rom_url = romUrl,
                 ejs_base = ejsBase,
                 item_id = itemId,
                 user_id = userId,
+                bios_url = biosUrl,
                 active_slot = activeSlot,
                 slot_value = slot ?? 0,
                 has_saves = hasSaves,
@@ -210,7 +225,7 @@ namespace JellyEmu.Controllers
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,
                 is_m3u = isJ3u,
-                needs_threads = (core == "dos" || core == "psp" || core == "arcade" || core == "mame2003_plus" || core == "amiga" || core == "3do" || core == "segaSaturn" || core == "jaguar"),
+                needs_threads = IsThreadedCore(resolvedCore),
                 virtual_gamepad = fullPrefs.VirtualGamepad,
                 virtual_gamepad_lefty = fullPrefs.VirtualGamepadLefty
             });
