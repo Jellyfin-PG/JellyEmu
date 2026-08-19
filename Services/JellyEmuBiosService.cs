@@ -150,16 +150,6 @@ namespace JellyEmu.Services
                 if (File.Exists(p)) return fn;
             }
 
-            foreach (var kvp in KnownBiosFilenames)
-            {
-                if (string.Equals(kvp.Key, platformTag, StringComparison.OrdinalIgnoreCase)) continue;
-                foreach (var fn in kvp.Value)
-                {
-                    var p = Path.Combine(root, fn);
-                    if (File.Exists(p)) return fn;
-                }
-            }
-
             return null;
         }
 

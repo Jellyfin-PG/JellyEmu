@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Vimm's Lair",
+    "domain": "vimm.net",
+    "searchUrl": "https://vimm.net/vault/?p=list&q={query}",
+    "searchRegex": "<td[^>]*>(?<system>[^<]+)</td>\\s*<td[^>]*>(?:<a href=\"[^\"]*\"[^>]*style=\"display:\\s*none\"[^>]*>.*?</a>\\s*|<a href\\s*=\\s*\"[^\"]*\"></a>\\s*)?<a href\\s*=\\s*\"(?<url>/vault/(?<id>\\d+))\"[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\\s*<td[^>]*>(?<regions>.*?)</td>\\s*<td[^>]*>(?<version>[^<]*)</td>\\s*<td[^>]*>(?<languages>[^<]*)</td>)?",
+    "browseUrl": "https://vimm.net/vault/?p=list&system={system}&section={letter}",
+    "browseRegex": "<td[^>]*>(?:<a href=\"[^\"]*\"[^>]*style=\"display:\\s*none\"[^>]*>.*?</a>\\s*|<a href\\s*=\\s*\"[^\"]*\"></a>\\s*)?<a href\\s*=\\s*\"(?<url>/vault/(?<id>\\d+))\"[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\\s*<td[^>]*>(?<regions>.*?)</td>\\s*<td[^>]*>(?<version>[^<]*)</td>\\s*<td[^>]*>(?<languages>[^<]*)</td>)?",
+    "downloadActionRegex": "<form\\s+([^>]*id=\"dl_form\"[^>]*)>",
+    "downloadMediaIdRegexes": [
+      "<input\\s+[^>]*name=\"mediaId\"[^>]*value=\"(?<mediaId>\\d+)\"",
+      "<input\\s+[^>]*value=\"(?<mediaId>\\d+)\"[^>]*name=\"mediaId\"",
+      "(?:let|const|var)\\s+media\\s*=\\s*\\[\\s*\\{\\s*\"ID\"\\s*:\\s*(?<mediaId>\\d+)"
+    ],
+    "downloadMethod": "GET_THEN_POST",
+    "downloadParamName": "mediaId",
+    "systemMap": {
+      "NES": "NES",
+      "SNES": "SNES",
+      "N64": "N64",
+      "Game Boy": "GB",
+      "Game Boy Color": "GBC",
+      "Game Boy Advance": "GBA",
+      "Nintendo DS": "DS",
+      "Virtual Boy": "VB",
+      "Master System": "SMS",
+      "Sega Genesis": "Genesis",
+      "Game Gear": "GG",
+      "Sega Saturn": "Saturn",
+      "Sega CD": "SegaCD",
+      "Sega 32X": "32X",
+      "PlayStation": "PS1",
+      "Atari 2600": "2600",
+      "Atari 7800": "7800",
+      "Atari Lynx": "Lynx",
+      "Atari Jaguar": "Jaguar",
+      "WonderSwan": "WonderSwan",
+      "TurboGrafx-16": "TG16",
+      "ColecoVision": "ColecoVision"
+    }
+  }
+]

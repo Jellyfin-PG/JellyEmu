@@ -86,159 +86,156 @@ namespace JellyEmu.Controllers
             {
                 { "PlayStation", new List<CoreOption>
                     {
-                        new("pcsx_rearmed", "PCSX ReARMed (Threaded)", true),
-                        new("mednafen_psx_hw", "Beetle PSX HW (Threaded)", true)
+                        new("pcsx_rearmed", "PCSX ReARMed", true),
+                        new("mednafen_psx_hw", "Beetle PSX HW", true)
                     }
                 },
                 { "Arcade", new List<CoreOption>
                     {
-                        new("fbneo", "FinalBurn Neo (Threaded)", true),
-                        new("mame2003_plus", "MAME 2003-Plus (Threaded)", true)
+                        new("fbneo", "FinalBurn Neo", true),
+                        new("mame2003_plus", "MAME 2003-Plus", true)
                     }
                 },
                 { "MAME 2003", new List<CoreOption>
                     {
-                        new("mame2003_plus", "MAME 2003-Plus (Threaded)", true),
-                        new("mame2003", "MAME 2003 (Threaded)", true),
-                        new("fbneo", "FinalBurn Neo (Threaded)", true)
+                        new("mame2003_plus", "MAME 2003-Plus", true),
+                        new("mame2003", "MAME 2003", true),
+                        new("fbneo", "FinalBurn Neo", true)
                     }
                 },
                 { "SNES", new List<CoreOption>
                     {
-                        new("snes9x", "Snes9x (Threaded)", true),
-                        new("snes9x2010", "Snes9x 2010 (Threaded)", true),
-                        new("snes9x2005", "Snes9x 2005 (Threaded)", true)
+                        new("snes9x", "Snes9x", true)
                     }
                 },
                 { "NES", new List<CoreOption>
                     {
-                        new("nestopia", "Nestopia (Threaded)", true),
-                        new("fceumm", "FCEUmm (Threaded)", true)
+                        new("nestopia", "Nestopia", true),
+                        new("fceumm", "FCEUmm", true)
                     }
                 },
                 { "N64", new List<CoreOption>
                     {
-                        new("mupen64plus_next", "Mupen64Plus Next (Threaded)", true),
-                        new("parallel_n64", "ParaLLEl N64 (Threaded)", true)
+                        new("mupen64plus_next", "Mupen64Plus Next", true),
+                        new("parallel_n64", "ParaLLEl N64", true)
                     }
                 },
                 { "Game Boy Advance", new List<CoreOption>
                     {
-                        new("mgba", "mGBA (Threaded)", true),
-                        new("vba_next", "VBA Next (Threaded)", true)
+                        new("mgba", "mGBA", true)
                     }
                 },
                 { "Game Boy", new List<CoreOption>
                     {
-                        new("gambatte", "Gambatte (Threaded)", true),
-                        new("sameboy", "SameBoy (Threaded)", true)
+                        new("gambatte", "Gambatte", true),
+                        new("mgba", "mGBA", true)
                     }
                 },
                 { "Game Boy Color", new List<CoreOption>
                     {
-                        new("gambatte", "Gambatte (Threaded)", true),
-                        new("sameboy", "SameBoy (Threaded)", true)
+                        new("gambatte", "Gambatte", true),
+                        new("mgba", "mGBA", true)
                     }
                 },
                 { "Nintendo DS", new List<CoreOption>
                     {
-                        new("desmume", "DeSmuME (Threaded)", true),
-                        new("melonds", "melonDS (Threaded)", true)
+                        new("desmume", "DeSmuME", true),
+                        new("melonds", "melonDS", true)
                     }
                 },
                 { "Nintendo 3DS", new List<CoreOption>
                     {
-                        new("azahar", "Azahar (Threaded)", true)
+                        new("azahar", "Azahar", true)
                     }
                 },
                 { "Sega Genesis", new List<CoreOption>
                     {
-                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
-                        new("picodrive", "PicoDrive (Threaded)", true)
+                        new("genesis_plus_gx", "Genesis Plus GX", true),
+                        new("picodrive", "PicoDrive", true)
                     }
                 },
                 { "Sega CD", new List<CoreOption>
                     {
-                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
-                        new("picodrive", "PicoDrive (Threaded)", true)
+                        new("genesis_plus_gx", "Genesis Plus GX", true),
+                        new("picodrive", "PicoDrive", true)
                     }
                 },
                 { "Sega 32X", new List<CoreOption>
                     {
-                        new("picodrive", "PicoDrive (Threaded)", true)
+                        new("picodrive", "PicoDrive", true)
                     }
                 },
                 { "Master System", new List<CoreOption>
                     {
-                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
-                        new("smsplus", "SMS Plus (Threaded)", true)
+                        new("genesis_plus_gx", "Genesis Plus GX", true),
+                        new("smsplus", "SMS Plus", true)
                     }
                 },
                 { "Game Gear", new List<CoreOption>
                     {
-                        new("genesis_plus_gx", "Genesis Plus GX (Threaded)", true),
-                        new("smsplus", "SMS Plus (Threaded)", true)
+                        new("genesis_plus_gx", "Genesis Plus GX", true),
+                        new("smsplus", "SMS Plus", true)
                     }
                 },
                 { "Sega Saturn", new List<CoreOption>
                     {
-                        new("yabause", "Yabause (Threaded)", true)
+                        new("yabause", "Yabause", true)
                     }
                 },
                 { "PSP", new List<CoreOption>
                     {
-                        new("ppsspp", "PPSSPP (Threaded)", true)
+                        new("ppsspp", "PPSSPP", true)
                     }
                 },
                 { "3DO", new List<CoreOption>
                     {
-                        new("opera", "Opera (Threaded)", true)
+                        new("opera", "Opera", true)
                     }
                 },
                 { "Atari 2600", new List<CoreOption>
                     {
-                        new("stella2014", "Stella 2014 (Threaded)", true)
+                        new("stella2014", "Stella 2014", true)
                     }
                 },
                 { "Atari 5200", new List<CoreOption>
                     {
-                        new("a5200", "Atari 5200 (Threaded)", true)
+                        new("a5200", "Atari 5200", true)
                     }
                 },
                 { "Atari 7800", new List<CoreOption>
                     {
-                        new("prosystem", "ProSystem (Threaded)", true)
+                        new("prosystem", "ProSystem", true)
                     }
                 },
                 { "Atari Lynx", new List<CoreOption>
                     {
-                        new("handy", "Handy (Threaded)", true)
+                        new("handy", "Handy", true)
                     }
                 },
                 { "Atari Jaguar", new List<CoreOption>
                     {
-                        new("virtualjaguar", "Virtual Jaguar (Threaded)", true)
+                        new("virtualjaguar", "Virtual Jaguar", true)
                     }
                 },
                 { "DOS", new List<CoreOption>
                     {
-                        new("dosbox_pure", "DOSBox Pure (Threaded)", true)
+                        new("dosbox_pure", "DOSBox Pure", true)
                     }
                 },
                 { "Commodore Amiga", new List<CoreOption>
                     {
-                        new("puae", "PUAE (Threaded)", true)
+                        new("puae", "PUAE", true)
                     }
                 },
                 { "Commodore 64", new List<CoreOption>
                     {
-                        new("vice_x64", "VICE x64 (Threaded)", true),
-                        new("vice_x64sc", "VICE x64sc (Threaded)", true)
+                        new("vice_x64", "VICE x64", true),
+                        new("vice_x64sc", "VICE x64sc", true)
                     }
                 },
                 { "Virtual Boy", new List<CoreOption>
                     {
-                        new("beetle_vb", "Beetle VB (Threaded)", true)
+                        new("beetle_vb", "Beetle VB", true)
                     }
                 },
                 { "PICO-8", new List<CoreOption>
