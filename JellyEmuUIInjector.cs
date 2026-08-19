@@ -429,12 +429,14 @@ namespace JellyEmu.Services
                         const discTags   = cachedTags.filter(t => isDiscTag(t));
                         const allTags    = [...systemTags, ...regionTags, ...discTags];
 
+                        const tagFrag = document.createDocumentFragment();
                         allTags.forEach(tag => {
                             const div = document.createElement('div');
                             div.className = 'mediaInfoItem jellyemu-misc-item';
                             div.textContent = tag;
-                            wrap.appendChild(div);
+                            tagFrag.appendChild(div);
                         });
+                        wrap.appendChild(tagFrag);
 
                         // Time to Beat premium pill
                         const ttbRaw = cachedProviderIds.IgdbTTB;
@@ -709,16 +711,26 @@ namespace JellyEmu.Services
                                 cachedTags        = item.Tags;
                                 cachedProviderIds = item.ProviderIds || {};
                                 if (visiblePage) visiblePage.classList.add('jellyemu-game-page');
-                                var _pollAttempts = 0;
-                                var _pollId = setInterval(function() {
-                                    if (currentItemId !== id) { clearInterval(_pollId); return; }
+                                var tryInject = function() {
+                                    if (currentItemId !== id) return true;
                                     var p = visiblePage || getVisibleDetailPage();
-                                    if (!p) { if (++_pollAttempts > 20) clearInterval(_pollId); return; }
+                                    if (!p) return false;
                                     if (isPlayable(cachedTags)) injectPlayButton(p);
                                     var bar = p.querySelector('.itemMiscInfo-primary');
-                                    if (bar) { clearInterval(_pollId); injectMiscInfo(p); return; }
-                                    if (++_pollAttempts > 20) clearInterval(_pollId);
-                                }, 100);
+                                    if (bar) { injectMiscInfo(p); return true; }
+                                    return false;
+                                };
+
+                                if (!tryInject()) {
+                                    var detailTarget = visiblePage || getVisibleDetailPage() || document.body;
+                                    var itemObserver = new MutationObserver(function(mutations, obs) {
+                                        if (tryInject()) {
+                                            obs.disconnect();
+                                        }
+                                    });
+                                    itemObserver.observe(detailTarget, { childList: true, subtree: true });
+                                    setTimeout(function() { itemObserver.disconnect(); }, 3000);
+                                }
                             } else {
                                 currentItemIsGame = false;
                                 cachedTags        = [];
@@ -910,10 +922,31 @@ namespace JellyEmu.Services
                         }
                     }
 
+                    const _cardIntersectionObserver = (typeof IntersectionObserver !== 'undefined')
+                        ? new IntersectionObserver(function(entries, observer) {
+                            entries.forEach(function(entry) {
+                                if (entry.isIntersecting) {
+                                    const card = entry.target;
+                                    observer.unobserve(card);
+                                    _enqueueCardForProcessing(card);
+                                }
+                            });
+                        }, { rootMargin: '300px 0px' })
+                        : null;
+
                     const _pendingCards = new Set();
                     let _cardFlushScheduled = false;
 
                     function scheduleCardProcess(card) {
+                        if (!card || card.getAttribute('data-jellyemu-checked') === '1') return;
+                        if (_cardIntersectionObserver) {
+                            _cardIntersectionObserver.observe(card);
+                        } else {
+                            _enqueueCardForProcessing(card);
+                        }
+                    }
+
+                    function _enqueueCardForProcessing(card) {
                         _pendingCards.add(card);
                         if (!_cardFlushScheduled) {
                             _cardFlushScheduled = true;
@@ -990,7 +1023,8 @@ namespace JellyEmu.Services
                                                 badgeWrap.appendChild(statusBadge);
                                             }
                                         });
-                                        if (badgeWrap.children.length > 0) imgCtr.appendChild(badgeWrap);
+                                        const cardOverlayFrag = document.createDocumentFragment();
+                                        if (badgeWrap.children.length > 0) cardOverlayFrag.appendChild(badgeWrap);
 
                                         const rating = item.CommunityRating;
                                         const pids = item.ProviderIds || {};
@@ -1005,8 +1039,10 @@ namespace JellyEmu.Services
                                             ratingBadge.innerHTML =
                                                 '<span class="material-icons starIcon star" aria-hidden="true" style="font-size:9px;line-height:1;"></span>' +
                                                 rating.toFixed(1);
-                                            imgCtr.appendChild(ratingBadge);
+                                            cardOverlayFrag.appendChild(ratingBadge);
                                         }
+
+                                        if (cardOverlayFrag.children.length > 0) imgCtr.appendChild(cardOverlayFrag);
 
                                         if (isPlayable(item.Tags)) {
                                             card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(playBtn) {
