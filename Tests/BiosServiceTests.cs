@@ -41,6 +41,8 @@ namespace JellyEmu.Tests
                 var gbaResolved = biosService.ResolveBiosRelativePath("Game Boy Advance", "mgba");
                 Assert.Equal("GBA/gba_bios.bin", gbaResolved);
 
+                Assert.Null(biosService.ResolveBiosRelativePath("Sega Genesis", "genesis_plus_gx"));
+
                 // Test list properties
                 var list = biosService.ListInstalledBios();
                 Assert.Equal(2, list.Count);
