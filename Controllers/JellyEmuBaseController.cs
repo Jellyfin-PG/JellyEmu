@@ -296,6 +296,49 @@ namespace JellyEmu.Controllers
             };
 
         /// <summary>
+        /// Maps ROM file extensions to core identifiers, used when an item carries
+        /// no recognised console tag.
+        /// https://emulatorjs.org/docs4devs/cores
+        /// </summary>
+        protected static readonly Dictionary<string, string> ExtensionCoreMap =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                // NES
+                { "nes", "nestopia" }, { "fds", "nestopia" }, { "unf", "nestopia" }, { "unif", "nestopia" },
+                // SNES
+                { "smc", "snes9x" }, { "sfc", "snes9x" }, { "swc", "snes9x" }, { "fig", "snes9x" },
+                // N64
+                { "z64", "mupen64plus_next" }, { "n64", "mupen64plus_next" }, { "v64", "mupen64plus_next" },
+                // Game Boy / Game Boy Color (both run on gambatte)
+                { "gb", "gambatte" }, { "gbc", "gambatte" },
+                // GBA
+                { "gba", "mgba" },
+                // Nintendo DS
+                { "nds", "desmume" },
+                // Nintendo 3DS
+                { "3ds", "azahar" }, { "cci", "azahar" }, { "cia", "azahar" },
+                // Virtual Boy
+                { "vb", "beetle_vb" },
+                // Sega
+                { "sms", "genesis_plus_gx" },
+                { "gg",  "genesis_plus_gx" },
+                { "md",  "genesis_plus_gx" }, { "smd", "genesis_plus_gx" }, { "gen", "genesis_plus_gx" }, { "68k", "genesis_plus_gx" },
+                { "32x", "picodrive" },
+                // PlayStation
+                { "pbp", "pcsx_rearmed" }, { "cue", "pcsx_rearmed" }, { "chd", "pcsx_rearmed" }, { "bin", "pcsx_rearmed" }, { "img", "pcsx_rearmed" }, { "iso", "pcsx_rearmed" },
+                // PSP
+                { "cso", "ppsspp" },
+                // Atari
+                { "a26", "stella2014" }, { "a78", "prosystem" }, { "lnx", "handy" }, { "jag", "virtualjaguar" }, { "j64", "virtualjaguar" },
+                // Commodore
+                { "d64", "vice_x64" }, { "t64", "vice_x64" }, { "crt", "vice_x64" }, { "prg", "vice_x64" }, { "adf", "puae" },
+                // DOS
+                { "exe", "dosbox_pure" }, { "com", "dosbox_pure" }, { "bat", "dosbox_pure" },
+                // PICO-8
+                { "p8", "pico8" },
+            };
+
+        /// <summary>
         /// Maps Jellyfin console tags to their libretro cheat database folder names.
         /// https://github.com/libretro/libretro-database/tree/master/cht
         /// </summary>
@@ -717,7 +760,8 @@ namespace JellyEmu.Controllers
                 }
             }
 
-            if (!list.Any(c => string.Equals(c.Id, defaultCore, StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrEmpty(defaultCore) &&
+                !list.Any(c => string.Equals(c.Id, defaultCore, StringComparison.OrdinalIgnoreCase)))
             {
                 var updatedList = new List<CoreOption>(list)
                 {
@@ -770,6 +814,12 @@ namespace JellyEmu.Controllers
             return ResolveCoreDefault(item);
         }
 
+        /// <summary>
+        /// Resolves the default core for an item from its console tag, file extension,
+        /// then resolved platform.
+        /// Returns <see cref="string.Empty"/> when the platform cannot be determined —
+        /// callers must treat that as a failure rather than guessing a core.
+        /// </summary>
         protected static string ResolveCoreDefault(MediaBrowser.Controller.Entities.BaseItem item)
         {
             if (item.Tags != null)
@@ -784,45 +834,8 @@ namespace JellyEmu.Controllers
                 if (item.Path.EndsWith(".p8.png", StringComparison.OrdinalIgnoreCase))
                     return "pico8";
 
-                var ext = Path.GetExtension(item.Path).TrimStart('.').ToLowerInvariant();
-                var extMap = new Dictionary<string, string>
-                {
-                    // NES
-                    { "nes", "nestopia" }, { "fds", "nestopia" }, { "unf", "nestopia" }, { "unif", "nestopia" },
-                    // SNES
-                    { "smc", "snes9x" }, { "sfc", "snes9x" }, { "swc", "snes9x" }, { "fig", "snes9x" },
-                    // N64
-                    { "z64", "mupen64plus_next" }, { "n64", "mupen64plus_next" }, { "v64", "mupen64plus_next" },
-                    // Game Boy / GBC
-                    { "gb", "gambatte" }, { "gbc", "gambatte" },
-                    // GBA
-                    { "gba", "mgba" },
-                    // Nintendo DS
-                    { "nds", "desmume" },
-                    // Nintendo 3DS
-                    { "3ds", "azahar" }, { "cci", "azahar" }, { "cia", "azahar" },
-                    // Virtual Boy
-                    { "vb", "beetle_vb" },
-                    // Sega
-                    { "sms", "genesis_plus_gx" },
-                    { "gg",  "genesis_plus_gx" },
-                    { "md",  "genesis_plus_gx" }, { "smd", "genesis_plus_gx" }, { "gen", "genesis_plus_gx" }, { "68k", "genesis_plus_gx" },
-                    { "32x", "picodrive" },
-                    // PlayStation
-                    { "pbp", "pcsx_rearmed" }, { "cue", "pcsx_rearmed" }, { "chd", "pcsx_rearmed" }, { "bin", "pcsx_rearmed" }, { "img", "pcsx_rearmed" }, { "iso", "pcsx_rearmed" },
-                    // PSP
-                    { "cso", "ppsspp" },
-                    // Atari
-                    { "a26", "stella2014" }, { "a78", "prosystem" }, { "lnx", "handy" }, { "jag", "virtualjaguar" }, { "j64", "virtualjaguar" },
-                    // Commodore
-                    { "d64", "vice_x64" }, { "t64", "vice_x64" }, { "crt", "vice_x64" }, { "prg", "vice_x64" }, { "adf", "puae" },
-                    // DOS
-                    { "exe", "dosbox_pure" }, { "com", "dosbox_pure" }, { "bat", "dosbox_pure" },
-                    // PICO-8
-                    { "p8", "pico8" }
-                };
-
-                if (extMap.TryGetValue(ext, out var extCore))
+                var ext = Path.GetExtension(item.Path).TrimStart('.');
+                if (ExtensionCoreMap.TryGetValue(ext, out var extCore))
                     return MapLegacyCore(extCore);
             }
 
@@ -830,7 +843,7 @@ namespace JellyEmu.Controllers
             if (CoreMap.TryGetValue(platformTag, out var fallbackCore))
                 return MapLegacyCore(fallbackCore);
 
-            return "nestopia";
+            return string.Empty;
         }
 
         protected static string ResolveCore(MediaBrowser.Controller.Entities.BaseItem item)

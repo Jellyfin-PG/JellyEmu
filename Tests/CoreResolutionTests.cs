@@ -279,5 +279,83 @@ namespace JellyEmu.Tests
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
+
+        private static void WithController(Action<CoreResolutionTestController> body)
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                body(new CoreResolutionTestController(new MockAppPaths(tempDir)));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Theory]
+        [InlineData("Game Boy", "gambatte")]
+        [InlineData("Game Boy Color", "gambatte")]
+        [InlineData("Game Boy Advance", "mgba")]
+        [InlineData("SNES", "snes9x")]
+        [InlineData("Sega Saturn", "yabause")]
+        [InlineData("Atari 2600", "stella2014")]
+        [InlineData("Atari 7800", "prosystem")]
+        public void ResolveCore_ConsoleTag_ResolvesExpectedCore(string tag, string expected)
+        {
+            WithController(controller =>
+            {
+                var item = new Book { Id = Guid.NewGuid(), Tags = new[] { tag }, Path = "game.bin" };
+
+                Assert.Equal(expected, controller.TestResolveCore(item));
+            });
+        }
+
+        [Theory]
+        [InlineData("Pokemon Crystal (USA).gbc", "gambatte")]
+        [InlineData("Tetris (World).gb", "gambatte")]
+        [InlineData("Super Mario World (USA).sfc", "snes9x")]
+        [InlineData("Sonic the Hedgehog (Japan).md", "genesis_plus_gx")]
+        public void ResolveCore_Extension_ResolvesExpectedCore(string path, string expected)
+        {
+            WithController(controller =>
+            {
+                var item = new Book { Id = Guid.NewGuid(), Path = path };
+
+                Assert.Equal(expected, controller.TestResolveCore(item));
+            });
+        }
+
+        [Fact]
+        public void ResolveCore_GbcTagAndExtension_AgreeOnGambatte()
+        {
+            WithController(controller =>
+            {
+                var tagged = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "Game Boy Color" },
+                    Path = "Pokemon Crystal (USA).gbc"
+                };
+                var untagged = new Book { Id = Guid.NewGuid(), Path = "Pokemon Crystal (USA).gbc" };
+
+                Assert.Equal("gambatte", controller.TestResolveCore(tagged));
+                Assert.Equal("gambatte", controller.TestResolveCore(untagged));
+            });
+        }
+
+        [Theory]
+        [InlineData("mystery.xyz")]
+        [InlineData(null)]
+        public void ResolveCore_Unresolvable_ReturnsEmptyRatherThanGuessing(string? path)
+        {
+            WithController(controller =>
+            {
+                var item = new Book { Id = Guid.NewGuid(), Path = path };
+
+                Assert.Equal(string.Empty, controller.TestResolveCore(item));
+            });
+        }
     }
 }

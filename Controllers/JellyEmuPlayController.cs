@@ -122,6 +122,7 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         public async Task<IActionResult> PlayEjs(string itemId, [FromQuery] string? userId, [FromQuery] int? slot, [FromQuery] string? core,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
@@ -133,6 +134,15 @@ namespace JellyEmu.Controllers
             }
 
             var resolvedCore = ResolveCore(item, userId, core);
+            if (string.IsNullOrEmpty(resolvedCore))
+            {
+                Logger.LogWarning("[JellyEmu] Play: could not resolve a core for {Name} ({ItemId}), path={Path}",
+                    item.Name, itemId, item.Path);
+                return UnprocessableEntity(
+                    $"JellyEmu could not determine which emulator core to use for \"{item.Name}\". " +
+                    "Tag the item with its console name (e.g. \"SNES\") or rename the ROM to use a recognised file extension.");
+            }
+
             var platformTag = ResolvePlatformTag(item);
             var availableCores = GetAvailableCoresForItem(item);
             var availableCoresJson = System.Text.Json.JsonSerializer.Serialize(availableCores.Select(c => new
