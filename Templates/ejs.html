@@ -2238,7 +2238,16 @@
         {{ end }}
 
         {{ if needs_threads }}
-        window.EJS_threads = true;
+        // Threads need SharedArrayBuffer, which is only available on a cross-origin isolated
+        // page, which requires a trustworthy origin (HTTPS or localhost). Over plain HTTP,
+        // the cross-origin headers are ignored, so we'll let EmulatorJS know to use threads
+        // only when SharedArrayBuffer is available.
+        if (typeof SharedArrayBuffer === 'function') {
+            window.EJS_threads = true;
+        } else {
+            console.warn('[JellyEmu] SharedArrayBuffer unavailable, so running single-threaded. ' +
+                'Use HTTPS to enable threading.');
+        }
         {{ else }}
         // EJS_threads not required for this core
         {{ end }}

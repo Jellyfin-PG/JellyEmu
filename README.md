@@ -180,6 +180,12 @@ Restart your Jellyfin server. Both plugins must be active at the same time — F
 2. Click **Restart**
 3. Confirm again by clicking **Restart**
 
+### Step 5 — Serve Jellyfin over HTTPS (Optional)
+
+Threaded emulator cores need `SharedArrayBuffer`, which browsers only expose on a cross-origin isolated page. These requires a trustworthy origin, like over HTTPS, or a `localhost` / `127.0.0.1` URL.
+
+Reaching Jellyfin over plain HTTP on a LAN hostname or IP (for example `http://jellyfin:8096`) is *not* a trustworthy origin, so the browser ignores JellyEmu's isolation headers. Games still load and play, but they run single-threaded, resulting in potential performance issues on more demanding systems like N64 or PSP. Put Jellyfin behind an HTTPS reverse proxy to allow threading.
+
 ---
 
 ## ROM Naming & Folder Structure Guide

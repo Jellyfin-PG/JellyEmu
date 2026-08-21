@@ -32,6 +32,37 @@ namespace JellyEmu.Controllers
             }
             return true;
         }
+        /// <summary>
+        /// Gets whether or not the browser should consider the origin trustworthy.
+        /// HTTPS or localhost are trustworthy in most browsers. This is important
+        /// for determining whether or not to send the
+        /// "Cross-Origin-Opener-Policy" header.
+        /// </summary>
+        protected bool IsTrustworthyOrigin()
+        {
+            if (Request.IsHttps) return true;
+
+            var proto = Request.Headers["X-Forwarded-Proto"].ToString();
+            if (proto.Contains("https", StringComparison.OrdinalIgnoreCase)) return true;
+
+            var host = Request.Host.Host;
+            return host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                || host is "127.0.0.1" or "::1" or "[::1]"
+                || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Applies the cross-origin isolation headers.
+        /// This is skipped on insecure requests to avoid browser security errors.
+        /// </summary>
+        protected void ApplyCrossOriginIsolationHeaders()
+        {
+            if (!IsTrustworthyOrigin()) return;
+
+            Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+            Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+        }
+
         protected readonly ILibraryManager LibraryManager;
         protected readonly IApplicationPaths AppPaths;
         protected readonly ILogger Logger;
