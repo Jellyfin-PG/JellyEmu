@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ game_name }}</title>
     <script src="/jellyemu/threejs/three.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <style>
         * {
             margin: 0;
@@ -740,7 +741,7 @@
 
         .je-gp-status {
             font-size: 12px;
-            opacity: .5;
+            opacity: 1;
             margin-bottom: 12px;
         }
 
@@ -1797,8 +1798,12 @@
                     document.getElementById('je-vol-mute').textContent = isMuted ? 'Unmute' : 'Mute';
 
                     // Force the emulator to match our tracked volume, just to be safe
-                    e.setVolume(_jeCurrentVol);
-                    e.volume = _jeCurrentVol;
+                    try {
+                        if (typeof e.setVolume === 'function') e.setVolume(_jeCurrentVol);
+                        e.volume = _jeCurrentVol;
+                    } catch (err) {
+                        console.warn('[JellyEmu] setVolume caught:', err);
+                    }
                 }
                 openPopup('je-pop-vol');
             });
@@ -1811,8 +1816,12 @@
 
                 var e = emu();
                 if (e) {
-                    e.setVolume(v);
-                    e.volume = v; // Keep EJS property in sync
+                    try {
+                        if (typeof e.setVolume === 'function') e.setVolume(v);
+                        e.volume = v; // Keep EJS property in sync
+                    } catch (err) {
+                        console.warn('[JellyEmu] setVolume caught:', err);
+                    }
 
                     if (v > 0) {
                         document.getElementById('je-vol-mute').textContent = 'Mute';
@@ -1833,8 +1842,12 @@
                     _jeLastVol = _jeCurrentVol; // Save current volume
                     _jeCurrentVol = 0;          // Update session tracker
 
-                    e.setVolume(0);
-                    e.volume = 0;
+                    try {
+                        if (typeof e.setVolume === 'function') e.setVolume(0);
+                        e.volume = 0;
+                    } catch (err) {
+                        console.warn('[JellyEmu] setVolume caught:', err);
+                    }
 
                     slider.value = 0;
                     document.getElementById('je-vol-pct').textContent = '0%';
@@ -1844,8 +1857,12 @@
                     var restoreVol = _jeLastVol > 0 ? _jeLastVol : 1.0;
                     _jeCurrentVol = restoreVol; // Restore session tracker
 
-                    e.setVolume(restoreVol);
-                    e.volume = restoreVol;
+                    try {
+                        if (typeof e.setVolume === 'function') e.setVolume(restoreVol);
+                        e.volume = restoreVol;
+                    } catch (err) {
+                        console.warn('[JellyEmu] setVolume caught:', err);
+                    }
 
                     slider.value = restoreVol;
                     document.getElementById('je-vol-pct').textContent = Math.round(restoreVol * 100) + '%';
