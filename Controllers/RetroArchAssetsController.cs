@@ -261,10 +261,10 @@ namespace JellyEmu.Controllers
         //
         // Buildbot-style browsing of the BIOS directory (jellyemu-bios or the
         // configured BiosPath), for RetroArch's Core System Files Downloader:
-        //   .index-dirs      — subdirectories at this level
-        //   .index           — files at this level
-        //   .index-extended  — files with date + hash
-        //   anything else    — the BIOS file itself
+        //   .index-dirs
+        //   .index
+        //   .index-extended
+        //   BIOS files
         // =========================================================================
         [HttpGet("/jellyemu/system")]
         [HttpHead("/jellyemu/system")]
