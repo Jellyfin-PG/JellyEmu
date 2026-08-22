@@ -180,6 +180,10 @@ Restart your Jellyfin server. Both plugins must be active at the same time — F
 2. Click **Restart**
 3. Confirm again by clicking **Restart**
 
+### Step 5 — Serve Jellyfin over HTTPS (Optional)
+
+Using Jellyfin over HTTPS is strongly recommended for security if accessing it publicly. It is also required to enable multi-threading for demanding 3D systems like N64 and PSP.
+
 ---
 
 ## ROM Naming & Folder Structure Guide

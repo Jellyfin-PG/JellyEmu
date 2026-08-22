@@ -102,8 +102,7 @@ namespace JellyEmu.Controllers
                 cart_url = cartUrl
             });
 
-            Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
-            Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+            ApplyCrossOriginIsolationHeaders();
 
             return Content(html, MediaTypeNames.Text.Html);
         }
@@ -242,8 +241,7 @@ namespace JellyEmu.Controllers
 
             // When opened as a new tab (threaded cores), these headers make the page
             // cross-origin isolated so SharedArrayBuffer is available. Harmless for iframe mode.
-            Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
-            Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+            ApplyCrossOriginIsolationHeaders();
 
             return Content(html, MediaTypeNames.Text.Html);
         }
