@@ -155,6 +155,11 @@ namespace JellyEmu
         public string BiosAssignmentsJson { get; set; } = string.Empty;
 
         /// <summary>
+        /// Centralized Cloudflare Worker URL for Community & Issue Board.
+        /// </summary>
+        public string CommunityWorkerUrl { get; set; } = "https://jellyemu-community.grimmdev.workers.dev";
+
+        /// <summary>
         /// Manual BIOS file assignments per system tag or core name (ignored by XmlSerializer).
         /// </summary>
         [XmlIgnore]
