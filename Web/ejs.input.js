@@ -299,10 +299,17 @@
 
     function _jeFindBindingsForGp(gpStr) {
         var results = [];
-        if (!gpStr) return results;
+        if (gpStr === undefined || gpStr === null || gpStr === '') return results;
+        var str = String(gpStr);
+
         for (var idx in _jeBindings) {
             var b = _jeBindings[idx];
-            if (b.gp1 === gpStr || b.gp2 === gpStr) results.push(parseInt(idx, 10));
+            if (!b) continue;
+            if (b.gp1 === str || b.gp2 === str) {
+                results.push(parseInt(idx, 10));
+            } else if (typeof gpStr === 'number' && (b.gp1 === _jeButtonLabel(gpStr) || b.gp2 === _jeButtonLabel(gpStr))) {
+                results.push(parseInt(idx, 10));
+            }
         }
         return results;
     }
@@ -335,21 +342,12 @@
     }, true);
 
     // - Gamepad hijack -
-    var _prevOnGameStart = window.EJS_onGameStart;
-    window.EJS_onGameStart = function () {
-        console.log('[JellyEmu] EJS_onGameStart fired, hijacking gamepad listeners');
+    window.addEventListener('jellyemu:gamestart', function () {
+        console.log('[JellyEmu] jellyemu:gamestart event received, hijacking gamepad listeners');
 
         window.EJS_defaultControls = {
             0: {}, 1: {}, 2: {}, 3: {}
         };
-
-        if (_prevOnGameStart) {
-            try {
-                _prevOnGameStart();
-            } catch (err) {
-                console.error('[JellyEmu] Error in prevOnGameStart:', err);
-            }
-        }
 
         var ejsButtonDown = null;
         var ejsButtonUp   = null;
@@ -394,9 +392,12 @@
             var registerOn = originalOn || gh.on;
 
             registerOn.call(gh, 'buttondown', function (ev) {
-                var label = ev.label;
+                var label = ev.label || (ev.button !== undefined ? _jeButtonLabel(ev.button) : '');
                 console.log('[JellyEmu Gamepad] buttondown | Label:', label, '| Ev:', ev);
                 var matched = _jeFindBindingsForGp(label);
+                if (matched.length === 0 && ev.button !== undefined) {
+                    matched = _jeFindBindingsForGp(_jeButtonLabel(ev.button));
+                }
                 if (matched.length > 0) {
                     if (!_jeGpActiveState[label]) {
                         _jeGpActiveState[label] = true;
@@ -408,9 +409,12 @@
             });
 
             registerOn.call(gh, 'buttonup', function (ev) {
-                var label = ev.label;
+                var label = ev.label || (ev.button !== undefined ? _jeButtonLabel(ev.button) : '');
                 console.log('[JellyEmu Gamepad] buttonup | Label:', label);
                 var matched = _jeFindBindingsForGp(label);
+                if (matched.length === 0 && ev.button !== undefined) {
+                    matched = _jeFindBindingsForGp(_jeButtonLabel(ev.button));
+                }
                 if (matched.length > 0) {
                     if (_jeGpActiveState[label]) {
                         _jeGpActiveState[label] = false;
@@ -512,7 +516,7 @@
             }
         }
         _jeApplyVirtualControls(100);
-    };
+    });
 
     var _syncTimer = null;
     function _jeSyncBindingsToServer() {
@@ -577,17 +581,140 @@
         });
     }
 
-    function buildGamepadBinds() {
-        var e  = window.EJS_emulator;
-        var gh = e && e.gamepad;
-        var gp = gh && gh.gamepads && gh.gamepads[0];
-        var activeMap = getActiveInputMap();
+    function _jeEscapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
-        document.getElementById('je-gp-status').textContent = gp
-            ? ('Detected: ' + gp.id)
-            : 'No gamepad detected';
+    function parseGamepadDetails(rawGp) {
+        if (!rawGp) return null;
+        var rawId = rawGp.id || 'Standard Gamepad';
+        var vendorId = '';
+        var productId = '';
+
+        var vidMatch = rawId.match(/(?:Vendor|VID)[_:\s]+([0-9a-fA-F]{4})/i) || rawId.match(/\b([0-9a-fA-F]{4})[:\-\/]([0-9a-fA-F]{4})\b/);
+        var pidMatch = rawId.match(/(?:Product|PID)[_:\s]+([0-9a-fA-F]{4})/i);
+
+        if (vidMatch) {
+            vendorId = vidMatch[1];
+            if (!pidMatch && vidMatch[2]) {
+                productId = vidMatch[2];
+            }
+        }
+        if (pidMatch && !productId) {
+            productId = pidMatch[1];
+        }
+
+        var cleanName = rawId
+            .replace(/\(STANDARD GAMEPAD.*?\)/gi, '')
+            .replace(/\(Vendor:.*?\)/gi, '')
+            .replace(/Vendor:.*$/gi, '')
+            .replace(/VID_.*?PID_.*?/gi, '')
+            .replace(/[\(\)]/g, '')
+            .trim();
+
+        var bCount = 0;
+        if (typeof rawGp.buttons === 'number') {
+            bCount = rawGp.buttons;
+        } else if (rawGp.buttons && typeof rawGp.buttons.length === 'number') {
+            bCount = rawGp.buttons.length;
+        } else if (typeof rawGp.numButtons === 'number') {
+            bCount = rawGp.numButtons;
+        }
+
+        var aCount = 0;
+        if (typeof rawGp.axes === 'number') {
+            aCount = rawGp.axes;
+        } else if (rawGp.axes && typeof rawGp.axes.length === 'number') {
+            aCount = rawGp.axes.length;
+        } else if (typeof rawGp.numAxes === 'number') {
+            aCount = rawGp.numAxes;
+        }
+
+        return {
+            rawId: rawId,
+            deviceName: cleanName,
+            vendorId: vendorId ? ('0x' + vendorId.toUpperCase()) : 'N/A',
+            productId: productId ? ('0x' + productId.toUpperCase()) : 'N/A',
+            mapping: rawGp.mapping || 'standard',
+            index: rawGp.index !== undefined ? rawGp.index : 0,
+            buttonsCount: bCount,
+            axesCount: aCount
+        };
+    }
+
+    function updateGamepadStatus() {
+        var gp = null;
+
+        if (navigator.getGamepads) {
+            try {
+                var pads = navigator.getGamepads();
+                if (pads) {
+                    for (var i = 0; i < pads.length; i++) {
+                        if (pads[i] && pads[i].connected !== false) {
+                            gp = pads[i];
+                            break;
+                        }
+                    }
+                }
+            } catch (err) {}
+        }
+
+        if (!gp) {
+            var e  = window.EJS_emulator;
+            var gh = e && e.gamepad;
+            gp = gh && gh.gamepads && gh.gamepads[0];
+        }
+
+        var statusEl = document.getElementById('je-gp-status');
+        var gpIconBlue = '<svg width="20" height="20" viewBox="0 0 24 24" fill="#00E5FF" style="vertical-align:middle;flex-shrink:0;filter:drop-shadow(0 0 4px rgba(0,229,255,0.4));"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H9v2H8v-2H6v-1h2V10h1v2h2v1zm4.5 1c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5S17.67 9 18.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>';
+        var gpIconGrey = '<svg width="20" height="20" viewBox="0 0 24 24" fill="#CBD5E1" style="vertical-align:middle;flex-shrink:0;"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H9v2H8v-2H6v-1h2V10h1v2h2v1zm4.5 1c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5S17.67 9 18.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>';
+
+        if (statusEl) {
+            statusEl.style.opacity = '1';
+            if (gp) {
+                var info = parseGamepadDetails(gp);
+                statusEl.innerHTML =
+                    '<div style="background: linear-gradient(135deg, rgba(0, 164, 220, 0.22) 0%, rgba(0, 119, 182, 0.15) 100%); border: 1px solid rgba(0, 229, 255, 0.45); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; box-shadow: 0 4px 16px rgba(0, 164, 220, 0.15);">' +
+                        '<div style="font-weight: 700; color: #ffffff; font-size: 13.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">' +
+                            gpIconBlue +
+                            '<span>' + _jeEscapeHtml(info.deviceName) + '</span>' +
+                            '<span style="font-size: 10px; background: #10B981; color: #ffffff; padding: 2px 8px; border-radius: 4px; font-weight: 700; letter-spacing: 0.04em; margin-left: auto; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);">CONNECTED</span>' +
+                        '</div>' +
+                        '<div style="font-size: 11.5px; color: #E2E8F0; word-break: break-all; margin-top: 4px;">' +
+                            '<strong style="color: #94A3B8;">Device ID:</strong> ' + _jeEscapeHtml(info.rawId) +
+                        '</div>' +
+                        '<div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: #E2E8F0; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.12);">' +
+                            '<span><strong style="color: #94A3B8;">Vendor (VID):</strong> <code style="background: rgba(0, 229, 255, 0.15); color: #00E5FF; padding: 1px 6px; border-radius: 4px; font-weight: 600; border: 1px solid rgba(0, 229, 255, 0.3);">' + info.vendorId + '</code></span>' +
+                            '<span><strong style="color: #94A3B8;">Product (PID):</strong> <code style="background: rgba(0, 229, 255, 0.15); color: #00E5FF; padding: 1px 6px; border-radius: 4px; font-weight: 600; border: 1px solid rgba(0, 229, 255, 0.3);">' + info.productId + '</code></span>' +
+                            '<span><strong style="color: #94A3B8;">Mapping:</strong> <span style="color: #FFFFFF; font-weight: 600;">' + _jeEscapeHtml(info.mapping) + '</span></span>' +
+                            '<span><strong style="color: #94A3B8;">Index:</strong> <span style="color: #FFFFFF; font-weight: 600;">#' + info.index + '</span></span>' +
+                            '<span><strong style="color: #94A3B8;">Inputs:</strong> <span style="color: #FFFFFF; font-weight: 600;">' + info.buttonsCount + ' buttons, ' + info.axesCount + ' axes</span></span>' +
+                        '</div>' +
+                    '</div>';
+            } else {
+                statusEl.innerHTML =
+                    '<div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 14px; margin-bottom: 14px; color: #F1F5F9; text-align: center; font-size: 12.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 10px;">' +
+                        gpIconGrey +
+                        '<span>No controller detected. Plug in a gamepad or press any button to connect.</span>' +
+                    '</div>';
+            }
+        }
+        return gp;
+    }
+
+    function buildGamepadBinds(forceRebuild) {
+        updateGamepadStatus();
 
         var bindsPanel = document.getElementById('je-gp-binds');
+        if (!bindsPanel) return;
+        if (!forceRebuild && bindsPanel.children.length > 0) return;
+
+        var activeMap = getActiveInputMap();
         bindsPanel.innerHTML =
             '<div class="je-bind-headers">' +
                 '<span>Action</span>' +
@@ -648,38 +775,40 @@
         for (var gi0 = 0; gi0 < pads0.length; gi0++) {
             var p0 = pads0[gi0]; if (!p0) continue;
             baseAxes[p0.index] = [];
-            for (var ai0 = 0; ai0 < p0.axes.length; ai0++) baseAxes[p0.index][ai0] = p0.axes[ai0];
+            for (var ai0 = 0; ai0 < p0.axes.length; ai0++) {
+                baseAxes[p0.index][ai0] = p0.axes[ai0];
+            }
         }
 
         var pollId = setInterval(function () {
             var pads = navigator.getGamepads ? navigator.getGamepads() : [];
             for (var gi = 0; gi < pads.length; gi++) {
-                var pad = pads[gi]; if (!pad) continue;
+                var p = pads[gi]; if (!p) continue;
 
-                // Buttons
-                for (var bi = 0; bi < pad.buttons.length; bi++) {
-                    if (pad.buttons[bi].pressed) {
+                for (var bi = 0; bi < p.buttons.length; bi++) {
+                    var btn = p.buttons[bi];
+                    var pressed = (typeof btn === 'object') ? btn.pressed : (btn === 1.0);
+                    if (pressed) {
                         clearInterval(pollId);
-                        var gpStr = _jeButtonLabel(bi);
+                        var bindStr = _jeButtonLabel(bi);
+                        _jeBindings[idx][field] = bindStr;
                         bk.classList.remove('je-listening');
-                        _jeBindings[idx][field] = gpStr;
-                        bk.textContent = _jeGpName(gpStr);
+                        bk.textContent = _jeGpName(bindStr);
                         _jeSyncBindingsToServer();
                         return;
                     }
                 }
 
-                // Axes
-                for (var ai = 0; ai < pad.axes.length; ai++) {
-                    var gpBase = baseAxes[pad.index];
-                    var base = gpBase && gpBase[ai] !== undefined ? gpBase[ai] : 0;
-                    var val  = pad.axes[ai];
-                    if (Math.abs(val) > 0.5 && Math.abs(val - base) > 0.5) {
+                var origAxes = baseAxes[p.index] || [];
+                for (var ai = 0; ai < p.axes.length; ai++) {
+                    var val = p.axes[ai];
+                    var initVal = origAxes[ai] !== undefined ? origAxes[ai] : 0;
+                    if (Math.abs(val - initVal) > 0.45 && Math.abs(val) > 0.5) {
                         clearInterval(pollId);
-                        var gpStr = _jeAxisLabel(ai, val);
+                        var axisStr = _jeAxisLabel(ai, val);
+                        _jeBindings[idx][field] = axisStr;
                         bk.classList.remove('je-listening');
-                        _jeBindings[idx][field] = gpStr;
-                        bk.textContent = _jeGpName(gpStr);
+                        bk.textContent = _jeGpName(axisStr);
                         _jeSyncBindingsToServer();
                         return;
                     }
@@ -750,7 +879,7 @@
     document.getElementById('je-input-reset').addEventListener('click', function () {
         _jeBindings = JSON.parse(JSON.stringify(_jeDefaultBindings));
         buildKeyboardBinds();
-        buildGamepadBinds();
+        buildGamepadBinds(true);
         _jeSyncBindingsToServer();
 
         var vgOn = document.getElementById('je-vg-toggle');
@@ -771,22 +900,47 @@
     // - Wire up the dock button -
     document.getElementById('je-btn-inputmap').addEventListener('click', function () {
         buildKeyboardBinds();
-        buildGamepadBinds();
+        buildGamepadBinds(true);
         syncVGTogglesLocal();
         openPopup('je-pop-inputmap');
     });
 
+    function _popupOpen() {
+        var pop = document.getElementById('je-pop-inputmap');
+        return pop && (pop.classList.contains('je-popup-active') || pop.style.display !== 'none');
+    }
+
+    var _gpPollInterval = null;
+    function startGpStatusPolling() {
+        stopGpStatusPolling();
+        _gpPollInterval = setInterval(function() {
+            if (_popupOpen()) {
+                updateGamepadStatus();
+            } else {
+                stopGpStatusPolling();
+            }
+        }, 500);
+    }
+
+    function stopGpStatusPolling() {
+        if (_gpPollInterval) {
+            clearInterval(_gpPollInterval);
+            _gpPollInterval = null;
+        }
+    }
+
     // - Gamepad Hotplug events -
     window.addEventListener("gamepadconnected", function () {
-        if (_popupOpen()) buildGamepadBinds();
+        buildGamepadBinds(true);
     });
     window.addEventListener("gamepaddisconnected", function () {
-        if (_popupOpen()) buildGamepadBinds();
+        buildGamepadBinds(true);
     });
 
     // - Input Popup Event Handlers -
     window.addEventListener('jePopupOpened', function (e) {
         if (e.detail && e.detail.id === 'je-pop-inputmap') {
+            startGpStatusPolling();
             var openEvent = (typeof CustomEvent === 'function') ?
                 new CustomEvent('jeInputOpened') :
                 document.createEvent('CustomEvent');
