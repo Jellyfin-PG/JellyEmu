@@ -182,7 +182,7 @@ Restart your Jellyfin server. Both plugins must be active at the same time — F
 
 ### Step 5 — Serve Jellyfin over HTTPS (Optional)
 
-For demanding systems to run smoothly, like N64 or PSP, JellyEmu will need multi-threading, which is only available over HTTPS. This is optional, however, and only to improve performance.
+Using Jellyfin over HTTPS is strongly recommended for security if accessing it publicly. It is also required to enable multi-threading for demanding 3D systems like N64 and PSP.
 
 ---
 
