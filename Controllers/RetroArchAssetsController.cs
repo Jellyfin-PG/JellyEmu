@@ -15,14 +15,14 @@ namespace JellyEmu.Controllers
     /// Exposes the JellyEmu library as a libretro buildbot assets server, so
     /// RetroArch's Online Updater (Content Downloader / Core System Files Downloader)
     /// can browse and download ROMs and BIOS files directly. Point RetroArch's
-    /// "Buildbot Assets URL" at http://your-server:8096/jellyemu/
+    /// "Buildbot Assets URL" at http://your-server:8096/jellyemu/retroarch/
     ///
-    ///   GET /jellyemu/cores/.index-dirs              — one system per line ("NES", "SNES", …)
-    ///   GET /jellyemu/cores/{system}/.index          — one downloadable filename per line
-    ///   GET /jellyemu/cores/{system}/.index-extended — "yyyy-MM-dd hash filename" per line
-    ///   GET /jellyemu/cores/{system}/{filename}      — the ROM itself (multi-file sets as a zip)
-    ///   GET /jellyemu/system/{*path}                 — BIOS folder browsing (.index/.index-dirs/.index-extended) and files
-    ///   GET /jellyemu/frontend/{file}                — 302 to the libretro buildbot's frontend assets
+    ///   GET /jellyemu/retroarch/cores/.index-dirs              — one system per line ("NES", "SNES", …)
+    ///   GET /jellyemu/retroarch/cores/{system}/.index          — one downloadable filename per line
+    ///   GET /jellyemu/retroarch/cores/{system}/.index-extended — "yyyy-MM-dd hash filename" per line
+    ///   GET /jellyemu/retroarch/cores/{system}/{filename}      — the ROM itself (multi-file sets as a zip)
+    ///   GET /jellyemu/retroarch/system/{*path}                 — BIOS folder browsing (.index/.index-dirs/.index-extended) and files
+    ///   GET /jellyemu/retroarch/frontend/{file}                — 302 to the libretro buildbot's frontend assets
     /// </summary>
     public class RetroArchAssetsController : JellyEmuBaseController
     {
@@ -163,10 +163,10 @@ namespace JellyEmu.Controllers
         }
 
         // =========================================================================
-        // GET /jellyemu/cores/.index-dirs
+        // GET /jellyemu/retroarch/cores/.index-dirs
         // =========================================================================
-        [HttpGet("/jellyemu/cores/.index-dirs")]
-        [HttpHead("/jellyemu/cores/.index-dirs")]
+        [HttpGet("/jellyemu/retroarch/cores/.index-dirs")]
+        [HttpHead("/jellyemu/retroarch/cores/.index-dirs")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult CoresIndexDirs()
         {
@@ -175,10 +175,10 @@ namespace JellyEmu.Controllers
         }
 
         // =========================================================================
-        // GET /jellyemu/cores/{system}/.index
+        // GET /jellyemu/retroarch/cores/{system}/.index
         // =========================================================================
-        [HttpGet("/jellyemu/cores/{system}/.index")]
-        [HttpHead("/jellyemu/cores/{system}/.index")]
+        [HttpGet("/jellyemu/retroarch/cores/{system}/.index")]
+        [HttpHead("/jellyemu/retroarch/cores/{system}/.index")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult CoresIndex(string system)
@@ -190,10 +190,10 @@ namespace JellyEmu.Controllers
         }
 
         // =========================================================================
-        // GET /jellyemu/cores/{system}/.index-extended
+        // GET /jellyemu/retroarch/cores/{system}/.index-extended
         // =========================================================================
-        [HttpGet("/jellyemu/cores/{system}/.index-extended")]
-        [HttpHead("/jellyemu/cores/{system}/.index-extended")]
+        [HttpGet("/jellyemu/retroarch/cores/{system}/.index-extended")]
+        [HttpHead("/jellyemu/retroarch/cores/{system}/.index-extended")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult CoresIndexExtended(string system)
@@ -212,13 +212,13 @@ namespace JellyEmu.Controllers
         }
 
         // =========================================================================
-        // GET /jellyemu/cores/{system}/{filename}
+        // GET /jellyemu/retroarch/cores/{system}/{filename}
         //
         // Serves the ROM named in the .index. Multi-file sets stream as a zip,
         // which RetroArch extracts into its downloads directory.
         // =========================================================================
-        [HttpGet("/jellyemu/cores/{system}/{filename}")]
-        [HttpHead("/jellyemu/cores/{system}/{filename}")]
+        [HttpGet("/jellyemu/retroarch/cores/{system}/{filename}")]
+        [HttpHead("/jellyemu/retroarch/cores/{system}/{filename}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CoresFile(string system, string filename)
@@ -257,7 +257,7 @@ namespace JellyEmu.Controllers
         }
 
         // =========================================================================
-        // GET /jellyemu/system/{**path}
+        // GET /jellyemu/retroarch/system/{**path}
         //
         // Buildbot-style browsing of the BIOS directory (jellyemu-bios or the
         // configured BiosPath), for RetroArch's Core System Files Downloader:
@@ -266,10 +266,10 @@ namespace JellyEmu.Controllers
         //   .index-extended
         //   BIOS files
         // =========================================================================
-        [HttpGet("/jellyemu/system")]
-        [HttpHead("/jellyemu/system")]
-        [HttpGet("/jellyemu/system/{**path}")]
-        [HttpHead("/jellyemu/system/{**path}")]
+        [HttpGet("/jellyemu/retroarch/system")]
+        [HttpHead("/jellyemu/retroarch/system")]
+        [HttpGet("/jellyemu/retroarch/system/{**path}")]
+        [HttpHead("/jellyemu/retroarch/system/{**path}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult SystemAssets(string? path = null)
@@ -334,7 +334,7 @@ namespace JellyEmu.Controllers
         }
 
         // =========================================================================
-        // GET /jellyemu/frontend/{file}
+        // GET /jellyemu/retroarch/frontend/{file}
         //
         // RetroArch uses the assets server for frontend assets, so we redirect those
         // requests directly to the official libretro buildbot.
@@ -354,8 +354,8 @@ namespace JellyEmu.Controllers
             "shaders_slang.zip",
         };
 
-        [HttpGet("/jellyemu/frontend/{file}")]
-        [HttpHead("/jellyemu/frontend/{file}")]
+        [HttpGet("/jellyemu/retroarch/frontend/{file}")]
+        [HttpHead("/jellyemu/retroarch/frontend/{file}")]
         [ProducesResponseType(StatusCodes.Status302Found)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult Frontend(string file)
