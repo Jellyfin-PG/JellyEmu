@@ -516,7 +516,7 @@
             }
         }
         _jeApplyVirtualControls(100);
-    };
+    });
 
     var _syncTimer = null;
     function _jeSyncBindingsToServer() {

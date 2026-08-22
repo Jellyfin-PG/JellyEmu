@@ -444,9 +444,8 @@
                             headers: loadHeaders
                         }).catch(function () {});
                     })
-                    .catch(function () {});
             }, 500);
-        };
+        });
 
         // Wire up disc swap UI triggers
         var btnNext = document.getElementById('je-btn-nextdisc');
