@@ -415,11 +415,8 @@
 
     // --- Multi-Disc / Playlist (J3U/M3U) Swapping & Restoration ---
     if (isM3u) {
-        // Hook EJS start event to check and restore Slot 99 SRAM
-        var origOnGameStart = window.EJS_onGameStart;
-        window.EJS_onGameStart = function () {
-            if (origOnGameStart) origOnGameStart();
-
+        // Subscribe to jellyemu:gamestart to check and restore Slot 99 SRAM
+        window.addEventListener('jellyemu:gamestart', function () {
             setTimeout(function () {
                 var loadHeaders = {};
                 if (token) {

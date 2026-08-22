@@ -342,21 +342,12 @@
     }, true);
 
     // - Gamepad hijack -
-    var _prevOnGameStart = window.EJS_onGameStart;
-    window.EJS_onGameStart = function () {
-        console.log('[JellyEmu] EJS_onGameStart fired, hijacking gamepad listeners');
+    window.addEventListener('jellyemu:gamestart', function () {
+        console.log('[JellyEmu] jellyemu:gamestart event received, hijacking gamepad listeners');
 
         window.EJS_defaultControls = {
             0: {}, 1: {}, 2: {}, 3: {}
         };
-
-        if (_prevOnGameStart) {
-            try {
-                _prevOnGameStart();
-            } catch (err) {
-                console.error('[JellyEmu] Error in prevOnGameStart:', err);
-            }
-        }
 
         var ejsButtonDown = null;
         var ejsButtonUp   = null;

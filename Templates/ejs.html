@@ -1389,12 +1389,22 @@
                 dismissLoader();
             };
 
-            // Hook into EJS start event
+            // Centralized EJS Game Start Callback Dispatcher
             window.EJS_onGameStart = function () {
-                // Load percentage observer
+                console.log('[JellyEmu] EJS_onGameStart fired (Centralized Dispatcher)');
+                var event = (typeof CustomEvent === 'function') ?
+                    new CustomEvent('jellyemu:gamestart', { detail: { timestamp: Date.now() } }) :
+                    document.createEvent('CustomEvent');
+                if (typeof CustomEvent !== 'function') {
+                    event.initCustomEvent('jellyemu:gamestart', true, true, { timestamp: Date.now() });
+                }
+                window.dispatchEvent(event);
+            };
+
+            // Subscribe UI dismissal and state loading to jellyemu:gamestart
+            window.addEventListener('jellyemu:gamestart', function () {
                 if (_jeEjsObserver) _jeEjsObserver.disconnect();
-                clearInterval(_jeFindLoader);
-                // Dismiss loading screen
+                if (typeof _jeFindLoader !== 'undefined') clearInterval(_jeFindLoader);
                 dismissLoader();
                 setTimeout(refocusGame, 500);
 
@@ -1413,10 +1423,6 @@
                 }, 500);
                 {{ end }}
 
-                // CRITICAL: EJS checks settingsMenu.style.display !== 'none' in keyChange()
-                // to decide whether to block keyboard input. Our CSS class-based hiding
-                // doesnt set inline style, so EJS thinks settings menu is open and blocks
-                // ALL keyboard input. Force inline style to 'none'.
                 setTimeout(function () {
                     var e = emu();
                     if (e) {
@@ -1424,7 +1430,7 @@
                         if (e.controlMenu) e.controlMenu.style.display = 'none';
                     }
                 }, 200);
-            };
+            });
 
             // Loading Status Observer
             var myStatusEl = document.getElementById('je-loader-status');
@@ -2283,42 +2289,58 @@
 
         {{ if has_saves }}
         var _jellyToken = window._jellyToken || '';
+        var _jellyEmuSessionStarted = false;
+        var _jellyEmuPingInterval = null;
+        var _jellyEmuSessionStart = Date.now();
 
-        // Mark game as played in Jellyfin when the emulator launches
-        fetch('/Users/{{ user_id }}/PlayedItems/{{ item_id }}', {
-            method: 'POST',
-            headers: { 'X-Emby-Authorization': 'MediaBrowser Client="JellyEmu", Device="Browser", DeviceId="jellyemu", Version="1.0", Token="' + _jellyToken + '"' }
-        }).catch(function (err) {
-            console.warn('[JellyEmu] Could not mark item as played:', err);
-        });
+        // Single Session Guarantee: Start session ONLY after game actually boots
+        window.addEventListener('jellyemu:gamestart', function () {
+            if (_jellyEmuSessionStarted) return;
+            _jellyEmuSessionStarted = true;
+            _jellyEmuSessionStart = Date.now();
 
-        // Open a Jellyfin session so the game appears in Dashboard → Active Sessions
-        var _jellyEmuDeviceId = 'jellyemu-' + Math.random().toString(36).slice(2, 10);
-        var startHeaders = {
-            'X-JellyEmu-DeviceId': _jellyEmuDeviceId,
-            'X-JellyEmu-DeviceName': (navigator.userAgent.indexOf('Mobi') !== -1 ? 'JellyEmu Mobile' : 'JellyEmu Browser')
-        };
-        if (typeof _jellyToken !== 'undefined' && _jellyToken) {
-            startHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
-        }
-        fetch('/jellyemu/session/start/{{ item_id }}/{{ user_id }}', {
-            method: 'POST',
-            headers: startHeaders
-        }).catch(function (err) {
-            console.warn('[JellyEmu] Could not open session:', err);
-        });
-
-        // Ping the session every 30 s to keep it alive and advance the elapsed timer
-        var _jellyEmuPingInterval = setInterval(function () {
-            var pingHeaders = {};
-            if (typeof _jellyToken !== 'undefined' && _jellyToken) {
-                pingHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
-            }
-            fetch('/jellyemu/session/ping/{{ item_id }}/{{ user_id }}', {
+            // Mark game as played in Jellyfin when the game starts
+            fetch('/Users/{{ user_id }}/PlayedItems/{{ item_id }}', {
                 method: 'POST',
-                headers: pingHeaders
-            }).catch(function () { });
-        }, 30000);
+                headers: { 'X-Emby-Authorization': 'MediaBrowser Client="JellyEmu", Device="Browser", DeviceId="jellyemu", Version="1.0", Token="' + _jellyToken + '"' }
+            }).catch(function (err) {
+                console.warn('[JellyEmu] Could not mark item as played:', err);
+            });
+
+            // Open a Jellyfin session so the game appears in Dashboard → Active Sessions
+            var _jellyEmuDeviceId = 'jellyemu-' + Math.random().toString(36).slice(2, 10);
+            var startHeaders = {
+                'X-JellyEmu-DeviceId': _jellyEmuDeviceId,
+                'X-JellyEmu-DeviceName': (navigator.userAgent.indexOf('Mobi') !== -1 ? 'JellyEmu Mobile' : 'JellyEmu Browser')
+            };
+            if (typeof _jellyToken !== 'undefined' && _jellyToken) {
+                startHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
+            }
+            fetch('/jellyemu/session/start/{{ item_id }}/{{ user_id }}', {
+                method: 'POST',
+                headers: startHeaders
+            }).catch(function (err) {
+                console.warn('[JellyEmu] Could not open session:', err);
+            });
+
+            // Ping the session every 30 s to keep it alive and advance the elapsed timer
+            _jellyEmuPingInterval = setInterval(function () {
+                var pingHeaders = {};
+                if (typeof _jellyToken !== 'undefined' && _jellyToken) {
+                    pingHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
+                }
+                fetch('/jellyemu/session/ping/{{ item_id }}/{{ user_id }}', {
+                    method: 'POST',
+                    headers: pingHeaders
+                }).catch(function () { });
+            }, 30000);
+
+            try {
+                window.dispatchEvent(new CustomEvent('jellyemu:session:start', {
+                    detail: { itemId: '{{ item_id }}', userId: '{{ user_id }}', deviceId: _jellyEmuDeviceId }
+                }));
+            } catch (_) {}
+        });
 
         // Record session start time for playtime tracking
         var _jellyEmuSessionStart = Date.now();
