@@ -246,10 +246,13 @@ namespace JellyEmu.Controllers
             var targetName = !string.IsNullOrWhiteSpace(filename) ? filename : name;
             if (string.IsNullOrWhiteSpace(targetName)) return NotFound();
 
-            var biosRoot = Path.GetFullPath(_biosService.GetBiosDirectory());
+            var biosRoot = Path.GetFullPath(_biosService.GetBiosDirectory())
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var fullPath = Path.GetFullPath(Path.Combine(biosRoot, targetName.Replace('/', Path.DirectorySeparatorChar)));
 
-            if (!fullPath.StartsWith(biosRoot, StringComparison.OrdinalIgnoreCase))
+            // Comparing against root + separator stops both "../" traversal and sibling
+            // directories that merely share the root as a name prefix.
+            if (!fullPath.StartsWith(biosRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             {
                 Logger.LogWarning("[JellyEmu] Security attempt to access file outside BIOS folder: {Name}", targetName);
                 return NotFound();

@@ -36,6 +36,52 @@
             </div>
             <p class="je-api-desc">Returns a JSON summary of all detected systems, total game counts, and playlist configuration details.</p>
         </div>
+
+        <p style="color: #aaa; margin: 1.5em 0 1.5em; font-size: 0.92em; line-height: 1.4;">
+            JellyEmu can act as a buildbot assets server for RetroArch's <strong>Online Updater</strong>. Set
+            <em>Settings &rarr; Network &rarr; Updater &rarr; Buildbot Assets URL</em> to
+            <code id="raAssetsBaseUrl">/jellyemu/retroarch/</code>. The <em>Content Downloader</em> and <em>Core System Files Downloader</em> now references JellyEmu content.
+        </p>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raCoresIndexDirsUrl">/jellyemu/retroarch/cores/.index-dirs</span>
+            </div>
+            <p class="je-api-desc">Lists the available systems, one per line, in the libretro buildbot index format.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raCoresIndexUrl">/jellyemu/retroarch/cores/{system}/.index</span>
+            </div>
+            <p class="je-api-desc">Lists the downloadable files for a system. <code>.index-extended</code> is also available, adding the modified date and hash per line.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raCoresFileUrl">/jellyemu/retroarch/cores/{system}/{filename}</span>
+            </div>
+            <p class="je-api-desc">Downloads a ROM named in the <code>.index</code>.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raSystemIndexUrl">/jellyemu/retroarch/system/{path}</span>
+            </div>
+            <p class="je-api-desc">Browses the JellyEmu BIOS folder in the same format: <code>.index-dirs</code>, <code>.index</code>, and <code>.index-extended</code> work at any depth, and any other path downloads the BIOS file.</p>
+        </div>
+
+        <div class="je-api-item">
+            <div class="je-api-header">
+                <span class="je-api-method get">GET</span>
+                <span class="je-api-path" id="raFrontendUrl">/jellyemu/retroarch/frontend/{file}</span>
+            </div>
+            <p class="je-api-desc">Redirects known frontend asset names to the official libretro buildbot so other Online Updater features continue working.</p>
+        </div>
     </div>
 
     <div class="verticalSection" style="margin-top: 2.5em;">
