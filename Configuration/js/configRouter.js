@@ -149,6 +149,12 @@
         set('raLaunchUrl', base + '/jellyemu/retroarch/launch/{itemId}');
         set('raInfoUrl', base + '/jellyemu/retroarch/info');
         set('raRomUrl', base + '/jellyemu/rom/{itemId}');
+        set('raAssetsBaseUrl', base + '/jellyemu/');
+        set('raCoresIndexDirsUrl', base + '/jellyemu/cores/.index-dirs');
+        set('raCoresIndexUrl', base + '/jellyemu/cores/{system}/.index');
+        set('raCoresFileUrl', base + '/jellyemu/cores/{system}/{filename}');
+        set('raSystemIndexUrl', base + '/jellyemu/system/{path}');
+        set('raFrontendUrl', base + '/jellyemu/frontend/{file}');
     }
 
     function loadRomCount(page) {
