@@ -43,11 +43,13 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/pico8/runtime.js
         /// </summary>
         [HttpGet("/jellyemu/pico8/runtime.js")]
+        [Produces("application/javascript")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status502BadGateway)]
         public async Task<IActionResult> Pico8Runtime()
         {
-            const string contentType = "application/javascript";
+            const string contentType = "application/javascript; charset=utf-8";
+            Response.ContentType = contentType;
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
             if (_pico8Manager.IsReady)
@@ -92,11 +94,13 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/threejs/three.min.js
         /// </summary>
         [HttpGet("/jellyemu/threejs/three.min.js")]
+        [Produces("application/javascript")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status502BadGateway)]
         public async Task<IActionResult> ThreeJs()
         {
-            const string contentType = "application/javascript";
+            const string contentType = "application/javascript; charset=utf-8";
+            Response.ContentType = contentType;
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
             if (_threeJsManager.IsReady)
@@ -151,10 +155,10 @@ namespace JellyEmu.Controllers
 
             var contentType = path switch
             {
-                var p when p.EndsWith(".mjs",  StringComparison.OrdinalIgnoreCase) => "application/javascript",
-                var p when p.EndsWith(".cjs",  StringComparison.OrdinalIgnoreCase) => "application/javascript",
-                var p when p.EndsWith(".jsx",  StringComparison.OrdinalIgnoreCase) => "text/javascript",
-                var p when p.EndsWith(".js",   StringComparison.OrdinalIgnoreCase) => "application/javascript",
+                var p when p.EndsWith(".mjs",  StringComparison.OrdinalIgnoreCase) => "application/javascript; charset=utf-8",
+                var p when p.EndsWith(".cjs",  StringComparison.OrdinalIgnoreCase) => "application/javascript; charset=utf-8",
+                var p when p.EndsWith(".jsx",  StringComparison.OrdinalIgnoreCase) => "text/javascript; charset=utf-8",
+                var p when p.EndsWith(".js",   StringComparison.OrdinalIgnoreCase) => "application/javascript; charset=utf-8",
                 var p when p.EndsWith(".wasm", StringComparison.OrdinalIgnoreCase) => "application/wasm",
                 var p when p.EndsWith(".css",  StringComparison.OrdinalIgnoreCase) => "text/css",
                 var p when p.EndsWith(".json", StringComparison.OrdinalIgnoreCase) => "application/json",
@@ -166,6 +170,7 @@ namespace JellyEmu.Controllers
                 _ => "application/octet-stream"
             };
 
+            Response.ContentType = contentType;
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
             if (path.Equals("cores/azahar-thread-legacy-wasm.data", StringComparison.OrdinalIgnoreCase) ||

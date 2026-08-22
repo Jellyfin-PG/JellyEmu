@@ -29,6 +29,7 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/assets/ejs.input.js
         /// </summary>
         [HttpGet("/jellyemu/assets/ejs.input.js")]
+        [Produces("application/javascript")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult InputJs()
@@ -37,10 +38,11 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Serves the input mapping embedded JS resource.
+        /// Serves the XR embedded JS resource.
         /// Path: GET /jellyemu/assets/ejs.xr.js
         /// </summary>
         [HttpGet("/jellyemu/assets/ejs.xr.js")]
+        [Produces("application/javascript")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult XrJs()
@@ -49,10 +51,11 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Serves the input mapping embedded JS resource.
-        /// Path: GET /jellyemu/assets/ejs.xr.js
+        /// Serves the save embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.save.js
         /// </summary>
         [HttpGet("/jellyemu/assets/ejs.save.js")]
+        [Produces("application/javascript")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult SaveJs()
@@ -61,12 +64,41 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the stylesheet embedded CSS resource.
+        /// Path: GET /jellyemu/assets/ejs.style.css
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.style.css")]
+        [Produces("text/css")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult StyleCss()
+        {
+            const string contentType = "text/css; charset=utf-8";
+            Response.ContentType = contentType;
+
+            var assembly = typeof(JellyEmuResourceController).Assembly;
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("ejs.style.css", StringComparison.OrdinalIgnoreCase));
+
+            if (resourceName == null)
+            {
+                Logger.LogError("[JellyEmu] Embedded stylesheet ejs.style.css not found.");
+                return NotFound();
+            }
+
+            var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null) return NotFound();
+
+            return File(stream, contentType);
+        }
+
+        /// <summary>
         /// Shared helper: finds and streams an embedded .js resource by filename.
         /// </summary>
         private IActionResult ServeEmbeddedJs(string filename)
         {
-            const string contentType = "application/javascript";
-            //Response.Headers["Cache-Control"] = "public, max-age=3600";
+            const string contentType = "application/javascript; charset=utf-8";
+            Response.ContentType = contentType;
 
             var assembly = typeof(JellyEmuResourceController).Assembly;
             var resourceName = assembly.GetManifestResourceNames()
