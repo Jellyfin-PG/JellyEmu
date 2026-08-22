@@ -336,10 +336,8 @@ namespace JellyEmu.Controllers
         // =========================================================================
         // GET /jellyemu/frontend/{file}
         //
-        // RetroArch also fetches frontend assets (assets.zip, overlays.zip, …) from
-        // its buildbot assets URL. JellyEmu doesn't host those, so redirect the
-        // known asset names to the real libretro buildbot to keep the rest of the
-        // Online Updater working while pointed at JellyEmu.
+        // RetroArch uses the assets server for frontend assets, so we redirect those
+        // requests directly to the official libretro buildbot.
         // =========================================================================
         private static readonly HashSet<string> FrontendAssets = new(StringComparer.OrdinalIgnoreCase)
         {
