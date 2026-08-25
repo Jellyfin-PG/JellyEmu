@@ -1,0 +1,34 @@
+#jellyemu-play-btn,
+#jellyemu-vantage-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,0.15) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-right: .5em !important;
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease !important;
+    transform: scale(1);
+}
+#jellyemu-play-btn:hover,
+#jellyemu-vantage-btn:hover {
+    transform: scale(1.18) !important;
+    background: rgba(255,255,255,0.25) !important;
+    color: #00a4dc !important;
+}
+#jellyemu-play-btn .detailButton-content,
+#jellyemu-vantage-btn .detailButton-content {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.jellyemu-game-page button[data-action="resume"],
+.jellyemu-game-page button[data-action="play"],
+.jellyemu-game-page .btnPlay {
+    display: none !important;
+}

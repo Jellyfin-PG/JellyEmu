@@ -1,0 +1,32 @@
+.jellyemu-card-play {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 50% !important;
+    background: rgba(0,0,0,0.55) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background-image: none !important;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+    transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease !important;
+}
+.jellyemu-card-play .material-icons {
+    font-size: 28px !important;
+}
+.card:hover .jellyemu-card-play,
+.card:focus-within .jellyemu-card-play {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+.card:hover .jellyemu-card-play:hover {
+    transform: translate(-50%, -50%) scale(1.15);
+    color: #00a4dc !important;
+}

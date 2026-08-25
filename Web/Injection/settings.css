@@ -1,0 +1,71 @@
+.je-settings-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    color: #fff;
+}
+.je-settings-section {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+.je-settings-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.je-settings-field {
+    margin-bottom: 20px;
+}
+.je-settings-label {
+    display: block;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 8px;
+}
+.je-settings-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.je-settings-input:focus {
+    border-color: #00a4dc;
+}
+.je-settings-btn-save {
+    background: #00a4dc;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+}
+.je-settings-btn-save:hover {
+    background: #00b4ec;
+}
+.je-settings-btn-save:disabled {
+    background: rgba(255,255,255,0.1);
+    cursor: not-allowed;
+}
+.je-settings-footer {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    margin-top: 16px;
+}
