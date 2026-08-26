@@ -10,9 +10,9 @@
     <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
     <RootNamespace>JellyEmu</RootNamespace>
-    <Version>0.8.7.0</Version>
-    <AssemblyVersion>0.8.7.0</AssemblyVersion>
-    <FileVersion>0.8.7.0</FileVersion>
+    <Version>0.8.8.0</Version>
+    <AssemblyVersion>0.8.8.0</AssemblyVersion>
+    <FileVersion>0.8.8.0</FileVersion>
     <Authors>Jellyfin-PG</Authors>
     <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -45,7 +45,10 @@
     <EmbeddedResource Include="Web/ejs.input.js" />
     <EmbeddedResource Include="Web/ejs.xr.js" />
     <EmbeddedResource Include="Web/ejs.save.js" />
+    <EmbeddedResource Include="Web/ejs.setting.js" />
     <EmbeddedResource Include="Web/ejs.style.css" />
+    <!-- Frontend Injection Modules -->
+    <EmbeddedResource Include="Web/Injection/*" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">

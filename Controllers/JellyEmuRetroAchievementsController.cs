@@ -37,10 +37,10 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/retroachievements/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public IActionResult GetCredentials(string userId)
+        public async Task<IActionResult> GetCredentials(string userId)
         {
             if (!VerifyUser(userId)) return Forbid();
-            var prefs = ReadFullPrefs(userId);
+            var prefs = await PreferenceService.GetEffectivePreferencesAsync(userId);
             return Ok(new
             {
                 userId,
@@ -61,32 +61,22 @@ namespace JellyEmu.Controllers
         public async Task<IActionResult> PostCredentials(string userId)
         {
             if (!VerifyUser(userId)) return Forbid();
-            var current = ReadFullPrefs(userId);
             try
             {
                 var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync();
                 using var doc = System.Text.Json.JsonDocument.Parse(body);
                 var r = doc.RootElement;
 
+                var current = await PreferenceService.GetEffectivePreferencesAsync(userId);
                 var newUsername = r.TryGetProperty("raUsername", out var u) ? (u.GetString() ?? current.RaUsername) : current.RaUsername;
                 var newApiKey = r.TryGetProperty("raApiKey", out var k) ? (k.GetString() ?? current.RaApiKey) : current.RaApiKey;
 
-                var updated = new UserFullPrefs(
-                    Scale: current.Scale,
-                    Mute: current.Mute,
-                    Controller: current.Controller,
-                    Haptics: current.Haptics,
-                    Autosave: current.Autosave,
-                    Shader: current.Shader,
-                    VideoRotation: current.VideoRotation,
-                    Controls: current.Controls,
-                    ControllerControls: current.ControllerControls,
-                    RaUsername: newUsername,
-                    RaApiKey: newApiKey,
-                    VirtualGamepad: current.VirtualGamepad,
-                    VirtualGamepadLefty: current.VirtualGamepadLefty);
+                await PreferenceService.SetPreferencesAsync(userId, "global", "", new Dictionary<string, string?>
+                {
+                    ["raUsername"] = newUsername,
+                    ["raApiKey"] = newApiKey
+                });
 
-                WriteFullPrefs(userId, updated);
                 return Ok(new { success = true, raUsername = newUsername });
             }
             catch (Exception ex)
@@ -141,7 +131,7 @@ namespace JellyEmu.Controllers
                 return NotFound(new { error = "Game does not support RetroAchievements." });
             }
 
-            var prefs = ReadFullPrefs(userId);
+            var prefs = await PreferenceService.GetEffectivePreferencesAsync(userId);
 
             if (string.IsNullOrEmpty(prefs.RaUsername) || string.IsNullOrEmpty(prefs.RaApiKey))
             {

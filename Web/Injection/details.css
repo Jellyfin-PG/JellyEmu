@@ -1,0 +1,24 @@
+/* Detail Page Styles & Pills */
+.jellyemu-info-wrap {
+    display: contents;
+}
+.jellyemu-misc-item {
+    display: inline-flex;
+    align-items: center;
+}
+.jellyemu-ttb-pill,
+.jellyemu-slot-pill,
+.jellyemu-playtime-pill,
+.jellyemu-romm-sync-pill,
+.jellyemu-platform-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+}
+.jellyemu-ra-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}

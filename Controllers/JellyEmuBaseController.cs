@@ -70,6 +70,11 @@ namespace JellyEmu.Controllers
         protected readonly JellyEmuSessionService SessionService;
         protected readonly IHttpClientFactory HttpClientFactory;
 
+        private JellyEmuPreferenceService? _preferenceService;
+        protected JellyEmuPreferenceService PreferenceService => _preferenceService ??= 
+            HttpContext?.RequestServices?.GetService(typeof(JellyEmuPreferenceService)) as JellyEmuPreferenceService 
+            ?? new JellyEmuPreferenceService(AppPaths, null!);
+
         public record CoreInfo(string Core, bool NeedsThreads, string Launcher);
 
         protected JellyEmuBaseController(
@@ -424,25 +429,11 @@ namespace JellyEmu.Controllers
             return Path.Combine(dir, $"{itemId}.screenshot.json");
         }
 
-        protected string GetSlotFilePath(string userId)
-        {
-            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "active-slot.json");
-        }
-
         protected string GetPlaytimePath(string userId)
         {
             var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
             Directory.CreateDirectory(dir);
             return Path.Combine(dir, "playtime.json");
-        }
-
-        protected string GetPrefsFilePath(string userId)
-        {
-            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "prefs.json");
         }
 
         private static bool _dbInitialized = false;
@@ -601,86 +592,7 @@ namespace JellyEmu.Controllers
             }
         }
 
-        protected UserPrefs ReadUserPrefs(string userId)
-        {
-            var path = GetSlotFilePath(userId);
-            if (!System.IO.File.Exists(path)) return new UserPrefs(1, string.Empty, 0);
-            try
-            {
-                var json = System.IO.File.ReadAllText(path);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                var root = doc.RootElement;
-                var slot   = root.TryGetProperty("slot",          out var s)  ? Math.Max(1, s.GetInt32())    : 1;
-                var shader = root.TryGetProperty("shader",         out var sh) ? (sh.GetString() ?? string.Empty) : string.Empty;
-                var rot    = root.TryGetProperty("videoRotation",  out var r)  ? r.GetInt32()                 : 0;
-                return new UserPrefs(slot, shader, rot);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "[JellyEmu] Slot prefs file corrupt for user {UserId}. Returning defaults.", userId);
-                return new UserPrefs(1, string.Empty, 0);
-            }
-        }
 
-        protected UserFullPrefs ReadFullPrefs(string userId)
-        {
-            var path = GetPrefsFilePath(userId);
-            if (!System.IO.File.Exists(path)) return DefaultFullPrefs;
-            try
-            {
-                var json = System.IO.File.ReadAllText(path);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                var r = doc.RootElement;
-                string Str(string key, string def) =>
-                    r.TryGetProperty(key, out var v) ? (v.GetString() ?? def) : def;
-                int Int(string key, int def) =>
-                    r.TryGetProperty(key, out var v) ? v.GetInt32() : def;
-                 return new UserFullPrefs(
-                    Scale:              Str("scale",              DefaultFullPrefs.Scale),
-                    Mute:               Str("mute",               DefaultFullPrefs.Mute),
-                    Controller:         Str("controller",         DefaultFullPrefs.Controller),
-                    Haptics:            Str("haptics",            DefaultFullPrefs.Haptics),
-                    Autosave:           Str("autosave",           DefaultFullPrefs.Autosave),
-                    Shader:             Str("shader",             DefaultFullPrefs.Shader),
-                    VideoRotation:      Int("videoRotation",      DefaultFullPrefs.VideoRotation),
-                    Controls:           Str("controls",           DefaultFullPrefs.Controls),
-                    ControllerControls: Str("controllerControls", DefaultFullPrefs.ControllerControls),
-                    RaUsername:         Str("raUsername",         DefaultFullPrefs.RaUsername),
-                    RaApiKey:           Str("raApiKey",           DefaultFullPrefs.RaApiKey),
-                    VirtualGamepad:     Str("virtualGamepad",     DefaultFullPrefs.VirtualGamepad),
-                    VirtualGamepadLefty:Str("virtualGamepadLefty",DefaultFullPrefs.VirtualGamepadLefty),
-                    PlatformCores:      Str("platformCores",      DefaultFullPrefs.PlatformCores),
-                    GameCores:          Str("gameCores",          DefaultFullPrefs.GameCores));
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "[JellyEmu] Prefs file corrupt for user {UserId}. Returning defaults.", userId);
-                return DefaultFullPrefs;
-            }
-        }
- 
-        protected void WriteFullPrefs(string userId, UserFullPrefs prefs)
-        {
-            var path = GetPrefsFilePath(userId);
-            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new
-            {
-                scale              = prefs.Scale,
-                mute               = prefs.Mute,
-                controller         = prefs.Controller,
-                haptics            = prefs.Haptics,
-                autosave           = prefs.Autosave,
-                shader             = prefs.Shader,
-                videoRotation      = prefs.VideoRotation,
-                controls           = prefs.Controls,
-                controllerControls = prefs.ControllerControls,
-                raUsername         = prefs.RaUsername,
-                raApiKey           = prefs.RaApiKey,
-                virtualGamepad     = prefs.VirtualGamepad,
-                virtualGamepadLefty= prefs.VirtualGamepadLefty,
-                platformCores      = prefs.PlatformCores,
-                gameCores          = prefs.GameCores
-            }));
-        }
 
         protected static bool IsThreadedCore(string core)
         {
@@ -826,17 +738,10 @@ namespace JellyEmu.Controllers
 
             if (!string.IsNullOrWhiteSpace(userId))
             {
-                var prefs = ReadFullPrefs(userId);
-                var itemIdStr = item.Id.ToString("N");
-
-                var gameCores = ParseCoreDictionary(prefs.GameCores);
-                if (gameCores.TryGetValue(itemIdStr, out var gameCore) && !string.IsNullOrWhiteSpace(gameCore))
-                    return MapLegacyCore(gameCore);
-
                 var platformTag = ResolvePlatformTag(item);
-                var platformCores = ParseCoreDictionary(prefs.PlatformCores);
-                if (platformCores.TryGetValue(platformTag, out var platformCore) && !string.IsNullOrWhiteSpace(platformCore))
-                    return MapLegacyCore(platformCore);
+                var prefs = PreferenceService.GetEffectivePreferencesAsync(userId, platformTag).GetAwaiter().GetResult();
+                if (!string.IsNullOrWhiteSpace(prefs.Core))
+                    return MapLegacyCore(prefs.Core);
             }
 
             return ResolveCoreDefault(item);

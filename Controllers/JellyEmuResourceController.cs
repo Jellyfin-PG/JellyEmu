@@ -1,3 +1,8 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
@@ -13,6 +18,27 @@ namespace JellyEmu.Controllers
     /// </summary>
     public class JellyEmuResourceController : JellyEmuBaseController
     {
+        private static readonly string[] InjectionJsModules =
+        {
+            "core.js",
+            "cards.js",
+            "details.js",
+            "settings.js",
+            "saves.js"
+        };
+
+        private static readonly string[] InjectionCssModules =
+        {
+            "core.css",
+            "cards.css",
+            "details.css",
+            "settings.css",
+            "saves.css"
+        };
+
+        private static byte[]? _cachedJsBundle;
+        private static byte[]? _cachedCssBundle;
+
         public JellyEmuResourceController(
             ILibraryManager libraryManager,
             IApplicationPaths appPaths,
@@ -64,6 +90,19 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the settings embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.setting.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.setting.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult SettingJs()
+        {
+            return ServeEmbeddedJs("ejs.setting.js");
+        }
+
+        /// <summary>
         /// Serves the stylesheet embedded CSS resource.
         /// Path: GET /jellyemu/assets/ejs.style.css
         /// </summary>
@@ -93,21 +132,115 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the combined injection CSS bundle generated in-memory from distinct module files.
+        /// Path: GET /jellyemu/assets/injection/bundle.css
+        /// </summary>
+        [HttpGet("/jellyemu/assets/injection/bundle.css")]
+        [Produces("text/css")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult InjectionBundleCss()
+        {
+            return CombineAndServe("Web.Injection.", InjectionCssModules, "text/css; charset=utf-8", ref _cachedCssBundle);
+        }
+
+        /// <summary>
+        /// Serves the combined injection JS bundle generated in-memory from distinct module files.
+        /// Path: GET /jellyemu/assets/injection/bundle.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/injection/bundle.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult InjectionBundleJs()
+        {
+            return CombineAndServe("Web.Injection.", InjectionJsModules, "application/javascript; charset=utf-8", ref _cachedJsBundle);
+        }
+
+        /// <summary>
+        /// Serves individual embedded injection assets (e.g. core.js, cards.js, saves.css, etc.)
+        /// Path: GET /jellyemu/assets/injection/{filename}
+        /// </summary>
+        [HttpGet("/jellyemu/assets/injection/{filename}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult InjectionAsset(string filename)
+        {
+            if (string.IsNullOrWhiteSpace(filename) || filename.Contains(".."))
+            {
+                return NotFound();
+            }
+
+            string contentType = filename.EndsWith(".css", StringComparison.OrdinalIgnoreCase)
+                ? "text/css; charset=utf-8"
+                : "application/javascript; charset=utf-8";
+
+            return ServeEmbeddedFile($"Web.Injection.{filename}", contentType);
+        }
+
+        /// <summary>
+        /// Helper to dynamically combine embedded files into a single in-memory bundle.
+        /// </summary>
+        private IActionResult CombineAndServe(string prefix, string[] modules, string contentType, ref byte[]? cache)
+        {
+            var assembly = typeof(JellyEmuResourceController).Assembly;
+            var allNames = assembly.GetManifestResourceNames();
+
+            using var ms = new MemoryStream();
+            foreach (var file in modules)
+            {
+                var targetSuffix = prefix + file;
+                var resourceName = allNames.FirstOrDefault(n => n.EndsWith(targetSuffix, StringComparison.OrdinalIgnoreCase));
+                if (resourceName != null)
+                {
+                    using var stream = assembly.GetManifestResourceStream(resourceName);
+                    if (stream != null)
+                    {
+                        stream.CopyTo(ms);
+                        ms.Write(Encoding.UTF8.GetBytes("\n"));
+                    }
+                }
+                else
+                {
+                    Logger.LogWarning("[JellyEmu] Embedded bundle module {Module} not found.", file);
+                }
+            }
+
+            if (ms.Length == 0)
+            {
+                return NotFound();
+            }
+
+            cache = ms.ToArray();
+            Response.ContentType = contentType;
+            Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
+            return File(cache, contentType);
+        }
+
+        /// <summary>
         /// Shared helper: finds and streams an embedded .js resource by filename.
         /// </summary>
         private IActionResult ServeEmbeddedJs(string filename)
         {
-            const string contentType = "application/javascript; charset=utf-8";
+            return ServeEmbeddedFile(filename, "application/javascript; charset=utf-8");
+        }
+
+        /// <summary>
+        /// Shared helper: finds and streams an embedded resource with proper caching headers.
+        /// </summary>
+        private IActionResult ServeEmbeddedFile(string resourceSuffix, string contentType)
+        {
             Response.ContentType = contentType;
+            Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
 
             var assembly = typeof(JellyEmuResourceController).Assembly;
             var resourceName = assembly.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith(filename, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(n => n.EndsWith(resourceSuffix, StringComparison.OrdinalIgnoreCase));
 
             if (resourceName == null)
             {
-                Logger.LogError("[JellyEmu] Embedded resource {Filename} not found. Available: {All}",
-                    filename,
+                Logger.LogError("[JellyEmu] Embedded resource {Suffix} not found. Available: {All}",
+                    resourceSuffix,
                     string.Join(", ", assembly.GetManifestResourceNames()));
                 return NotFound();
             }

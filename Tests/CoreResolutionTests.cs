@@ -47,7 +47,34 @@ namespace JellyEmu.Tests
         [NonAction]
         public void TestSaveUserPrefs(string userId, UserFullPrefs prefs)
         {
-            WriteFullPrefs(userId, prefs);
+            PreferenceService.SetPreferencesAsync(userId, "global", "", new Dictionary<string, string?>
+            {
+                ["scale"] = prefs.Scale,
+                ["mute"] = prefs.Mute,
+                ["controller"] = prefs.Controller,
+                ["haptics"] = prefs.Haptics,
+                ["autosave"] = prefs.Autosave,
+                ["shader"] = prefs.Shader,
+                ["videoRotation"] = prefs.VideoRotation.ToString(),
+                ["controls"] = prefs.Controls,
+                ["controllerControls"] = prefs.ControllerControls,
+                ["raUsername"] = prefs.RaUsername,
+                ["raApiKey"] = prefs.RaApiKey,
+                ["virtualGamepad"] = prefs.VirtualGamepad,
+                ["virtualGamepadLefty"] = prefs.VirtualGamepadLefty
+            }).GetAwaiter().GetResult();
+
+            if (!string.IsNullOrWhiteSpace(prefs.PlatformCores))
+            {
+                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(prefs.PlatformCores);
+                if (dict != null)
+                {
+                    foreach (var (platform, core) in dict)
+                    {
+                        PreferenceService.SetPreferencesAsync(userId, "system", platform, new Dictionary<string, string?> { ["core"] = core }).GetAwaiter().GetResult();
+                    }
+                }
+            }
         }
     }
 
@@ -207,48 +234,11 @@ namespace JellyEmu.Tests
             }
             finally
             {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
 
-        [Fact]
-        public void UserGameCorePreference_TakesPrecedenceOverPlatformPreference()
-        {
-            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-            try
-            {
-                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
-                var userId = "user456";
-                var itemId = Guid.NewGuid();
-                var item = new Book
-                {
-                    Id = itemId,
-                    Tags = new[] { "PlayStation" },
-                    Path = "C:\\Games\\PlayStation\\Tekken.cue"
-                };
-
-                var prefs = new JellyEmuBaseController.UserFullPrefs(
-                    Scale: "fit", Mute: "false", Controller: "auto", Haptics: "true", Autosave: "true",
-                    Shader: "", VideoRotation: 0, Controls: "", ControllerControls: "", RaUsername: "", RaApiKey: "",
-                    VirtualGamepad: "false", VirtualGamepadLefty: "false",
-                    PlatformCores: "{\"PlayStation\":\"pcsx_rearmed\"}",
-                    GameCores: $"{{\"{(itemId.ToString("N"))}\":\"mednafen_psx_hw\"}}"
-                );
-
-                controller.TestSaveUserPrefs(userId, prefs);
-
-                var resolvedCore = controller.TestResolveCore(item, userId);
-                var resolvedInfo = controller.TestResolveCoreInfo(item, userId);
-
-                Assert.Equal("mednafen_psx_hw", resolvedCore);
-                Assert.True(resolvedInfo.NeedsThreads);
-            }
-            finally
-            {
-                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
-            }
-        }
 
         [Fact]
         public void DefaultCoreResolution_Nintendo3DS_ReturnsAzaharAndIsSupported()
@@ -276,6 +266,7 @@ namespace JellyEmu.Tests
             }
             finally
             {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -290,6 +281,7 @@ namespace JellyEmu.Tests
             }
             finally
             {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }

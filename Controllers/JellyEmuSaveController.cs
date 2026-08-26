@@ -36,7 +36,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult HeadSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSavePath(userId, itemId, slotNum);
 
             if (System.IO.File.Exists(path))
@@ -58,7 +58,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetSave(string itemId, string userId, [FromQuery] int? slot)
         {
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
@@ -90,7 +90,7 @@ namespace JellyEmu.Controllers
             if (Request.ContentLength is 0)
                 return BadRequest("Empty save body.");
 
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSavePath(userId, itemId, slotNum);
 
             var tempPath = path + ".tmp";
@@ -139,7 +139,7 @@ namespace JellyEmu.Controllers
                 return Forbid();
             }
 
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSavePath(userId, itemId, slotNum);
 
             if (!System.IO.File.Exists(path))
@@ -159,44 +159,6 @@ namespace JellyEmu.Controllers
                 Logger.LogError(ex, "[JellyEmu] Failed to delete save file for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
-        }
-
-        /// <summary>
-        /// Returns the active save slot for a user.
-        /// Path: GET /jellyemu/slot/{userId}
-        /// </summary>
-        [HttpGet("/jellyemu/slot/{userId}")]
-        [Produces(MediaTypeNames.Application.Json)]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public IActionResult GetSlot(string userId)
-        {
-            var prefs = ReadUserPrefs(userId);
-            return Ok(new { userId, slot = prefs.Slot });
-        }
-
-        /// <summary>
-        /// Updates the active save slot for a user (1–99).
-        /// Path: POST /jellyemu/slot/{userId}?slot={n}
-        /// </summary>
-        [HttpPost("/jellyemu/slot/{userId}")]
-        [Authorize]
-        [Produces(MediaTypeNames.Application.Json)]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public IActionResult SetSlot(string userId, [FromQuery] int slot)
-        {
-            if (!VerifyUser(userId)) return Forbid();
-            if (slot < 1 || slot > 99)
-                return BadRequest("Slot must be between 1 and 99.");
-
-            var existing = ReadUserPrefs(userId);
-            var path = GetSlotFilePath(userId);
-            System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(
-                new { slot, shader = existing.Shader, videoRotation = existing.VideoRotation }));
-
-            Logger.LogInformation("[JellyEmu] User {UserId} slot set — slot:{Slot}", userId, slot);
-            return Ok(new { userId, slot });
         }
 
         /// <summary>
@@ -347,7 +309,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult HeadSram(string itemId, string userId, [FromQuery] int? slot)
         {
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSramPath(userId, itemId, slotNum);
 
             if (System.IO.File.Exists(path))
@@ -369,7 +331,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetSram(string itemId, string userId, [FromQuery] int? slot)
         {
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSramPath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
@@ -401,7 +363,7 @@ namespace JellyEmu.Controllers
             if (Request.ContentLength is 0)
                 return BadRequest("Empty SRAM body.");
 
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSramPath(userId, itemId, slotNum);
 
             var tempPath = path + ".tmp";
@@ -450,7 +412,7 @@ namespace JellyEmu.Controllers
                 return Forbid();
             }
 
-            var slotNum = slot.HasValue ? slot.Value : ReadUserPrefs(userId).Slot;
+            var slotNum = slot.HasValue ? slot.Value : 1;
             var path = GetSramPath(userId, itemId, slotNum);
 
             if (!System.IO.File.Exists(path))
