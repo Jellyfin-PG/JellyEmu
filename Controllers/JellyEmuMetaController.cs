@@ -58,5 +58,64 @@ namespace JellyEmu.Controllers
             return new JsonResult(result);
         }
 
+        /// <summary>
+        /// Returns all supported console systems and their available emulation cores.
+        /// Path: GET /jellyemu/systems
+        /// </summary>
+        [HttpGet("/jellyemu/systems")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult GetSystems()
+        {
+            var systems = PlatformCoreRegistry.Select(kvp => new
+            {
+                name = kvp.Key,
+                cores = kvp.Value.Select(c => new
+                {
+                    id = c.Id,
+                    name = c.Name,
+                    needsThreads = c.NeedsThreads
+                })
+            });
+
+            return Ok(new
+            {
+                systems,
+                platformCoreMap = PlatformCoreRegistry
+            });
+        }
+
+        public record ShaderOption(string Id, string Label);
+
+        public static readonly List<ShaderOption> AvailableShaders = new()
+        {
+            new("disabled", "None"),
+            new("2xScaleHQ.glslp", "2x ScaleHQ"),
+            new("4xScaleHQ.glslp", "4x ScaleHQ"),
+            new("sabr", "SABR"),
+            new("crt-aperture.glslp", "CRT Aperture"),
+            new("crt-easymode.glslp", "CRT Easymode"),
+            new("crt-geom.glslp", "CRT Geom"),
+            new("crt-mattias.glslp", "CRT Mattias"),
+            new("crt-beam", "CRT Beam"),
+            new("crt-caligari", "CRT Caligari"),
+            new("crt-lottes", "CRT Lottes"),
+            new("crt-zfast", "CRT ZFast"),
+            new("crt-yeetron", "CRT Yeetron"),
+            new("bicubic", "Bicubic"),
+            new("mix-frames", "Mix Frames")
+        };
+
+        /// <summary>
+        /// Returns the canonical list of supported emulator shaders.
+        /// Path: GET /jellyemu/shaders
+        /// </summary>
+        [HttpGet("/jellyemu/shaders")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult GetShaders()
+        {
+            return Ok(AvailableShaders.Select(s => new { id = s.Id, label = s.Label }));
+        }
     }
 }
