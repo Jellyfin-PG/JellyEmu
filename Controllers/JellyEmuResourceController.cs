@@ -90,6 +90,19 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the settings embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.setting.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.setting.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult SettingJs()
+        {
+            return ServeEmbeddedJs("ejs.setting.js");
+        }
+
+        /// <summary>
         /// Serves the stylesheet embedded CSS resource.
         /// Path: GET /jellyemu/assets/ejs.style.css
         /// </summary>
@@ -128,13 +141,6 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult InjectionBundleCss()
         {
-            if (_cachedCssBundle != null)
-            {
-                Response.ContentType = "text/css; charset=utf-8";
-                Response.Headers["Cache-Control"] = "public, max-age=3600";
-                return File(_cachedCssBundle, "text/css; charset=utf-8");
-            }
-
             return CombineAndServe("Web.Injection.", InjectionCssModules, "text/css; charset=utf-8", ref _cachedCssBundle);
         }
 
@@ -148,13 +154,6 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult InjectionBundleJs()
         {
-            if (_cachedJsBundle != null)
-            {
-                Response.ContentType = "application/javascript; charset=utf-8";
-                Response.Headers["Cache-Control"] = "public, max-age=3600";
-                return File(_cachedJsBundle, "application/javascript; charset=utf-8");
-            }
-
             return CombineAndServe("Web.Injection.", InjectionJsModules, "application/javascript; charset=utf-8", ref _cachedJsBundle);
         }
 
@@ -214,7 +213,7 @@ namespace JellyEmu.Controllers
 
             cache = ms.ToArray();
             Response.ContentType = contentType;
-            Response.Headers["Cache-Control"] = "public, max-age=3600";
+            Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
             return File(cache, contentType);
         }
 
@@ -232,7 +231,7 @@ namespace JellyEmu.Controllers
         private IActionResult ServeEmbeddedFile(string resourceSuffix, string contentType)
         {
             Response.ContentType = contentType;
-            Response.Headers["Cache-Control"] = "public, max-age=3600";
+            Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
 
             var assembly = typeof(JellyEmuResourceController).Assembly;
             var resourceName = assembly.GetManifestResourceNames()

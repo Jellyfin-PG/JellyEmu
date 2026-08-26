@@ -166,11 +166,13 @@ namespace JellyEmu.Controllers
             var isJ3u = !string.IsNullOrEmpty(item.Path) && item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase);
 
             var hasSaves = !string.IsNullOrEmpty(userId);
-            var userPrefs = hasSaves ? ReadUserPrefs(userId!) : new UserPrefs(1, string.Empty, 0);
-            var fullPrefs = hasSaves ? ReadFullPrefs(userId!) : DefaultFullPrefs;
-            var activeSlot = (slot.HasValue && slot.Value > 0) ? slot.Value : userPrefs.Slot;
-            var activeShader = userPrefs.Shader;
-            var videoRotation = userPrefs.VideoRotation;
+            var effectivePrefs = hasSaves
+                ? await PreferenceService.GetEffectivePreferencesAsync(userId!, platformTag)
+                : JellyEmuPreferenceService.SystemDefaults;
+
+            var activeSlot = (slot.HasValue && slot.Value > 0) ? slot.Value : 1;
+            var activeShader = effectivePrefs.Shader;
+            var videoRotation = effectivePrefs.VideoRotation;
             var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
             var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
 
@@ -235,8 +237,16 @@ namespace JellyEmu.Controllers
                 save_post_url = savePostUrl,
                 is_m3u = isJ3u,
                 needs_threads = IsThreadedCore(resolvedCore),
-                virtual_gamepad = fullPrefs.VirtualGamepad,
-                virtual_gamepad_lefty = fullPrefs.VirtualGamepadLefty
+                virtual_gamepad = effectivePrefs.VirtualGamepad,
+                virtual_gamepad_lefty = effectivePrefs.VirtualGamepadLefty,
+                vsync = effectivePrefs.Vsync,
+                ffrate = effectivePrefs.FfRate,
+                smrate = effectivePrefs.SmRate,
+                show_fps = effectivePrefs.ShowFps,
+                scale = effectivePrefs.Scale,
+                volume = effectivePrefs.Volume ?? "1",
+                mute = effectivePrefs.Mute ?? "0",
+                version = GetType().Assembly.GetName().Version?.ToString() ?? "0.8.8"
             });
 
             // When opened as a new tab (threaded cores), these headers make the page

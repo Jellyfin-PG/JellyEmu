@@ -1,71 +1,243 @@
-.je-settings-container {
-    max-width: 600px;
+/* JellyEmu MUI Settings Styling */
+
+.je-settings-page {
+    max-width: 860px;
     margin: 0 auto;
-    padding: 40px 24px;
-    color: #fff;
+    padding: 2em 1.5em 5em 1.5em;
+    color: var(--text-color, #fff);
+    font-family: inherit;
 }
-.je-settings-section {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 24px;
-}
-.je-settings-title {
-    font-size: 1.4rem;
-    font-weight: 600;
-    margin-bottom: 16px;
+
+.je-settings-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 2em;
+    flex-wrap: wrap;
+    gap: 1em;
 }
-.je-settings-field {
-    margin-bottom: 20px;
+
+.je-settings-heading {
+    font-size: 1.8em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0;
 }
-.je-settings-label {
-    display: block;
-    font-size: 0.9rem;
-    color: rgba(255,255,255,0.6);
-    margin-bottom: 8px;
+
+.je-settings-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    margin-bottom: 2em;
+    gap: 0.5em;
+    overflow-x: auto;
 }
-.je-settings-input {
-    width: 100%;
-    box-sizing: border-box;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    padding: 10px 12px;
-    color: #fff;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s;
-}
-.je-settings-input:focus {
-    border-color: #00a4dc;
-}
-.je-settings-btn-save {
-    background: #00a4dc;
-    color: #fff;
+
+.je-settings-tab {
+    background: transparent;
     border: none;
-    border-radius: 6px;
-    padding: 12px 24px;
-    font-size: 1rem;
-    font-weight: 600;
+    border-bottom: 3px solid transparent;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.8em 1.4em;
+    font-size: 0.95em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    white-space: nowrap;
+}
+
+.je-settings-tab:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.je-settings-tab.active {
+    color: var(--accent, #00a4dc);
+    border-bottom-color: var(--accent, #00a4dc);
+    background: transparent;
+}
+
+.je-settings-section {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 1.8em;
+    margin-bottom: 2em;
+}
+
+.je-settings-section-heading {
+    font-size: 1.25em;
+    font-weight: 500;
+    margin: 0 0 0.4em 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--text-color, #fff);
+}
+
+.je-settings-section-desc {
+    font-size: 0.88em;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 1.8em;
+    line-height: 1.5;
+}
+
+.je-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5em;
+}
+
+.je-input-container {
+    margin-bottom: 1.2em;
+}
+
+.je-input-label {
+    display: block;
+    font-size: 0.88em;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.4em;
+    font-weight: 500;
+}
+
+.je-field-desc {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.45);
+    margin-top: 0.35em;
+    line-height: 1.35;
+}
+
+.je-select,
+.je-input {
     width: 100%;
     box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 0.7em 0.9em;
+    color: #fff;
+    font-size: 0.95em;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
 }
-.je-settings-btn-save:hover {
+
+.je-select:focus,
+.je-input:focus {
+    border-color: var(--accent, #00a4dc);
+    box-shadow: 0 0 0 1px var(--accent, #00a4dc);
+}
+
+.je-select option {
+    background: #1c1c1c;
+    color: #fff;
+}
+
+.je-actions {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-top: 2em;
+    flex-wrap: wrap;
+}
+
+.je-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 0.75em 1.6em;
+    font-size: 0.95em;
+    font-weight: 500;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+}
+
+.je-btn-primary {
+    background: var(--accent, #00a4dc);
+    color: #fff;
+}
+
+.je-btn-primary:hover {
     background: #00b4ec;
+    box-shadow: 0 2px 8px rgba(0, 164, 220, 0.4);
 }
-.je-settings-btn-save:disabled {
-    background: rgba(255,255,255,0.1);
+
+.je-btn-primary:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.35);
     cursor: not-allowed;
+    box-shadow: none;
 }
-.je-settings-footer {
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.4);
+
+.je-btn-danger {
+    background: rgba(255, 75, 75, 0.15);
+    color: #ff6b6b;
+    border: 1px solid rgba(255, 75, 75, 0.3);
+}
+
+.je-btn-danger:hover {
+    background: rgba(255, 75, 75, 0.25);
+    border-color: rgba(255, 75, 75, 0.5);
+}
+
+.je-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.8em;
+    padding: 0.25em 0.7em;
+    border-radius: 12px;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.je-badge-active {
+    background: rgba(0, 164, 220, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(0, 164, 220, 0.3);
+}
+
+.je-badge-inherit {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.je-empty-state {
     text-align: center;
-    margin-top: 16px;
+    padding: 3em 1em;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.95em;
+}
+
+.je-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--accent, #00a4dc);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: jeFadeIn 0.25s ease;
+}
+
+@keyframes jeFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
 }

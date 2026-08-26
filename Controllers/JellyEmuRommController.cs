@@ -243,13 +243,13 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/romm/sync-on-launch/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> RommSyncOnLaunch(string itemId, string userId)
+        public async Task<IActionResult> RommSyncOnLaunch(string itemId, string userId, [FromQuery] int? slot)
         {
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { pulled = false, reason = "disabled" });
 
-            var slot      = ReadUserPrefs(userId).Slot;
-            var localPath = GetSavePath(userId, itemId, slot);
+            var slotNum   = slot.HasValue ? slot.Value : 1;
+            var localPath = GetSavePath(userId, itemId, slotNum);
             var romId     = GetRommIdForItem(itemId);
             if (string.IsNullOrEmpty(romId))
                 return Ok(new { pulled = false, reason = "no_romm_id" });
@@ -316,13 +316,13 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/romm/sync-after-save/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> RommSyncAfterSave(string itemId, string userId)
+        public async Task<IActionResult> RommSyncAfterSave(string itemId, string userId, [FromQuery] int? slot)
         {
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { pushed = false, reason = "disabled" });
 
-            var slot      = ReadUserPrefs(userId).Slot;
-            var localPath = GetSavePath(userId, itemId, slot);
+            var slotNum   = slot.HasValue ? slot.Value : 1;
+            var localPath = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(localPath))
                 return Ok(new { pushed = false, reason = "no_local_save" });
 
@@ -335,8 +335,8 @@ namespace JellyEmu.Controllers
                 var client = GetRommClient();
                 var bytes  = await System.IO.File.ReadAllBytesAsync(localPath).ConfigureAwait(false);
                 using var content = new System.Net.Http.MultipartFormDataContent();
-                content.Add(new System.Net.Http.ByteArrayContent(bytes), "file", $"{itemId}_slot{slot}.state");
-                content.Add(new System.Net.Http.StringContent(slot.ToString()), "slot");
+                content.Add(new System.Net.Http.ByteArrayContent(bytes), "file", $"{itemId}_slot{slotNum}.state");
+                content.Add(new System.Net.Http.StringContent(slotNum.ToString()), "slot");
 
                 var resp = await client.PostAsync($"{RommInstanceUrl}/api/saves?rom_id={romId}", content).ConfigureAwait(false);
                 if (!resp.IsSuccessStatusCode)

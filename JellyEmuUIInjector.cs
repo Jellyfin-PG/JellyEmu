@@ -29,11 +29,12 @@ namespace JellyEmu.Services
 
                 bool vantageEnabled = Plugin.Instance?.Configuration?.VantageEnabled ?? true;
                 string vantageStr = vantageEnabled ? "true" : "false";
+                string versionStr = typeof(JellyEmuUIInjector).Assembly.GetName().Version?.ToString() ?? "0.8.8";
 
                 string injection = $$"""
-                <link rel="stylesheet" href="/jellyemu/assets/injection/bundle.css" data-jellyemu-mods="1">
+                <link rel="stylesheet" href="/jellyemu/assets/injection/bundle.css?v={{versionStr}}" data-jellyemu-mods="1">
                 <script data-jellyemu-mods="1">window.__JELLYEMU_CONFIG__ = { vantageEnabled: {{vantageStr}} };</script>
-                <script src="/jellyemu/assets/injection/bundle.js" defer data-jellyemu-mods="1"></script>
+                <script src="/jellyemu/assets/injection/bundle.js?v={{versionStr}}" defer data-jellyemu-mods="1"></script>
                 """;
 
                 string block = "\n" + StartMarker + "\n" + injection + "\n" + EndMarker + "\n";

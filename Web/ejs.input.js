@@ -257,7 +257,9 @@
     if (userId) {
         var prefHeaders = {};
         if (token) prefHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
-        fetch('/jellyemu/prefs/' + userId, { headers: prefHeaders })
+        var cItemId = (window.JellyEmuConfig && window.JellyEmuConfig.itemId) ? encodeURIComponent(window.JellyEmuConfig.itemId) : '';
+        var cPlatform = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) ? encodeURIComponent(window.JellyEmuConfig.platformTag) : '';
+        fetch('/jellyemu/prefs/' + userId + '/effective?itemId=' + cItemId + '&platform=' + cPlatform, { headers: prefHeaders })
             .then(function (r) { if (r.ok) return r.json(); })
             .then(function (data) {
                 if (data && data.jeBindings) {

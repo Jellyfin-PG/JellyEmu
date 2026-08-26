@@ -43,7 +43,6 @@
     }
 
     // Tab Management
-
     var tabBtnStates = document.getElementById('je-tab-btn-states');
     var tabBtnSram   = document.getElementById('je-tab-btn-sram');
     var panelStates  = document.getElementById('je-panel-states');
@@ -69,7 +68,6 @@
     }
 
     // Screenshots
-
     function loadSlotScreenshot(s, thumbEl) {
         jeFetch('/jellyemu/save-screenshot/' + itemId + '/' + userId + '/' + s)
             .then(function (r) {
@@ -100,7 +98,6 @@
     }
 
     // Save States (Cloud)
-
     function buildSaveSlots() {
         var body = document.getElementById('je-saves-body');
         if (!body) return;
@@ -197,7 +194,6 @@
     }
 
     // SRAM (Cloud Backups)
-
     function buildSramSlots() {
         var body = document.getElementById('je-sram-body');
         if (!body) return;
@@ -413,7 +409,7 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // --- Multi-Disc / Playlist (J3U/M3U) Swapping & Restoration ---
+    // Multi-Disc / Playlist (J3U/M3U) Swapping
     if (isM3u) {
         // Subscribe to jellyemu:gamestart to check and restore Slot 99 SRAM
         window.addEventListener('jellyemu:gamestart', function () {
@@ -508,7 +504,7 @@
             loader.classList.remove('je-dismiss');
         }
         
-        // 1. Get SRAM
+        // Get SRAM
         var g = gm();
         var rawSave = g ? g.getSaveFile() : null;
         var savePromise = Promise.resolve();
@@ -526,7 +522,7 @@
             }
         }
         
-        // 3. Swap index and reload
+        // Swap index and reload
         savePromise.finally(function () {
             jeFetch('/jellyemu/playlist/' + itemId + '/swap/' + userId + '?disc=' + targetDisc, {
                 method: 'POST'

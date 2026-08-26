@@ -66,29 +66,20 @@
         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
         const itemId = JE.currentItemId;
 
-        const slotPromise = (userId && itemId)
-            ? fetch('/jellyemu/slot/' + userId).then(r => r.ok ? r.json() : null).catch(() => null)
-            : Promise.resolve(null);
-
-        if (userId && itemId && !wrap.querySelector('.jellyemu-slot-pill')) {
-            slotPromise.then(data => {
-                if (!data) return;
-                const slot = data.slot || 1;
-                fetch('/jellyemu/save/' + itemId + '/' + userId, { method: 'HEAD' })
-                    .then(r => {
-                        const hasSave = r.ok;
+        if (userId && itemId && !wrap.querySelector('.jellyemu-save-pill')) {
+            fetch('/jellyemu/save/' + itemId + '/' + userId, { method: 'HEAD' })
+                .then(r => {
+                    if (r.ok) {
                         const pill = document.createElement('div');
-                        pill.className = 'mediaInfoItem jellyemu-slot-pill';
-                        pill.title = hasSave ? 'Save exists in slot ' + slot : 'No save in slot ' + slot;
+                        pill.className = 'mediaInfoItem jellyemu-save-pill';
+                        pill.title = 'Saved Game State Available';
                         pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
-                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;">' +
-                            (hasSave ? 'save' : 'save_alt') + '</span>' +
-                            'Slot ' + slot +
-                            (hasSave ? ' <span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">check_circle</span>' : '');
+                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">save</span>' +
+                            'Saved State';
                         wrap.appendChild(pill);
-                    })
-                    .catch(() => {});
-            });
+                    }
+                })
+                .catch(() => {});
         }
 
         if (userId && itemId && !wrap.querySelector('.jellyemu-playtime-pill')) {

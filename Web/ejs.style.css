@@ -19,7 +19,7 @@ body {
     height: 100%;
 }
 
-/* - EJS Elements - */
+/* EJS Elements */
 .ejs_menu_bar,
 .ejs_parent>div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),
 #je-loader+.ejs_parent .ejs_menu_bar {
@@ -42,7 +42,7 @@ body {
     display: none !important;
 }
 
-/* - Loading Screen - */
+/* Loading Screen */
 #je-loader {
     position: fixed;
     inset: 0;
@@ -179,7 +179,7 @@ body {
     height: 90px;
 }
 
-/* - Shared Dock Styles - */
+/* Shared Dock Styles */
 .je-bar {
     position: fixed;
     z-index: 90000;
@@ -191,7 +191,7 @@ body {
     pointer-events: none;
 }
 
-/* - Top Bar - */
+/* Top Bar */
 #je-topbar {
     top: 0;
     left: 0;
@@ -248,7 +248,7 @@ body {
     fill: currentColor;
 }
 
-/* - Bottom Dock - */
+/* Bottom Dock */
 #je-dock {
     bottom: 16px;
     left: 50%;
@@ -326,7 +326,7 @@ body {
     flex-shrink: 0;
 }
 
-/* - Popup / Modal - */
+/* Popup / Modal */
 .je-overlay {
     position: fixed;
     inset: 0;
@@ -406,7 +406,7 @@ body {
     flex: 1;
 }
 
-/* - Save Slots - */
+/* Save Slots */
 .je-slot {
     display: flex;
     align-items: center;
@@ -491,7 +491,7 @@ body {
     border-color: rgba(255, 255, 255, .25);
 }
 
-/* - Volume - */
+/* Volume */
 .je-vol-wrap {
     display: flex;
     flex-direction: column;
@@ -523,7 +523,7 @@ body {
     cursor: pointer;
 }
 
-/* - Cheats - */
+/* Cheats */
 .je-cheat-row {
     display: flex;
     align-items: center;
@@ -572,7 +572,7 @@ body {
     resize: none;
 }
 
-/* - Toggle Switch - */
+/* Toggle Switch */
 .je-toggle {
     position: relative;
     width: 40px;
@@ -615,7 +615,7 @@ body {
     transform: translateX(18px);
 }
 
-/* - Settings Rows - */
+/* Settings Rows */
 .je-setting {
     display: flex;
     align-items: center;
@@ -666,7 +666,7 @@ body {
     margin-top: 0;
 }
 
-/* - Input Mapping - */
+/* Input Mapping */
 .je-tabs {
     display: flex;
     gap: 0;
@@ -701,7 +701,7 @@ body {
     display: block;
 }
 
-/* - Input Mapping Grid - */
+/* Input Mapping Grid */
 .je-bind-headers {
     display: grid;
     grid-template-columns: 1fr 90px 90px;
@@ -777,7 +777,7 @@ body {
     margin-bottom: 12px;
 }
 
-/* - FPS Counter - */
+/* FPS Counter */
 #je-fps {
     position: fixed;
     top: 56px;
@@ -799,7 +799,7 @@ body {
     display: block;
 }
 
-/* - Dock Minimize - */
+/* Dock Minimize */
 #je-dock-min {
     position: fixed;
     bottom: 16px;
@@ -847,7 +847,7 @@ body {
     display: none !important;
 }
 
-/* - VR/AR Button - */
+/* VR/AR Button */
 #je-vr-btn,
 #je-ar-btn {
     display: none;
@@ -869,7 +869,7 @@ body {
     background: rgba(100, 200, 255, .28);
 }
 
-/* - Mobile - */
+/* Mobile */
 @media (max-width: 768px) {
     #je-dock {
         gap: 2px;
@@ -923,7 +923,7 @@ body {
     }
 }
 
-/* - Disc Selector - */
+/* Disc Selector */
 .je-disc-item {
     display: flex;
     align-items: center;
