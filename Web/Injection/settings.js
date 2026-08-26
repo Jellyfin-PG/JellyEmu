@@ -2,22 +2,133 @@
     window.JellyEmu = window.JellyEmu || {};
     const JE = window.JellyEmu;
 
-    JE.hijackJellyEmuSettings = function() {
+    let _systemsData = [];
+    let _systemCoreMap = {};
+    let _knownSystems = [];
+
+    let SHADER_OPTIONS = [];
+
+    const SCALE_OPTIONS = [
+        { id: "fit", label: "Fit Screen (Aspect Ratio)" },
+        { id: "stretch", label: "Stretch to Fill" },
+        { id: "1", label: "1x Native Resolution (Original Size)" },
+        { id: "2", label: "2x Integer Scale" },
+        { id: "3", label: "3x Integer Scale" },
+        { id: "4", label: "4x Integer Scale" }
+    ];
+
+    const ROTATION_OPTIONS = [
+        { id: "0", label: "0° (Standard Landscape)" },
+        { id: "90", label: "90° (Clockwise / Vertical TATE)" },
+        { id: "180", label: "180° (Inverted)" },
+        { id: "270", label: "270° (Counter-Clockwise)" }
+    ];
+
+    const FFRATE_OPTIONS = [
+        { id: "2", label: "2x" },
+        { id: "3", label: "3x (Default)" },
+        { id: "4", label: "4x" },
+        { id: "5", label: "5x" },
+        { id: "8", label: "8x" },
+        { id: "10", label: "10x" },
+        { id: "unlimited", label: "Unlimited" }
+    ];
+
+    const SMRATE_OPTIONS = [
+        { id: "2", label: "2x" },
+        { id: "3", label: "3x (Default)" },
+        { id: "4", label: "4x" },
+        { id: "5", label: "5x" }
+    ];
+
+    function normalizeShaderId(id) {
+        if (!id || id === 'none' || id === 'disabled' || id === '0') return 'disabled';
+        var s = String(id).trim();
+        if (s.toLowerCase() === 'crt-easymode') return 'crt-easymode.glslp';
+        if (s.toLowerCase() === '2xscalehq') return '2xScaleHQ.glslp';
+        if (s.toLowerCase() === '4xscalehq') return '4xScaleHQ.glslp';
+        if (s.toLowerCase() === 'crt-aperture') return 'crt-aperture.glslp';
+        if (s.toLowerCase() === 'crt-geom') return 'crt-geom.glslp';
+        if (s.toLowerCase() === 'crt-mattias') return 'crt-mattias.glslp';
+        return s;
+    }
+
+    function normalizeScaleId(id) {
+        if (!id) return 'fit';
+        var s = String(id).trim().toLowerCase();
+        if (s === 'aspect') return 'fit';
+        if (s === 'native') return '1';
+        if (s === '2x') return '2';
+        if (s === '3x') return '3';
+        if (s === '4x') return '4';
+        return s;
+    }
+
+    let _activeTab = "global";
+    let _selectedSystem = "";
+
+    function showToast(msg) {
+        const existing = document.querySelector('.je-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'je-toast';
+        toast.innerHTML = `<span class="material-icons" style="font-size:18px">check_circle</span> ${msg}`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    async function ensureSystemsLoaded(token) {
+        try {
+            const headers = {};
+            if (token) headers['Authorization'] = `MediaBrowser Token="${token}"`;
+            
+            const [sysRes, shaderRes] = await Promise.all([
+                _knownSystems.length > 0 ? Promise.resolve(null) : fetch('/jellyemu/systems', { headers }),
+                fetch('/jellyemu/shaders', { headers }).catch(() => null)
+            ]);
+
+            if (shaderRes && shaderRes.ok) {
+                const shaderData = await shaderRes.json();
+                if (Array.isArray(shaderData) && shaderData.length > 0) {
+                    SHADER_OPTIONS = shaderData.map(s => ({
+                        id: s.id || s.Id || '',
+                        label: s.label || s.Label || s.id || s.Id || ''
+                    })).filter(s => s.id);
+                }
+            }
+
+            if (sysRes && sysRes.ok) {
+                const data = await sysRes.json();
+                if (data && data.systems) {
+                    _systemsData = data.systems;
+                    _systemCoreMap = {};
+                    _knownSystems = [];
+                    data.systems.forEach(s => {
+                        _knownSystems.push(s.name);
+                        _systemCoreMap[s.name] = s.cores || [];
+                    });
+                    if (!_selectedSystem && _knownSystems.length > 0) {
+                        _selectedSystem = _knownSystems[0];
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[JellyEmu] Failed to load systems/shaders metadata:', e);
+        }
+    }
+
+    JE.hijackJellyEmuSettings = async function() {
         const activePage = document.querySelector('.page:not(.hide):not(#myPreferencesMenuPage)');
         if (!activePage) return;
 
-        if (activePage.hasAttribute('data-jellyemu-settings-hijacked')) {
-            const headerTitle = document.querySelector('.skinHeader .pageTitle');
-            if (headerTitle && headerTitle.textContent !== 'JellyEmu Settings') {
-                headerTitle.textContent = 'JellyEmu Settings';
-            }
-            return;
+        const isAlreadyHijacked = activePage.hasAttribute('data-jellyemu-settings-hijacked');
+        if (!isAlreadyHijacked) {
+            activePage.setAttribute('data-jellyemu-settings-hijacked', '1');
+            activePage.className = 'page libraryPage noSecondaryNavPage mainAnimatedPage';
+            activePage.setAttribute('data-title', 'JellyEmu Settings');
+            activePage.setAttribute('data-backbutton', 'true');
         }
-
-        activePage.setAttribute('data-jellyemu-settings-hijacked', '1');
-        activePage.className = 'page libraryPage noSecondaryNavPage mainAnimatedPage';
-        activePage.setAttribute('data-title', 'JellyEmu Settings');
-        activePage.setAttribute('data-backbutton', 'true');
 
         document.title = 'JellyEmu Settings';
         const headerTitle = document.querySelector('.skinHeader .pageTitle');
@@ -26,74 +137,515 @@
         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
         const token  = window.ApiClient ? window.ApiClient.accessToken() : '';
 
-        activePage.innerHTML = `
-            <div class="je-settings-container">
-                <div class="je-settings-section">
-                    <div class="je-settings-title">
-                        <span class="material-icons" style="color:#f0c040">emoji_events</span>
-                        RetroAchievements
-                    </div>
-                    <div class="je-settings-field">
-                        <label class="je-settings-label">Username</label>
-                        <input type="text" id="je-ra-user" class="je-settings-input" placeholder="Enter RA Username">
-                    </div>
-                    <div class="je-settings-field">
-                        <label class="je-settings-label">Web API Key</label>
-                        <input type="password" id="je-ra-key" class="je-settings-input" placeholder="Enter RA API Key">
-                        <div class="je-settings-footer">Get your key from <a href="https://retroachievements.org/settings" target="_blank" style="color:#00a4dc">retroachievements.org/settings</a></div>
-                    </div>
-                    <button id="je-settings-save" class="je-settings-btn-save">Save Credentials</button>
-                </div>
-            </div>`;
-
         if (!userId) {
-            activePage.querySelector('.je-settings-container').innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">Please sign in to manage settings.</div>';
+            activePage.innerHTML = `
+                <div class="je-settings-page">
+                    <div class="je-empty-state">Please sign in to Jellyfin to manage emulator settings.</div>
+                </div>`;
             return;
         }
 
-        const userInp = activePage.querySelector('#je-ra-user');
-        const keyInp  = activePage.querySelector('#je-ra-key');
-        const saveBtn = activePage.querySelector('#je-settings-save');
+        await ensureSystemsLoaded(token);
 
-        fetch('/jellyemu/retroachievements/' + userId, {
-            headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
-        })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-            if (data) {
-                userInp.value = data.raUsername || '';
-                keyInp.value  = data.raApiKey   || '';
-            }
-        });
+        function renderContainer() {
+            activePage.innerHTML = `
+                <div class="je-settings-page">
+                    <div class="je-settings-header">
+                        <h1 class="je-settings-heading">
+                            <span class="material-icons" style="color:var(--accent, #00a4dc)">sports_esports</span>
+                            JellyEmu Settings
+                        </h1>
+                        <button id="je-btn-reset-all" class="je-btn je-btn-danger">
+                            <span class="material-icons" style="font-size:16px">restart_alt</span>
+                            Reset to Factory Defaults
+                        </button>
+                    </div>
 
-        saveBtn.addEventListener('click', function() {
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
+                    <div class="je-settings-tabs">
+                        <button class="je-settings-tab ${_activeTab === 'global' ? 'active' : ''}" data-tab="global">
+                            <span class="material-icons" style="font-size:18px">public</span>
+                            Global Settings
+                        </button>
+                        <button class="je-settings-tab ${_activeTab === 'system' ? 'active' : ''}" data-tab="system">
+                            <span class="material-icons" style="font-size:18px">devices</span>
+                            System Settings
+                        </button>
+                        <button class="je-settings-tab ${_activeTab === 'ra' ? 'active' : ''}" data-tab="ra">
+                            <span class="material-icons" style="font-size:18px">emoji_events</span>
+                            RetroAchievements
+                        </button>
+                    </div>
 
-            fetch('/jellyemu/retroachievements/' + userId, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'MediaBrowser Token="' + token + '"'
-                },
-                body: JSON.stringify({
-                    raUsername: userInp.value,
-                    raApiKey: keyInp.value
-                })
-            })
-            .then(r => r.ok ? r.json() : Promise.reject())
-            .then(() => {
-                saveBtn.textContent = 'Saved!';
-                setTimeout(() => {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = 'Save Credentials';
-                }, 2000);
-            })
-            .catch(() => {
-                alert('Failed to save credentials.');
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save Credentials';
+                    <div id="je-settings-content"></div>
+                </div>`;
+
+            // Tab listeners
+            activePage.querySelectorAll('.je-settings-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    _activeTab = btn.getAttribute('data-tab');
+                    renderContainer();
+                });
             });
-        });
+
+            // Factory reset button listener
+            const resetBtn = activePage.querySelector('#je-btn-reset-all');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (confirm('Are you sure you want to reset ALL your JellyEmu settings and custom system overrides back to factory defaults?')) {
+                        resetBtn.disabled = true;
+                        fetch(`/jellyemu/prefs/${userId}/reset`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `MediaBrowser Token="${token}"` }
+                        })
+                        .then(r => r.json())
+                        .then(() => {
+                            showToast('All settings reset to factory defaults.');
+                            renderContainer();
+                        })
+                        .catch(err => {
+                            console.error('[JellyEmu] Reset failed:', err);
+                            alert('Failed to reset settings.');
+                        })
+                        .finally(() => { resetBtn.disabled = false; });
+                    }
+                });
+            }
+
+            loadTabContent();
+        }
+
+        function loadTabContent() {
+            const container = activePage.querySelector('#je-settings-content');
+            if (!container) return;
+
+            if (_activeTab === 'global') {
+                renderGlobalTab(container);
+            } else if (_activeTab === 'system') {
+                renderSystemTab(container);
+            } else if (_activeTab === 'ra') {
+                renderRaTab(container);
+            }
+        }
+
+        // Global Settings Tab
+        function renderGlobalTab(container) {
+            container.innerHTML = `<div class="je-empty-state">Loading global settings...</div>`;
+
+            fetch(`/jellyemu/prefs/${userId}?scope=global`, {
+                headers: { 'Authorization': `MediaBrowser Token="${token}"` }
+            })
+            .then(r => r.ok ? r.json() : {})
+            .then(data => {
+                const p = (data && data.preferences) || {};
+                const activeShader = normalizeShaderId(p.shader || 'crt-easymode.glslp');
+                const activeScale = normalizeScaleId(p.scale || 'fit');
+                const activeVsync = (p.vsync === undefined || p.vsync === null || p.vsync === '' || p.vsync === '1' || p.vsync === true) ? '1' : '0';
+
+                container.innerHTML = `
+                    <div class="je-settings-section">
+                        <h2 class="je-settings-section-heading">
+                            <span class="material-icons" style="color:var(--accent, #00a4dc)">display_settings</span>
+                            Display & Audio Defaults
+                        </h2>
+                        <div class="je-settings-section-desc">Default visual, audio, and scaling settings applied to all games across every system.</div>
+
+                        <div class="je-settings-grid">
+                            <div class="je-input-container">
+                                <label class="je-input-label">Default Shader Filter</label>
+                                <select id="je-pref-shader" class="je-select">
+                                    ${SHADER_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === activeShader ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                </select>
+                                <div class="je-field-desc">Post-processing shader applied to the game canvas.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Screen Scaling Mode</label>
+                                <select id="je-pref-scale" class="je-select">
+                                    ${SCALE_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === activeScale ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                </select>
+                                <div class="je-field-desc">How emulator frames scale inside the player viewport.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Default Screen Rotation</label>
+                                <select id="je-pref-rotation" class="je-select">
+                                    ${ROTATION_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === (p.videoRotation || '0') ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                </select>
+                                <div class="je-field-desc">Orientation angle for the game display.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Default Audio Volume</label>
+                                <select id="je-pref-volume" class="je-select">
+                                    <option value="1" ${(p.volume || '1') === '1' || (p.volume === '1.0') ? 'selected' : ''}>100% (Default)</option>
+                                    <option value="0.9" ${p.volume === '0.9' ? 'selected' : ''}>90%</option>
+                                    <option value="0.8" ${p.volume === '0.8' ? 'selected' : ''}>80%</option>
+                                    <option value="0.7" ${p.volume === '0.7' ? 'selected' : ''}>70%</option>
+                                    <option value="0.6" ${p.volume === '0.6' ? 'selected' : ''}>60%</option>
+                                    <option value="0.5" ${p.volume === '0.5' ? 'selected' : ''}>50%</option>
+                                    <option value="0.4" ${p.volume === '0.4' ? 'selected' : ''}>40%</option>
+                                    <option value="0.3" ${p.volume === '0.3' ? 'selected' : ''}>30%</option>
+                                    <option value="0.2" ${p.volume === '0.2' ? 'selected' : ''}>20%</option>
+                                    <option value="0.1" ${p.volume === '0.1' ? 'selected' : ''}>10%</option>
+                                    <option value="0" ${p.volume === '0' || p.volume === '0.0' ? 'selected' : ''}>Muted (0%)</option>
+                                </select>
+                                <div class="je-field-desc">Default sound volume level when launching games.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Default Audio Mute</label>
+                                <select id="je-pref-mute" class="je-select">
+                                    <option value="0" ${(p.mute || '0') === '0' ? 'selected' : ''}>Sound Enabled (Default)</option>
+                                    <option value="1" ${(p.mute || '0') === '1' ? 'selected' : ''}>Muted on Launch</option>
+                                </select>
+                                <div class="je-field-desc">Initial mute state when launching games.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Show FPS Overlay</label>
+                                <select id="je-pref-fps" class="je-select">
+                                    <option value="0" ${(p.showFps || '0') === '0' ? 'selected' : ''}>Disabled (Default)</option>
+                                    <option value="1" ${(p.showFps || '0') === '1' ? 'selected' : ''}>Enabled (Display Framerate Badge)</option>
+                                </select>
+                                <div class="je-field-desc">Real-time frames per second counter overlay.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="je-settings-section">
+                        <h2 class="je-settings-section-heading">
+                            <span class="material-icons" style="color:var(--accent, #00a4dc)">sports_esports</span>
+                            Performance, Emulation & Controls
+                        </h2>
+                        <div class="je-settings-section-desc">Fast forward speeds, state persistence, controller vibration, and touch gamepad preferences.</div>
+
+                        <div class="je-settings-grid">
+                            <div class="je-input-container">
+                                <label class="je-input-label">Fast Forward Speed</label>
+                                <select id="je-pref-ffrate" class="je-select">
+                                    ${FFRATE_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === (p.ffrate || '3') ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                </select>
+                                <div class="je-field-desc">Speed multiplier when fast-forward is triggered.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Slow Motion Speed</label>
+                                <select id="je-pref-smrate" class="je-select">
+                                    ${SMRATE_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === (p.smrate || '3') ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                </select>
+                                <div class="je-field-desc">Speed reduction factor for slow-motion gameplay.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Autosave on Exit</label>
+                                <select id="je-pref-autosave" class="je-select">
+                                    <option value="1" ${(p.autosave || '0') === '1' ? 'selected' : ''}>Enabled (Auto Save State)</option>
+                                    <option value="0" ${(p.autosave || '0') === '0' ? 'selected' : ''}>Disabled (Manual Saves Only)</option>
+                                </select>
+                                <div class="je-field-desc">Automatically saves state upon closing the emulator.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Gamepad Haptics</label>
+                                <select id="je-pref-haptics" class="je-select">
+                                    <option value="1" ${(p.haptics || '1') === '1' ? 'selected' : ''}>Enabled (Vibration Feedback)</option>
+                                    <option value="0" ${(p.haptics || '1') === '0' ? 'selected' : ''}>Disabled</option>
+                                </select>
+                                <div class="je-field-desc">Physical gamepad rumble vibration feedback.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">On-Screen Mobile Gamepad</label>
+                                <select id="je-pref-vg" class="je-select">
+                                    <option value="0" ${(p.virtualGamepad || '0') === '0' ? 'selected' : ''}>Disabled by Default</option>
+                                    <option value="1" ${(p.virtualGamepad || '0') === '1' ? 'selected' : ''}>Enabled by Default</option>
+                                </select>
+                                <div class="je-field-desc">Touchscreen controls overlay for mobile devices.</div>
+                            </div>
+
+                            <div class="je-input-container">
+                                <label class="je-input-label">Mobile Gamepad Layout</label>
+                                <select id="je-pref-vg-lefty" class="je-select">
+                                    <option value="0" ${(p.virtualGamepadLefty || '0') === '0' ? 'selected' : ''}>Right-Handed (Standard)</option>
+                                    <option value="1" ${(p.virtualGamepadLefty || '0') === '1' ? 'selected' : ''}>Left-Handed (Lefty Mode)</option>
+                                </select>
+                                <div class="je-field-desc">D-pad and action button orientation on mobile.</div>
+                            </div>
+                        </div>
+
+                        <div class="je-actions">
+                            <button id="je-save-global" class="je-btn je-btn-primary">
+                                <span class="material-icons" style="font-size:18px">save</span>
+                                Save Global Settings
+                            </button>
+                        </div>
+                    </div>`;
+
+                const saveBtn = container.querySelector('#je-save-global');
+                saveBtn.addEventListener('click', () => {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = `<span class="material-icons" style="font-size:18px">sync</span> Saving...`;
+
+                    const payload = {
+                        scope: 'global',
+                        targetId: '',
+                        preferences: {
+                            shader: container.querySelector('#je-pref-shader').value,
+                            scale: container.querySelector('#je-pref-scale').value,
+                            videoRotation: container.querySelector('#je-pref-rotation').value,
+                            volume: container.querySelector('#je-pref-volume').value,
+                            mute: container.querySelector('#je-pref-mute').value,
+                            showFps: container.querySelector('#je-pref-fps').value,
+                            ffrate: container.querySelector('#je-pref-ffrate').value,
+                            smrate: container.querySelector('#je-pref-smrate').value,
+                            autosave: container.querySelector('#je-pref-autosave').value,
+                            haptics: container.querySelector('#je-pref-haptics').value,
+                            virtualGamepad: container.querySelector('#je-pref-vg').value,
+                            virtualGamepadLefty: container.querySelector('#je-pref-vg-lefty').value
+                        }
+                    };
+
+                    fetch(`/jellyemu/prefs/${userId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `MediaBrowser Token="${token}"`
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(r => r.json())
+                    .then(() => {
+                        showToast('Global settings saved.');
+                        loadTabContent();
+                    })
+                    .catch(err => {
+                        console.error('[JellyEmu] Failed to save global settings:', err);
+                        alert('Failed to save settings.');
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = `<span class="material-icons" style="font-size:18px">save</span> Save Global Settings`;
+                    });
+                });
+            });
+        }
+
+        // System Settings Tab
+        function renderSystemTab(container) {
+            container.innerHTML = `
+                <div class="je-settings-section">
+                    <h2 class="je-settings-section-heading">
+                        <span class="material-icons" style="color:var(--accent, #00a4dc)">devices</span>
+                        Platform & Console Settings
+                    </h2>
+                    <div class="je-settings-section-desc">Configure emulation core, shader, rotation, performance, audio, and controls for a specific system.</div>
+
+                    <div class="je-input-container" style="margin-bottom:2em;">
+                        <label class="je-input-label">Select System / Platform</label>
+                        <select id="je-select-system" class="je-select">
+                            ${_knownSystems.map(sys => `<option value="${sys}" ${sys === _selectedSystem ? 'selected' : ''}>${sys}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div id="je-system-form-container"></div>
+                </div>`;
+
+            const sysSelect = container.querySelector('#je-select-system');
+            sysSelect.addEventListener('change', () => {
+                _selectedSystem = sysSelect.value;
+                loadSystemSettings(container);
+            });
+
+            loadSystemSettings(container);
+        }
+
+        function loadSystemSettings(container) {
+            const formContainer = container.querySelector('#je-system-form-container');
+            if (!formContainer) return;
+
+            formContainer.innerHTML = `<div class="je-empty-state">Loading ${_selectedSystem} settings...</div>`;
+
+            fetch(`/jellyemu/prefs/${userId}?scope=system&targetId=${encodeURIComponent(_selectedSystem)}`, {
+                headers: { 'Authorization': `MediaBrowser Token="${token}"` }
+            })
+            .then(r => r.ok ? r.json() : {})
+            .then(data => {
+                const sp = (data && data.preferences) || {};
+                const hasCustomCore = !!sp.core;
+                const availableCores = _systemCoreMap[_selectedSystem] || [];
+
+                formContainer.innerHTML = `
+                    <div style="display:flex;align-items:center;margin-bottom:1.5em;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.8em;">
+                        <span style="font-weight:500;font-size:1.1em;color:#fff;">${_selectedSystem} Configuration</span>
+                        <span class="je-badge ${hasCustomCore ? 'je-badge-active' : 'je-badge-inherit'}">
+                            ${hasCustomCore ? 'Custom Core Selected' : 'Default Core'}
+                        </span>
+                    </div>
+
+                    <div class="je-settings-grid">
+                        ${availableCores.length > 1 ? `
+                        <div class="je-input-container" style="grid-column: 1 / -1;">
+                            <label class="je-input-label" style="color:var(--accent, #00a4dc);font-weight:600;">Emulation Core</label>
+                            <select id="je-sys-core" class="je-select">
+                                ${availableCores.map((c, index) => `<option value="${c.id}" ${(sp.core ? c.id === sp.core : index === 0) ? 'selected' : ''}>${c.name || c.id}${index === 0 ? ' (Default)' : ''}</option>`).join('')}
+                            </select>
+                            <div class="je-field-desc">Select the Libretro core used to emulate ${_selectedSystem} games. All display, control, and performance options are managed globally.</div>
+                        </div>` : availableCores.length === 1 ? `
+                        <div class="je-input-container" style="grid-column: 1 / -1;">
+                            <label class="je-input-label" style="color:var(--accent, #00a4dc);font-weight:600;">Emulation Core</label>
+                            <select id="je-sys-core" class="je-select" disabled>
+                                <option value="${availableCores[0].id}" selected>${availableCores[0].name || availableCores[0].id} (Default)</option>
+                            </select>
+                            <div class="je-field-desc">Default Libretro core for ${_selectedSystem}. All display, control, and performance options are managed globally.</div>
+                        </div>` : `
+                        <div style="color:rgba(255,255,255,0.6);padding:1em 0;">No alternative cores available for ${_selectedSystem}. All other preferences follow your Global Settings.</div>
+                        `}
+                    </div>
+
+                    <div class="je-actions" style="margin-top:24px">
+                        <button id="je-save-sys" class="je-btn je-btn-primary">
+                            <span class="material-icons" style="font-size:18px">save</span>
+                            Save ${_selectedSystem} Settings
+                        </button>
+                        ${hasCustomCore ? `
+                        <button id="je-clear-sys" class="je-btn je-btn-danger" style="margin-left:12px">
+                            <span class="material-icons" style="font-size:18px">delete_sweep</span>
+                            Reset to Default Core
+                        </button>` : ''}
+                    </div>`;
+
+                const saveBtn = formContainer.querySelector('#je-save-sys');
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', () => {
+                        saveBtn.disabled = true;
+
+                        const coreEl  = formContainer.querySelector('#je-sys-core');
+                        const coreVal = coreEl ? coreEl.value : '';
+
+                        const prefsObj = {};
+                        if (coreVal) prefsObj.core = coreVal;
+                        else prefsObj.core = null;
+
+                        fetch(`/jellyemu/prefs/${userId}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `MediaBrowser Token="${token}"`
+                            },
+                            body: JSON.stringify({
+                                scope: 'system',
+                                targetId: _selectedSystem,
+                                preferences: prefsObj
+                            })
+                        })
+                        .then(r => r.json())
+                        .then(() => {
+                            showToast(`${_selectedSystem} settings updated.`);
+                            loadSystemSettings(container);
+                        })
+                        .catch(err => {
+                            console.error('[JellyEmu] Failed to save system settings:', err);
+                            alert('Failed to save system settings.');
+                            saveBtn.disabled = false;
+                        });
+                    });
+                }
+
+                const clearBtn = formContainer.querySelector('#je-clear-sys');
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => {
+                        if (confirm(`Reset ${_selectedSystem} core back to default?`)) {
+                            clearBtn.disabled = true;
+                            fetch(`/jellyemu/prefs/${userId}?scope=system&targetId=${encodeURIComponent(_selectedSystem)}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `MediaBrowser Token="${token}"` }
+                            })
+                            .then(r => r.json())
+                            .then(() => {
+                                showToast(`${_selectedSystem} core reset to default.`);
+                                loadSystemSettings(container);
+                            })
+                            .catch(err => {
+                                console.error('[JellyEmu] Failed to reset system core:', err);
+                                alert('Failed to reset core.');
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // Retroachievements Tab
+        function renderRaTab(container) {
+            container.innerHTML = `
+                <div class="je-settings-section">
+                    <h2 class="je-settings-section-heading">
+                        <span class="material-icons" style="color:#f0c040">emoji_events</span>
+                        RetroAchievements Account
+                    </h2>
+                    <div class="je-settings-section-desc">Connect your RetroAchievements account to unlock achievements and track game progress.</div>
+
+                    <div class="je-input-container">
+                        <label class="je-input-label">Username</label>
+                        <input type="text" id="je-ra-user" class="je-input" placeholder="Enter RetroAchievements Username">
+                    </div>
+
+                    <div class="je-input-container">
+                        <label class="je-input-label">Web API Key</label>
+                        <input type="password" id="je-ra-key" class="je-input" placeholder="Enter RetroAchievements Web API Key">
+                        <div class="je-field-desc">Find your API key at <a href="https://retroachievements.org/settings" target="_blank" style="color:var(--accent, #00a4dc)">retroachievements.org/settings</a> (under Web API Key)</div>
+                    </div>
+
+                    <div class="je-actions">
+                        <button id="je-save-ra" class="je-btn je-btn-primary">
+                            <span class="material-icons" style="font-size:18px">save</span>
+                            Save Credentials
+                        </button>
+                    </div>
+                </div>`;
+
+            const userInp = container.querySelector('#je-ra-user');
+            const keyInp  = container.querySelector('#je-ra-key');
+            const saveBtn = container.querySelector('#je-save-ra');
+
+            fetch(`/jellyemu/retroachievements/${userId}`, {
+                headers: { 'Authorization': `MediaBrowser Token="${token}"` }
+            })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data) {
+                    userInp.value = data.raUsername || '';
+                    keyInp.value  = data.raApiKey   || '';
+                }
+            });
+
+            saveBtn.addEventListener('click', () => {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = `<span class="material-icons" style="font-size:18px">sync</span> Saving...`;
+
+                fetch(`/jellyemu/retroachievements/${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `MediaBrowser Token="${token}"`
+                    },
+                    body: JSON.stringify({
+                        raUsername: userInp.value.trim(),
+                        raApiKey: keyInp.value.trim()
+                    })
+                })
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(() => {
+                    showToast('RetroAchievements credentials saved.');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = `<span class="material-icons" style="font-size:18px">save</span> Save Credentials`;
+                })
+                .catch(() => {
+                    alert('Failed to save RetroAchievements credentials.');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = `<span class="material-icons" style="font-size:18px">save</span> Save Credentials`;
+                });
+            });
+        }
+
+        renderContainer();
     };
 })();
