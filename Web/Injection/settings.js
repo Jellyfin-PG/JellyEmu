@@ -6,40 +6,20 @@
     let _systemCoreMap = {};
     let _knownSystems = [];
 
-    let SHADER_OPTIONS = [];
-
-    const SCALE_OPTIONS = [
-        { id: "fit", label: "Fit Screen (Aspect Ratio)" },
-        { id: "stretch", label: "Stretch to Fill" },
-        { id: "1", label: "1x Native Resolution (Original Size)" },
-        { id: "2", label: "2x Integer Scale" },
-        { id: "3", label: "3x Integer Scale" },
-        { id: "4", label: "4x Integer Scale" }
-    ];
-
-    const ROTATION_OPTIONS = [
-        { id: "0", label: "0° (Standard Landscape)" },
-        { id: "90", label: "90° (Clockwise / Vertical TATE)" },
-        { id: "180", label: "180° (Inverted)" },
-        { id: "270", label: "270° (Counter-Clockwise)" }
-    ];
-
-    const FFRATE_OPTIONS = [
-        { id: "2", label: "2x" },
-        { id: "3", label: "3x (Default)" },
-        { id: "4", label: "4x" },
-        { id: "5", label: "5x" },
-        { id: "8", label: "8x" },
-        { id: "10", label: "10x" },
-        { id: "unlimited", label: "Unlimited" }
-    ];
-
-    const SMRATE_OPTIONS = [
-        { id: "2", label: "2x" },
-        { id: "3", label: "3x (Default)" },
-        { id: "4", label: "4x" },
-        { id: "5", label: "5x" }
-    ];
+    let _settingOptions = {
+        shaders: [],
+        scaling: [],
+        rotation: [],
+        fastForwardRates: [],
+        slowMotionRates: [],
+        volume: [],
+        mute: [],
+        fps: [],
+        autosave: [],
+        haptics: [],
+        virtualGamepad: [],
+        virtualGamepadLefty: []
+    };
 
     function normalizeShaderId(id) {
         if (!id || id === 'none' || id === 'disabled' || id === '0') return 'disabled';
@@ -83,18 +63,28 @@
             const headers = {};
             if (token) headers['Authorization'] = `MediaBrowser Token="${token}"`;
             
-            const [sysRes, shaderRes] = await Promise.all([
-                _knownSystems.length > 0 ? Promise.resolve(null) : fetch('/jellyemu/systems', { headers }),
-                fetch('/jellyemu/shaders', { headers }).catch(() => null)
+            const [sysRes, optsRes] = await Promise.all([
+                _knownSystems.length > 0 ? Promise.resolve(null) : fetch('/jellyemu/systems', { headers }).catch(() => null),
+                fetch('/jellyemu/setting-options', { headers }).catch(() => null)
             ]);
 
-            if (shaderRes && shaderRes.ok) {
-                const shaderData = await shaderRes.json();
-                if (Array.isArray(shaderData) && shaderData.length > 0) {
-                    SHADER_OPTIONS = shaderData.map(s => ({
-                        id: s.id || s.Id || '',
-                        label: s.label || s.Label || s.id || s.Id || ''
-                    })).filter(s => s.id);
+            if (optsRes && optsRes.ok) {
+                const optsData = await optsRes.json();
+                if (optsData) {
+                    _settingOptions = {
+                        shaders: optsData.shaders || [],
+                        scaling: optsData.scaling || [],
+                        rotation: optsData.rotation || [],
+                        fastForwardRates: optsData.fastForwardRates || [],
+                        slowMotionRates: optsData.slowMotionRates || [],
+                        volume: optsData.volume || [],
+                        mute: optsData.mute || [],
+                        fps: optsData.fps || [],
+                        autosave: optsData.autosave || [],
+                        haptics: optsData.haptics || [],
+                        virtualGamepad: optsData.virtualGamepad || [],
+                        virtualGamepadLefty: optsData.virtualGamepadLefty || []
+                    };
                 }
             }
 
@@ -106,7 +96,10 @@
                     _knownSystems = [];
                     data.systems.forEach(s => {
                         _knownSystems.push(s.name);
-                        _systemCoreMap[s.name] = s.cores || [];
+                        _systemCoreMap[s.name] = (s.cores || []).map(c => ({
+                            id: c.id,
+                            name: c.name || c.id
+                        }));
                     });
                     if (!_selectedSystem && _knownSystems.length > 0) {
                         _selectedSystem = _knownSystems[0];
@@ -114,7 +107,7 @@
                 }
             }
         } catch (e) {
-            console.warn('[JellyEmu] Failed to load systems/shaders metadata:', e);
+            console.warn('[JellyEmu] Failed to load systems/options metadata:', e);
         }
     }
 
@@ -241,6 +234,11 @@
                 const activeScale = normalizeScaleId(p.scale || 'fit');
                 const activeVsync = (p.vsync === undefined || p.vsync === null || p.vsync === '' || p.vsync === '1' || p.vsync === true) ? '1' : '0';
 
+                const renderOptions = (list, active) => {
+                    if (!Array.isArray(list)) return '';
+                    return list.map(opt => `<option value="${opt.id}" ${String(opt.id) === String(active) ? 'selected' : ''}>${opt.label}</option>`).join('');
+                };
+
                 container.innerHTML = `
                     <div class="je-settings-section">
                         <h2 class="je-settings-section-heading">
@@ -253,7 +251,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Default Shader Filter</label>
                                 <select id="je-pref-shader" class="je-select">
-                                    ${SHADER_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === activeShader ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                    ${renderOptions(_settingOptions.shaders, activeShader)}
                                 </select>
                                 <div class="je-field-desc">Post-processing shader applied to the game canvas.</div>
                             </div>
@@ -261,7 +259,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Screen Scaling Mode</label>
                                 <select id="je-pref-scale" class="je-select">
-                                    ${SCALE_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === activeScale ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                    ${renderOptions(_settingOptions.scaling, activeScale)}
                                 </select>
                                 <div class="je-field-desc">How emulator frames scale inside the player viewport.</div>
                             </div>
@@ -269,7 +267,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Default Screen Rotation</label>
                                 <select id="je-pref-rotation" class="je-select">
-                                    ${ROTATION_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === (p.videoRotation || '0') ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                    ${renderOptions(_settingOptions.rotation, p.videoRotation || '0')}
                                 </select>
                                 <div class="je-field-desc">Orientation angle for the game display.</div>
                             </div>
@@ -277,17 +275,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Default Audio Volume</label>
                                 <select id="je-pref-volume" class="je-select">
-                                    <option value="1" ${(p.volume || '1') === '1' || (p.volume === '1.0') ? 'selected' : ''}>100% (Default)</option>
-                                    <option value="0.9" ${p.volume === '0.9' ? 'selected' : ''}>90%</option>
-                                    <option value="0.8" ${p.volume === '0.8' ? 'selected' : ''}>80%</option>
-                                    <option value="0.7" ${p.volume === '0.7' ? 'selected' : ''}>70%</option>
-                                    <option value="0.6" ${p.volume === '0.6' ? 'selected' : ''}>60%</option>
-                                    <option value="0.5" ${p.volume === '0.5' ? 'selected' : ''}>50%</option>
-                                    <option value="0.4" ${p.volume === '0.4' ? 'selected' : ''}>40%</option>
-                                    <option value="0.3" ${p.volume === '0.3' ? 'selected' : ''}>30%</option>
-                                    <option value="0.2" ${p.volume === '0.2' ? 'selected' : ''}>20%</option>
-                                    <option value="0.1" ${p.volume === '0.1' ? 'selected' : ''}>10%</option>
-                                    <option value="0" ${p.volume === '0' || p.volume === '0.0' ? 'selected' : ''}>Muted (0%)</option>
+                                    ${renderOptions(_settingOptions.volume, p.volume || '1')}
                                 </select>
                                 <div class="je-field-desc">Default sound volume level when launching games.</div>
                             </div>
@@ -295,8 +283,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Default Audio Mute</label>
                                 <select id="je-pref-mute" class="je-select">
-                                    <option value="0" ${(p.mute || '0') === '0' ? 'selected' : ''}>Sound Enabled (Default)</option>
-                                    <option value="1" ${(p.mute || '0') === '1' ? 'selected' : ''}>Muted on Launch</option>
+                                    ${renderOptions(_settingOptions.mute, p.mute || '0')}
                                 </select>
                                 <div class="je-field-desc">Initial mute state when launching games.</div>
                             </div>
@@ -304,8 +291,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Show FPS Overlay</label>
                                 <select id="je-pref-fps" class="je-select">
-                                    <option value="0" ${(p.showFps || '0') === '0' ? 'selected' : ''}>Disabled (Default)</option>
-                                    <option value="1" ${(p.showFps || '0') === '1' ? 'selected' : ''}>Enabled (Display Framerate Badge)</option>
+                                    ${renderOptions(_settingOptions.fps, p.showFps || '0')}
                                 </select>
                                 <div class="je-field-desc">Real-time frames per second counter overlay.</div>
                             </div>
@@ -323,7 +309,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Fast Forward Speed</label>
                                 <select id="je-pref-ffrate" class="je-select">
-                                    ${FFRATE_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === (p.ffrate || '3') ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                    ${renderOptions(_settingOptions.fastForwardRates, p.ffrate || '3')}
                                 </select>
                                 <div class="je-field-desc">Speed multiplier when fast-forward is triggered.</div>
                             </div>
@@ -331,7 +317,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Slow Motion Speed</label>
                                 <select id="je-pref-smrate" class="je-select">
-                                    ${SMRATE_OPTIONS.map(opt => `<option value="${opt.id}" ${opt.id === (p.smrate || '3') ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                    ${renderOptions(_settingOptions.slowMotionRates, p.smrate || '3')}
                                 </select>
                                 <div class="je-field-desc">Speed reduction factor for slow-motion gameplay.</div>
                             </div>
@@ -339,8 +325,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Autosave on Exit</label>
                                 <select id="je-pref-autosave" class="je-select">
-                                    <option value="1" ${(p.autosave || '0') === '1' ? 'selected' : ''}>Enabled (Auto Save State)</option>
-                                    <option value="0" ${(p.autosave || '0') === '0' ? 'selected' : ''}>Disabled (Manual Saves Only)</option>
+                                    ${renderOptions(_settingOptions.autosave, p.autosave || '0')}
                                 </select>
                                 <div class="je-field-desc">Automatically saves state upon closing the emulator.</div>
                             </div>
@@ -348,8 +333,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Gamepad Haptics</label>
                                 <select id="je-pref-haptics" class="je-select">
-                                    <option value="1" ${(p.haptics || '1') === '1' ? 'selected' : ''}>Enabled (Vibration Feedback)</option>
-                                    <option value="0" ${(p.haptics || '1') === '0' ? 'selected' : ''}>Disabled</option>
+                                    ${renderOptions(_settingOptions.haptics, p.haptics !== undefined ? String(p.haptics) : '1')}
                                 </select>
                                 <div class="je-field-desc">Physical gamepad rumble vibration feedback.</div>
                             </div>
@@ -357,8 +341,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">On-Screen Mobile Gamepad</label>
                                 <select id="je-pref-vg" class="je-select">
-                                    <option value="0" ${(p.virtualGamepad || '0') === '0' ? 'selected' : ''}>Disabled by Default</option>
-                                    <option value="1" ${(p.virtualGamepad || '0') === '1' ? 'selected' : ''}>Enabled by Default</option>
+                                    ${renderOptions(_settingOptions.virtualGamepad, p.virtualGamepad || '0')}
                                 </select>
                                 <div class="je-field-desc">Touchscreen controls overlay for mobile devices.</div>
                             </div>
@@ -366,8 +349,7 @@
                             <div class="je-input-container">
                                 <label class="je-input-label">Mobile Gamepad Layout</label>
                                 <select id="je-pref-vg-lefty" class="je-select">
-                                    <option value="0" ${(p.virtualGamepadLefty || '0') === '0' ? 'selected' : ''}>Right-Handed (Standard)</option>
-                                    <option value="1" ${(p.virtualGamepadLefty || '0') === '1' ? 'selected' : ''}>Left-Handed (Lefty Mode)</option>
+                                    ${renderOptions(_settingOptions.virtualGamepadLefty, p.virtualGamepadLefty || '0')}
                                 </select>
                                 <div class="je-field-desc">D-pad and action button orientation on mobile.</div>
                             </div>

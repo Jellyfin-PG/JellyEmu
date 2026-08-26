@@ -62,7 +62,7 @@ Consistent naming makes navigating a multi-language stack predictable and straig
 
 ### 3.4 REST API Endpoints
 - Base Path: lowercase kebab-case under `/jellyemu/`.
-- Resource Routing: `/jellyemu/{resource}` (for example, `/jellyemu/prefs/{userId}`, `/jellyemu/systems`, `/jellyemu/shaders`).
+- Resource Routing: `/jellyemu/{resource}` (for example, `/jellyemu/prefs/{userId}`, `/jellyemu/systems`, `/jellyemu/setting-options`).
 - Query Parameters: camelCase (for example, `?scope=system&targetId=nes`).
 
 ---

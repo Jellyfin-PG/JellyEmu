@@ -314,27 +314,37 @@
             .catch(function (e) { console.warn('[JellyEmu] Failed loading core options:', e); });
     }
 
-    function populateShaderSelect(selectedVal) {
-        var shaderSelect = document.getElementById('je-glob-shader');
-        if (!shaderSelect) return Promise.resolve();
+    function populateSelect(elId, optionsList, activeVal) {
+        var el = document.getElementById(elId);
+        if (!el || !Array.isArray(optionsList) || optionsList.length === 0) return;
+        el.innerHTML = '';
+        optionsList.forEach(function (opt) {
+            var o = document.createElement('option');
+            o.value = opt.id;
+            o.textContent = opt.label;
+            if (String(opt.id) === String(activeVal)) o.selected = true;
+            el.appendChild(o);
+        });
+    }
 
-        return jeFetch('/jellyemu/shaders')
-            .then(function (r) { return r.ok ? r.json() : []; })
-            .then(function (data) {
-                if (!Array.isArray(data) || data.length === 0) return;
-                var active = normalizeShader(selectedVal || _globPrefs.shader || cfg.activeShader || 'crt-easymode.glslp');
-                shaderSelect.innerHTML = '';
-                data.forEach(function (s) {
-                    var opt = document.createElement('option');
-                    var sid = s.id || s.Id || '';
-                    var slabel = s.label || s.Label || sid;
-                    opt.value = sid;
-                    opt.textContent = slabel;
-                    if (normalizeShader(sid) === active) opt.selected = true;
-                    shaderSelect.appendChild(opt);
-                });
+    function populateSettingOptions() {
+        return jeFetch('/jellyemu/setting-options')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (opts) {
+                if (!opts) return;
+                var defaultShader = normalizeShader(cfg.activeShader) || 'crt-easymode.glslp';
+                if (defaultShader === 'disabled' && cfg.activeShader !== 'disabled' && cfg.activeShader !== 'none') defaultShader = 'crt-easymode.glslp';
+
+                populateSelect('je-glob-shader', opts.shaders, _globPrefs.shader ? normalizeShader(_globPrefs.shader) : defaultShader);
+                populateSelect('je-glob-screensize', opts.scaling, _globPrefs.scale ? normalizeScale(_globPrefs.scale) : (normalizeScale(cfg.scale) || 'fit'));
+                populateSelect('je-glob-rotation', opts.rotation, _globPrefs.videoRotation !== undefined ? String(_globPrefs.videoRotation) : (cfg.videoRotation !== undefined ? String(cfg.videoRotation) : '0'));
+                populateSelect('je-glob-fps', opts.fps, _globPrefs.showFps !== undefined ? String(_globPrefs.showFps) : (cfg.showFps !== undefined ? String(cfg.showFps) : '0'));
+                populateSelect('je-glob-ffrate', opts.fastForwardRates, _globPrefs.ffrate || cfg.ffrate || '3');
+                populateSelect('je-glob-smrate', opts.slowMotionRates, _globPrefs.smrate || cfg.smrate || '3');
+                populateSelect('je-glob-autosave', opts.autosave, _globPrefs.autosave || '0');
+                populateSelect('je-glob-haptics', opts.haptics, _globPrefs.haptics !== undefined ? String(_globPrefs.haptics) : '1');
             })
-            .catch(function (e) { console.warn('[JellyEmu] Failed loading shaders list:', e); });
+            .catch(function (e) { console.warn('[JellyEmu] Failed loading setting options:', e); });
     }
 
     function normalizeScale(val) {
@@ -363,23 +373,7 @@
             .then(function (r) { return r.ok ? r.json() : {}; })
             .then(function (data) {
                 _globPrefs = (data && data.preferences) || {};
-                var setVal = function (id, val, def) {
-                    var el = document.getElementById(id);
-                    if (el) el.value = (val !== undefined && val !== null && val !== '') ? String(val) : def;
-                };
-
-                var defaultShader = normalizeShader(cfg.activeShader) || 'crt-easymode.glslp';
-                if (defaultShader === 'disabled' && cfg.activeShader !== 'disabled' && cfg.activeShader !== 'none') defaultShader = 'crt-easymode.glslp';
-
-                populateShaderSelect(_globPrefs.shader || defaultShader);
-                setVal('je-glob-shader', _globPrefs.shader ? normalizeShader(_globPrefs.shader) : defaultShader);
-                setVal('je-glob-screensize', _globPrefs.scale ? normalizeScale(_globPrefs.scale) : (normalizeScale(cfg.scale) || 'fit'));
-                setVal('je-glob-rotation', _globPrefs.videoRotation, (cfg.videoRotation !== undefined ? String(cfg.videoRotation) : '0'));
-                setVal('je-glob-fps', _globPrefs.showFps, (cfg.showFps !== undefined ? String(cfg.showFps) : '0'));
-                setVal('je-glob-ffrate', _globPrefs.ffrate, cfg.ffrate || '3');
-                setVal('je-glob-smrate', _globPrefs.smrate, cfg.smrate || '3');
-                setVal('je-glob-autosave', _globPrefs.autosave, '0');
-                setVal('je-glob-haptics', _globPrefs.haptics, '1');
+                return populateSettingOptions();
             }).catch(function (e) { console.warn('[JellyEmu] Failed loading global prefs:', e); });
 
         return Promise.all([pSys, pGlob]);
