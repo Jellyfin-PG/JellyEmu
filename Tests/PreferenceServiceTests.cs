@@ -140,8 +140,8 @@ namespace JellyEmu.Tests
 
                 var summary = await service.GetAllOverridesSummaryAsync(userId);
                 Assert.Equal(2, summary.Count);
-                Assert.Contains(summary, s => s.Scope == "system" && s.TargetId == "SNES");
-                Assert.Contains(summary, s => s.Scope == "system" && s.TargetId == "GBA");
+                Assert.Contains(summary, s => s.Scope == "system" && string.Equals(s.TargetId, "snes", StringComparison.OrdinalIgnoreCase));
+                Assert.Contains(summary, s => s.Scope == "system" && string.Equals(s.TargetId, "gba", StringComparison.OrdinalIgnoreCase));
             }
             finally
             {
@@ -242,6 +242,57 @@ namespace JellyEmu.Tests
                 var updatedGba = await service.GetEffectivePreferencesAsync(userId, "Game Boy Advance");
                 Assert.Equal("0.75", updatedGba.Volume);
                 Assert.Equal("1", updatedGba.Mute);
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task CustomInputMapping_PerConsole_SavesAndRetrievesIndependently()
+        {
+            var (service, tempDir) = CreateTestService();
+            try
+            {
+                var userId = "user_input_test";
+                var gbCustomBindings = "{\"8\":{\"kb1\":90,\"kb2\":0,\"gp1\":\"BUTTON_1\",\"gp2\":\"\"},\"0\":{\"kb1\":88,\"kb2\":0,\"gp1\":\"BUTTON_3\",\"gp2\":\"\"}}";
+                var snesCustomBindings = "{\"8\":{\"kb1\":90,\"kb2\":0,\"gp1\":\"BUTTON_2\",\"gp2\":\"\"},\"0\":{\"kb1\":88,\"kb2\":0,\"gp1\":\"BUTTON_1\",\"gp2\":\"\"}}";
+
+                // Save custom bindings for Game Boy using platform tag "Game Boy"
+                await service.SetPreferencesAsync(userId, "system", "Game Boy", new Dictionary<string, string?>
+                {
+                    ["controls"] = gbCustomBindings
+                });
+
+                // Save custom bindings for SNES using scheme key "snes"
+                await service.SetPreferencesAsync(userId, "system", "snes", new Dictionary<string, string?>
+                {
+                    ["controls"] = snesCustomBindings
+                });
+
+                // 1. Querying "Game Boy" should retrieve gbCustomBindings
+                var effGb = await service.GetEffectivePreferencesAsync(userId, "Game Boy");
+                Assert.Equal(gbCustomBindings, effGb.Controls);
+
+                // 2. Querying alias "GBC" or "gb" should also resolve to canonical "gb" and retrieve gbCustomBindings
+                var effGbc = await service.GetEffectivePreferencesAsync(userId, "GBC");
+                Assert.Equal(gbCustomBindings, effGbc.Controls);
+
+                var effGbKey = await service.GetEffectivePreferencesAsync(userId, "gb");
+                Assert.Equal(gbCustomBindings, effGbKey.Controls);
+
+                // 3. Querying "Super Nintendo" or "SNES" should retrieve snesCustomBindings
+                var effSnesTag = await service.GetEffectivePreferencesAsync(userId, "Super Nintendo");
+                Assert.Equal(snesCustomBindings, effSnesTag.Controls);
+
+                var effSnesKey = await service.GetEffectivePreferencesAsync(userId, "snes");
+                Assert.Equal(snesCustomBindings, effSnesKey.Controls);
+
+                // 4. Querying an unconfigured system (e.g. "N64") should NOT have custom controls
+                var effN64 = await service.GetEffectivePreferencesAsync(userId, "N64");
+                Assert.Equal(string.Empty, effN64.Controls);
             }
             finally
             {

@@ -14,37 +14,85 @@
     function closePopup(id) { window._jeClosePopup && window._jeClosePopup(id); }
     function syncVGToggles(){ window._jeSyncVGToggles && window._jeSyncVGToggles(); }
 
-    // - Input Map -
-    var inputMap = {
-        0:  'B',               1:  'Y',              2:  'SELECT',         3:  'START',
-        4:  'UP',              5:  'DOWN',            6:  'LEFT',           7:  'RIGHT',
-        8:  'A',               9:  'X',               10: 'L',              11: 'R',
-        12: 'L2',             13: 'R2',              14: 'L3',             15: 'R3',
-        16: 'L STICK RIGHT',  17: 'L STICK LEFT',   18: 'L STICK DOWN',  19: 'L STICK UP',
-        20: 'R STICK RIGHT',  21: 'R STICK LEFT',   22: 'R STICK DOWN',  23: 'R STICK UP',
-        24: 'QUICK SAVE',     25: 'QUICK LOAD',      26: 'CHANGE SLOT',   27: 'FAST FORWARD',
-        28: 'REWIND',          29: 'SLOW MOTION'
+    // ==========================================
+    // - EMULATORJS SYSTEM INPUT SCHEMES -
+    // Ref: https://github.com/EmulatorJS/EmulatorJS/blob/0b1c5e94d8df0db7509b211fb9ffc72d2805948a/data/src/emulator.js#L2817
+    // ==========================================
+    var HOTKEYS = [
+        { id: 24, label: 'QUICK SAVE', description: 'Save state immediately' },
+        { id: 25, label: 'QUICK LOAD', description: 'Load state immediately' },
+        { id: 26, label: 'CHANGE SLOT', description: 'Cycle active save state slot' },
+        { id: 27, label: 'FAST FORWARD', description: 'Toggle fast forward emulation' },
+        { id: 28, label: 'REWIND', description: 'Rewind gameplay in real time' },
+        { id: 29, label: 'SLOW MOTION', description: 'Toggle slow motion gameplay' }
+    ];
+
+    // ==========================================
+    // - BACKEND SINGLE SOURCE OF TRUTH SCHEME -
+    // Initialized from window.JellyEmuConfig.inputScheme and synchronized via /jellyemu/input/schemes
+    // ==========================================
+    var _activeBackendScheme = (window.JellyEmuConfig && window.JellyEmuConfig.inputScheme) || null;
+    var SYSTEM_SCHEMES = {};
+    if (_activeBackendScheme && _activeBackendScheme.id) {
+        SYSTEM_SCHEMES[_activeBackendScheme.id] = _activeBackendScheme;
+    }
+
+    // Generic fallback for offline or uninitialized state
+    SYSTEM_SCHEMES['default'] = {
+        name: 'Standard Controller',
+        buttons: [
+            { id: 8, label: 'A' }, { id: 0, label: 'B' }, { id: 9, label: 'X' }, { id: 1, label: 'Y' },
+            { id: 2, label: 'SELECT' }, { id: 3, label: 'START' },
+            { id: 4, label: 'UP' }, { id: 5, label: 'DOWN' }, { id: 6, label: 'LEFT' }, { id: 7, label: 'RIGHT' },
+            { id: 10, label: 'L1' }, { id: 11, label: 'R1' }
+        ],
+        analogAxes: []
     };
 
-    var n64InputMap = {
-        0:  'N64 B BUTTON',   1:  'C-BUTTON LEFT',   2:  'Z-TRIGGER (Alt)',3:  'START',
-        4:  'D-PAD UP',       5:  'D-PAD DOWN',      6:  'D-PAD LEFT',     7:  'D-PAD RIGHT',
-        8:  'N64 A BUTTON',   9:  'C-BUTTON DOWN',   10: 'L SHOULDER',     11: 'R SHOULDER',
-        12: 'Z-TRIGGER',      13: 'C-BUTTON RIGHT',  14: 'C-BUTTON UP',    15: 'R3',
-        16: 'STICK RIGHT',    17: 'STICK LEFT',      18: 'STICK DOWN',     19: 'STICK UP',
-        20: 'C-BUTTON RIGHT', 21: 'C-BUTTON LEFT',   22: 'C-BUTTON DOWN',  23: 'C-BUTTON UP',
-        24: 'QUICK SAVE',     25: 'QUICK LOAD',      26: 'CHANGE SLOT',   27: 'FAST FORWARD',
-        28: 'REWIND',          29: 'SLOW MOTION'
-    };
-
-    function _jeIsN64() {
+    function getActiveControlScheme() {
+        if (_activeBackendScheme && _activeBackendScheme.id) {
+            return _activeBackendScheme.id;
+        }
+        var e = emu();
+        if (e && typeof e.getControlScheme === 'function') {
+            try {
+                var cs = e.getControlScheme();
+                if (cs && SYSTEM_SCHEMES[cs]) return cs;
+            } catch (err) {}
+        }
         var core = (window.EJS_core || '').toLowerCase();
-        var platform = (window.EJS_platformTag || '').toUpperCase();
-        return platform === 'N64' || core === 'mupen64plus_next' || core === 'parallel_n64' || core === 'n64';
+        if (core) return core;
+        var tag = (window.EJS_platformTag || '').toUpperCase().trim();
+        if (tag) return tag;
+        return 'default';
+    }
+
+    function getActiveSchemeDefinition() {
+        var key = getActiveControlScheme();
+        return SYSTEM_SCHEMES[key] || SYSTEM_SCHEMES['default'];
+    }
+
+    function getActiveInputButtons() {
+        var scheme = getActiveSchemeDefinition();
+        var buttons = (scheme && scheme.buttons) ? scheme.buttons.slice() : [];
+        var hasHotkeys = buttons.some(function (b) { return b.id >= 24; });
+        if (!hasHotkeys) {
+            buttons = buttons.concat(HOTKEYS);
+        }
+        return buttons;
     }
 
     function getActiveInputMap() {
-        return _jeIsN64() ? n64InputMap : inputMap;
+        var buttons = getActiveInputButtons();
+        var map = {};
+        for (var i = 0; i < buttons.length; i++) {
+            map[buttons[i].id] = buttons[i].label;
+        }
+        return map;
+    }
+
+    function _jeIsN64() {
+        return getActiveControlScheme() === 'n64';
     }
 
     // - Hotkey handlers -
@@ -161,8 +209,8 @@
         return name + (val > 0 ? ':+1' : ':-1');
     }
 
-    // - Default bindings -
-    var _jeDefaultBindings = {
+    // - Base Default bindings -
+    var _jeBaseDefaultBindings = {
         0:  { kb1:88,  kb2:0, gp1:'BUTTON_2',              gp2:'' },
         1:  { kb1:83,  kb2:0, gp1:'BUTTON_4',              gp2:'' },
         2:  { kb1:86,  kb2:0, gp1:'SELECT',                gp2:'' },
@@ -194,57 +242,50 @@
         28: { kb1:32,  kb2:0, gp1:'', gp2:'' },
         29: { kb1:109, kb2:0, gp1:'', gp2:'' }
     };
+    var _jeDefaultBindings = _jeBaseDefaultBindings; // backward-compatibility alias
 
-    var _jeN64DefaultBindings = {
-        0:  { kb1:67,  kb2:0, gp1:'BUTTON_2',              gp2:'BUTTON_3' },
-        1:  { kb1:0,   kb2:0, gp1:'RIGHT_STICK_X:-1',      gp2:'' },
-        2:  { kb1:0,   kb2:0, gp1:'',                      gp2:'' },
-        3:  { kb1:13,  kb2:0, gp1:'START',                 gp2:'' },
-        4:  { kb1:38,  kb2:0, gp1:'DPAD_UP',               gp2:'' },
-        5:  { kb1:40,  kb2:0, gp1:'DPAD_DOWN',             gp2:'' },
-        6:  { kb1:37,  kb2:0, gp1:'DPAD_LEFT',             gp2:'' },
-        7:  { kb1:39,  kb2:0, gp1:'DPAD_RIGHT',            gp2:'' },
-        8:  { kb1:88,  kb2:0, gp1:'BUTTON_1',              gp2:'' },
-        9:  { kb1:0,   kb2:0, gp1:'RIGHT_STICK_Y:+1',      gp2:'' },
-        10: { kb1:81,  kb2:0, gp1:'LEFT_TOP_SHOULDER',     gp2:'' },
-        11: { kb1:69,  kb2:0, gp1:'RIGHT_TOP_SHOULDER',    gp2:'' },
-        12: { kb1:90,  kb2:0, gp1:'LEFT_BOTTOM_SHOULDER',  gp2:'RIGHT_BOTTOM_SHOULDER' },
-        13: { kb1:0,   kb2:0, gp1:'RIGHT_STICK_X:+1',      gp2:'' },
-        14: { kb1:0,   kb2:0, gp1:'RIGHT_STICK_Y:-1',      gp2:'BUTTON_4' },
-        15: { kb1:0,   kb2:0, gp1:'LEFT_STICK',            gp2:'' },
-        16: { kb1:76,  kb2:0, gp1:'LEFT_STICK_X:+1',       gp2:'' },
-        17: { kb1:74,  kb2:0, gp1:'LEFT_STICK_X:-1',       gp2:'' },
-        18: { kb1:75,  kb2:0, gp1:'LEFT_STICK_Y:+1',       gp2:'' },
-        19: { kb1:73,  kb2:0, gp1:'LEFT_STICK_Y:-1',       gp2:'' },
-        20: { kb1:0,   kb2:0, gp1:'',                      gp2:'' },
-        21: { kb1:83,  kb2:0, gp1:'',                      gp2:'' },
-        22: { kb1:65,  kb2:0, gp1:'',                      gp2:'' },
-        23: { kb1:87,  kb2:0, gp1:'',                      gp2:'' },
-        24: { kb1:49,  kb2:0, gp1:'', gp2:'' },
-        25: { kb1:50,  kb2:0, gp1:'', gp2:'' },
-        26: { kb1:51,  kb2:0, gp1:'', gp2:'' },
-        27: { kb1:107, kb2:0, gp1:'', gp2:'' },
-        28: { kb1:32,  kb2:0, gp1:'', gp2:'' },
-        29: { kb1:109, kb2:0, gp1:'', gp2:'' }
-    };
+    function _jeGetDefaultBindings() {
+        var schemeDef = getActiveSchemeDefinition();
+        if (schemeDef && schemeDef.defaultBindings && Object.keys(schemeDef.defaultBindings).length > 0) {
+            return JSON.parse(JSON.stringify(schemeDef.defaultBindings));
+        }
+        var buttons = getActiveInputButtons();
+        var result = {};
+        for (var i = 0; i < buttons.length; i++) {
+            var id = buttons[i].id;
+            if (_jeBaseDefaultBindings[id]) {
+                result[id] = JSON.parse(JSON.stringify(_jeBaseDefaultBindings[id]));
+            } else {
+                result[id] = { kb1: 0, kb2: 0, gp1: '', gp2: '' };
+            }
+        }
+        return result;
+    }
 
     // - Live binding map -
     var _jeBindings = {};
     function _jeLoadBindings(serverPrefs) {
-        var defaults = _jeIsN64() ? _jeN64DefaultBindings : _jeDefaultBindings;
+        var defaults = _jeGetDefaultBindings();
         try {
-            var saved = serverPrefs && serverPrefs.jeBindings ? JSON.parse(serverPrefs.jeBindings) : null;
+            var raw = (serverPrefs && (serverPrefs.jeBindings || serverPrefs.controls))
+                ? (serverPrefs.jeBindings || serverPrefs.controls)
+                : (cfg.customBindings || null);
+            var saved = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
             _jeBindings = saved || JSON.parse(JSON.stringify(defaults));
         } catch (e) {
             _jeBindings = JSON.parse(JSON.stringify(defaults));
         }
 
-        if (_jeIsN64()) {
-            if (!_jeBindings[16] || !_jeBindings[16].gp1) _jeBindings[16] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[16]));
-            if (!_jeBindings[17] || !_jeBindings[17].gp1) _jeBindings[17] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[17]));
-            if (!_jeBindings[18] || !_jeBindings[18].gp1) _jeBindings[18] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[18]));
-            if (!_jeBindings[19] || !_jeBindings[19].gp1) _jeBindings[19] = JSON.parse(JSON.stringify(_jeN64DefaultBindings[19]));
+        // Ensure all active buttons for current scheme exist in _jeBindings
+        var buttons = getActiveInputButtons();
+        for (var i = 0; i < buttons.length; i++) {
+            var id = buttons[i].id;
+            if (!_jeBindings[id]) {
+                _jeBindings[id] = defaults[id] ? JSON.parse(JSON.stringify(defaults[id])) : { kb1: 0, kb2: 0, gp1: '', gp2: '' };
+            }
+        }
 
+        if (_jeIsN64()) {
             [4, 5, 6, 7].forEach(function (i) {
                 if (_jeBindings[i] && _jeBindings[i].gp2 && _jeBindings[i].gp2.indexOf('LEFT_STICK') !== -1) {
                     _jeBindings[i].gp2 = '';
@@ -258,11 +299,13 @@
         var prefHeaders = {};
         if (token) prefHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
         var cItemId = (window.JellyEmuConfig && window.JellyEmuConfig.itemId) ? encodeURIComponent(window.JellyEmuConfig.itemId) : '';
-        var cPlatform = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) ? encodeURIComponent(window.JellyEmuConfig.platformTag) : '';
-        fetch('/jellyemu/prefs/' + userId + '/effective?itemId=' + cItemId + '&platform=' + cPlatform, { headers: prefHeaders })
+        var cPlatform = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) || window.EJS_platformTag || '';
+        var consoleKey = getActiveControlScheme();
+        var platformQuery = consoleKey || cPlatform;
+        fetch('/jellyemu/prefs/' + userId + '/effective?itemId=' + cItemId + '&platform=' + encodeURIComponent(platformQuery), { headers: prefHeaders })
             .then(function (r) { if (r.ok) return r.json(); })
             .then(function (data) {
-                if (data && data.jeBindings) {
+                if (data && (data.jeBindings || data.controls)) {
                     _jeLoadBindings(data);
                     if (document.getElementById('je-tab-kb')) {
                         buildKeyboardBinds();
@@ -272,6 +315,45 @@
             })
             .catch(function (err) { console.warn('[JellyEmu] Failed to load bindings:', err); });
     }
+
+    // - Synchronize controller schemes from backend (single source of truth) -
+    function _jeSyncSchemesFromBackend() {
+        var schemeHeaders = {};
+        if (token) schemeHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
+        var platformOrCore = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) || window.EJS_platformTag || window.EJS_core || '';
+        var endpoint = platformOrCore ? ('/jellyemu/input/schemes/' + encodeURIComponent(platformOrCore)) : '/jellyemu/input/schemes';
+
+        fetch(endpoint, { headers: schemeHeaders })
+            .then(function (r) { if (r.ok) return r.json(); })
+            .then(function (data) {
+                if (!data) return;
+                if (data.hotkeys && Array.isArray(data.hotkeys)) {
+                    HOTKEYS = data.hotkeys;
+                }
+                if (data.scheme) {
+                    _activeBackendScheme = data.scheme;
+                    SYSTEM_SCHEMES[data.scheme.id] = data.scheme;
+                } else if (data.schemes) {
+                    Object.keys(data.schemes).forEach(function (k) {
+                        SYSTEM_SCHEMES[k] = data.schemes[k];
+                    });
+                    var activeKey = getActiveControlScheme();
+                    if (data.schemes[activeKey]) {
+                        _activeBackendScheme = data.schemes[activeKey];
+                    }
+                }
+                _jeLoadBindings(null);
+                if (document.getElementById('je-tab-kb') && _popupOpen()) {
+                    buildKeyboardBinds();
+                    buildGamepadBinds(true);
+                }
+                console.log('[JellyEmu] Controller schemes synchronized from backend');
+            })
+            .catch(function (err) {
+                console.warn('[JellyEmu] Backend controller schemes sync skipped:', err);
+            });
+    }
+    _jeSyncSchemesFromBackend();
 
     var _jeSimulatedState = {};
 
@@ -288,15 +370,16 @@
         }
         _jeSimulatedState[idx] = boolPressed;
 
-        var mapName = getActiveInputMap()[idx] || idx;
+        var mapName = getActiveInputMap()[idx] || ('ID ' + idx);
         console.log('[JellyEmu Input] _jeSimulate | Index:', idx, '(' + mapName + ') | Pressed:', boolPressed);
 
-        if (_jeIsN64() && idx >= 16 && idx <= 19) {
-            try { g.simulateInput(0, idx, boolPressed ? 32767 : 0); } catch (e) {}
-            return;
+        var isAnalog = (idx >= 16 && idx <= 23);
+        var simVal = boolPressed ? (isAnalog ? 32767 : 1) : 0;
+        try {
+            g.simulateInput(0, idx, simVal);
+        } catch (e) {
+            console.warn('[JellyEmu Input] simulateInput error:', e);
         }
-
-        g.simulateInput(0, idx, boolPressed ? 1 : 0);
     }
 
     function _jeFindBindingsForGp(gpStr) {
@@ -343,132 +426,177 @@
         }
     }, true);
 
-    // - Gamepad hijack -
+    // ============================================================
+    // - DIRECT RAW GAMEPAD ENGINE -
+    // Polls navigator.getGamepads() every animation frame.
+    // Handles button mapping and emulation input directly with full logging.
+    // ============================================================
+    var _jeActiveGpListen = null; // { idx, field, bk, timeoutId, initialAxes }
+    var _jeRawGpPrevButtons = {}; // padIndex -> { bi: bool }
+    var _jeRawGpPrevAxes = {};    // padIndex -> { ai: val }
+    var _jeGpActiveState = {};    // label -> bool (for simulation debounce)
+
+    function _jeHandleAxisSimulation(label, isPressed) {
+        if (isPressed) {
+            if (!_jeGpActiveState[label]) {
+                _jeGpActiveState[label] = true;
+                var binds = _jeFindBindingsForGp(label);
+                binds.forEach(function (idx) { _jeSimulate(idx, true); });
+            }
+        } else {
+            if (_jeGpActiveState[label]) {
+                _jeGpActiveState[label] = false;
+                var binds = _jeFindBindingsForGp(label);
+                binds.forEach(function (idx) { _jeSimulate(idx, false); });
+            }
+        }
+    }
+
+    function _jePollRawGamepads() {
+        var pads = [];
+        if (navigator.getGamepads) {
+            try { pads = navigator.getGamepads() || []; } catch (e) {}
+        } else if (navigator.webkitGetGamepads) {
+            try { pads = navigator.webkitGetGamepads() || []; } catch (e) {}
+        }
+
+        for (var gi = 0; gi < pads.length; gi++) {
+            var gp = pads[gi];
+            if (!gp || !gp.connected) continue;
+
+            if (!_jeRawGpPrevButtons[gp.index]) _jeRawGpPrevButtons[gp.index] = {};
+            if (!_jeRawGpPrevAxes[gp.index]) _jeRawGpPrevAxes[gp.index] = {};
+
+            // 1. Process Buttons (supports pressed bool, pressure value > 0.4, or numeric button)
+            var buttonsCount = gp.buttons ? gp.buttons.length : 0;
+            for (var bi = 0; bi < buttonsCount; bi++) {
+                var btn = gp.buttons[bi];
+                var val = 0;
+                var pressed = false;
+                if (typeof btn === 'object' && btn !== null) {
+                    val = typeof btn.value === 'number' ? btn.value : (btn.pressed ? 1 : 0);
+                    pressed = !!btn.pressed || val > 0.4;
+                } else if (typeof btn === 'number') {
+                    val = btn;
+                    pressed = btn > 0.4;
+                }
+
+                var wasPressed = !!_jeRawGpPrevButtons[gp.index][bi];
+
+                if (pressed !== wasPressed) {
+                    _jeRawGpPrevButtons[gp.index][bi] = pressed;
+                    var label = _jeButtonLabel(bi);
+                    console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' (' + gp.id + ') Button ' + bi + ' [' + label + '] ' + (pressed ? 'PRESSED' : 'RELEASED') + ' (val: ' + val.toFixed(2) + ')');
+
+                    // If currently listening for mapping in Input Settings modal:
+                    if (_jeActiveGpListen && pressed) {
+                        var listen = _jeActiveGpListen;
+                        _jeActiveGpListen = null;
+                        clearTimeout(listen.timeoutId);
+                        listen.bk.classList.remove('je-listening');
+                        _jeBindings[listen.idx][listen.field] = label;
+                        listen.bk.textContent = _jeGpName(label);
+                        _jeSyncBindingsToServer();
+                        continue;
+                    }
+
+                    // If not mapping, dispatch to gameplay simulation
+                    if (!_jeActiveGpListen) {
+                        var matched = _jeFindBindingsForGp(label);
+                        if (matched.length === 0) {
+                            matched = _jeFindBindingsForGp(bi);
+                        }
+                        if (matched.length > 0) {
+                            if (pressed) {
+                                if (!_jeGpActiveState[label]) {
+                                    _jeGpActiveState[label] = true;
+                                    matched.forEach(function (idx) { _jeSimulate(idx, true); });
+                                }
+                            } else {
+                                if (_jeGpActiveState[label]) {
+                                    _jeGpActiveState[label] = false;
+                                    matched.forEach(function (idx) { _jeSimulate(idx, false); });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Process Axes (Analog Sticks & Triggers on axes)
+            var axesCount = gp.axes ? gp.axes.length : 0;
+            for (var ai = 0; ai < axesCount; ai++) {
+                var aVal = gp.axes[ai];
+                var prevVal = _jeRawGpPrevAxes[gp.index][ai] !== undefined ? _jeRawGpPrevAxes[gp.index][ai] : 0;
+                var axisName = ai < _jeAxisNames.length ? _jeAxisNames[ai] : ('EXTRA_STICK_' + ai);
+
+                var isMovedPos = aVal > 0.5;
+                var isMovedNeg = aVal < -0.5;
+                var wasMovedPos = prevVal > 0.5;
+                var wasMovedNeg = prevVal < -0.5;
+
+                _jeRawGpPrevAxes[gp.index][ai] = aVal;
+
+                var posLabel = axisName + ':+1';
+                var negLabel = axisName + ':-1';
+
+                // Positive axis direction
+                if (isMovedPos !== wasMovedPos) {
+                    console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' Axis ' + ai + ' [' + posLabel + '] ' + (isMovedPos ? 'MOVED' : 'RELEASED') + ' (val: ' + aVal.toFixed(2) + ')');
+                    if (_jeActiveGpListen && isMovedPos) {
+                        var initA = (_jeActiveGpListen.initialAxes && _jeActiveGpListen.initialAxes[gp.index] && _jeActiveGpListen.initialAxes[gp.index][ai]) || 0;
+                        if (Math.abs(aVal - initA) > 0.4) {
+                            var listen = _jeActiveGpListen;
+                            _jeActiveGpListen = null;
+                            clearTimeout(listen.timeoutId);
+                            listen.bk.classList.remove('je-listening');
+                            _jeBindings[listen.idx][listen.field] = posLabel;
+                            listen.bk.textContent = _jeGpName(posLabel);
+                            _jeSyncBindingsToServer();
+                            continue;
+                        }
+                    } else if (!_jeActiveGpListen) {
+                        _jeHandleAxisSimulation(posLabel, isMovedPos);
+                    }
+                }
+
+                // Negative axis direction
+                if (isMovedNeg !== wasMovedNeg) {
+                    console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' Axis ' + ai + ' [' + negLabel + '] ' + (isMovedNeg ? 'MOVED' : 'RELEASED') + ' (val: ' + aVal.toFixed(2) + ')');
+                    if (_jeActiveGpListen && isMovedNeg) {
+                        var initA = (_jeActiveGpListen.initialAxes && _jeActiveGpListen.initialAxes[gp.index] && _jeActiveGpListen.initialAxes[gp.index][ai]) || 0;
+                        if (Math.abs(aVal - initA) > 0.4) {
+                            var listen = _jeActiveGpListen;
+                            _jeActiveGpListen = null;
+                            clearTimeout(listen.timeoutId);
+                            listen.bk.classList.remove('je-listening');
+                            _jeBindings[listen.idx][listen.field] = negLabel;
+                            listen.bk.textContent = _jeGpName(negLabel);
+                            _jeSyncBindingsToServer();
+                            continue;
+                        }
+                    } else if (!_jeActiveGpListen) {
+                        _jeHandleAxisSimulation(negLabel, isMovedNeg);
+                    }
+                }
+            }
+        }
+
+        requestAnimationFrame(_jePollRawGamepads);
+    }
+    requestAnimationFrame(_jePollRawGamepads);
+
+    // Disable EJS internal controls so they do not conflict with JellyEmu raw controller simulation
     window.addEventListener('jellyemu:gamestart', function () {
-        console.log('[JellyEmu] jellyemu:gamestart event received, hijacking gamepad listeners');
+        console.log('[JellyEmu] jellyemu:gamestart event received, clearing EJS controls for direct JellyEmu gamepad simulation');
 
         window.EJS_defaultControls = {
             0: {}, 1: {}, 2: {}, 3: {}
         };
 
-        var ejsButtonDown = null;
-        var ejsButtonUp   = null;
-        var ejsAxisChange = null;
-        var _jeGpActiveState = {};
-
-        function _jeHijack() {
+        function _jeDisableEjsControls() {
             var e = window.EJS_emulator;
-            if (!e || !e.gamepad) return false;
-
-            var gh = e.gamepad;
-
-            var originalOn = gh.on;
-            if (originalOn && !originalOn._jeHijacked) {
-                gh.on = function (name, cb) {
-                    var lowerName = name.toLowerCase();
-                    if (lowerName === 'buttondown') {
-                        ejsButtonDown = cb;
-                    } else if (lowerName === 'buttonup') {
-                        ejsButtonUp = cb;
-                    } else if (lowerName === 'axischanged') {
-                        ejsAxisChange = cb;
-                    } else {
-                        originalOn.call(gh, name, cb);
-                    }
-                };
-                gh.on._jeHijacked = true;
-            }
-
-            if (gh.listeners) {
-                if (gh.listeners['buttondown'] && gh.listeners['buttondown'] !== ejsButtonDown) {
-                    ejsButtonDown = gh.listeners['buttondown'];
-                }
-                if (gh.listeners['buttonup'] && gh.listeners['buttonup'] !== ejsButtonUp) {
-                    ejsButtonUp = gh.listeners['buttonup'];
-                }
-                if (gh.listeners['axischanged'] && gh.listeners['axischanged'] !== ejsAxisChange) {
-                    ejsAxisChange = gh.listeners['axischanged'];
-                }
-            }
-
-            var registerOn = originalOn || gh.on;
-
-            registerOn.call(gh, 'buttondown', function (ev) {
-                var label = ev.label || (ev.button !== undefined ? _jeButtonLabel(ev.button) : '');
-                console.log('[JellyEmu Gamepad] buttondown | Label:', label, '| Ev:', ev);
-                var matched = _jeFindBindingsForGp(label);
-                if (matched.length === 0 && ev.button !== undefined) {
-                    matched = _jeFindBindingsForGp(_jeButtonLabel(ev.button));
-                }
-                if (matched.length > 0) {
-                    if (!_jeGpActiveState[label]) {
-                        _jeGpActiveState[label] = true;
-                        matched.forEach(function (idx) { _jeSimulate(idx, true); });
-                    }
-                } else {
-                    if (ejsButtonDown) ejsButtonDown(ev);
-                }
-            });
-
-            registerOn.call(gh, 'buttonup', function (ev) {
-                var label = ev.label || (ev.button !== undefined ? _jeButtonLabel(ev.button) : '');
-                console.log('[JellyEmu Gamepad] buttonup | Label:', label);
-                var matched = _jeFindBindingsForGp(label);
-                if (matched.length === 0 && ev.button !== undefined) {
-                    matched = _jeFindBindingsForGp(_jeButtonLabel(ev.button));
-                }
-                if (matched.length > 0) {
-                    if (_jeGpActiveState[label]) {
-                        _jeGpActiveState[label] = false;
-                        matched.forEach(function (idx) { _jeSimulate(idx, false); });
-                    }
-                } else {
-                    if (ejsButtonUp) ejsButtonUp(ev);
-                }
-            });
-
-            registerOn.call(gh, 'axischanged', function (ev) {
-                var axisName = ev.axis;
-                var newVal   = ev.value;
-
-                if (Math.abs(newVal) > 0.25) {
-                    var isPos = newVal > 0;
-                    var posLabel = axisName + ':+1';
-                    var negLabel = axisName + ':-1';
-                    var activeLabel = isPos ? posLabel : negLabel;
-                    var inactiveLabel = isPos ? negLabel : posLabel;
-
-                    if (!_jeGpActiveState[activeLabel]) {
-                        _jeGpActiveState[activeLabel] = true;
-                        var activeBinds = _jeFindBindingsForGp(activeLabel);
-                        activeBinds.forEach(function (idx) {
-                            _jeSimulate(idx, true);
-                        });
-                    }
-
-                    if (_jeGpActiveState[inactiveLabel]) {
-                        _jeGpActiveState[inactiveLabel] = false;
-                        _jeFindBindingsForGp(inactiveLabel).forEach(function (idx) {
-                            _jeSimulate(idx, false);
-                        });
-                    }
-                } else {
-                    [':+1', ':-1'].forEach(function (dir) {
-                        var checkLabel = axisName + dir;
-                        if (_jeGpActiveState[checkLabel]) {
-                            _jeGpActiveState[checkLabel] = false;
-                            _jeFindBindingsForGp(checkLabel).forEach(function (idx) {
-                                _jeSimulate(idx, false);
-                            });
-                        }
-                    });
-                }
-
-                if (ejsAxisChange) {
-                    try { ejsAxisChange(ev); } catch (e) {}
-                }
-            });
-
+            if (!e) return;
             var ejsControls = e.controls && e.controls[0];
             if (ejsControls) {
                 Object.keys(ejsControls).forEach(function (k) {
@@ -476,25 +604,11 @@
                         ejsControls[k].value2 = '';
                     }
                 });
-                console.log('[JellyEmu] EJS controls.value2 cleared');
             }
-
-            console.log('[JellyEmu] Gamepad listeners hijacked successfully');
-            return true;
         }
-
-        function _jeTryHijack(attemptsLeft) {
-            if (_jeHijack()) {
-                return;
-            }
-            if (attemptsLeft <= 0) {
-                console.warn('[JellyEmu] Gave up waiting for EJS gamepad object');
-                return;
-            }
-            setTimeout(function () { _jeTryHijack(attemptsLeft - 1); }, 100);
-        }
-
-        _jeTryHijack(50);
+        _jeDisableEjsControls();
+        setTimeout(_jeDisableEjsControls, 500);
+        setTimeout(_jeDisableEjsControls, 1500);
 
         function _jeApplyVirtualControls(attemptsLeft) {
             var e = emu();
@@ -526,10 +640,26 @@
         _syncTimer = setTimeout(function () {
             var headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
-            fetch('/jellyemu/prefs/' + userId, {
+            var consoleKey = getActiveControlScheme();
+            var cPlatform = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) || (window.EJS_platformTag || '');
+            var targetConsole = consoleKey || cPlatform;
+            var url = '/jellyemu/prefs/' + userId + (targetConsole ? ('?scope=system&targetId=' + encodeURIComponent(targetConsole)) : '');
+            var payload = {
+                scope: 'system',
+                targetId: targetConsole,
+                preferences: {
+                    controls: JSON.stringify(_jeBindings),
+                    jeBindings: JSON.stringify(_jeBindings)
+                },
+                controls: JSON.stringify(_jeBindings),
+                jeBindings: JSON.stringify(_jeBindings)
+            };
+            fetch(url, {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify({ jeBindings: JSON.stringify(_jeBindings) })
+                body: JSON.stringify(payload)
+            }).then(function (r) {
+                if (r.ok) console.log('[JellyEmu] Custom controller bindings saved to SQLite for console ' + targetConsole);
             }).catch(function (err) { console.warn('[JellyEmu] Bindings sync failed:', err); });
         }, 800);
     }
@@ -537,6 +667,11 @@
     (function () {
         var s = document.createElement('style');
         s.textContent =
+            '#je-tab-kb, #je-tab-gp, #je-tab-vg { flex-direction: column !important; width: 100% !important; }' +
+            '#je-tab-kb.je-tab-active, #je-tab-gp.je-tab-active, #je-tab-vg.je-tab-active { display: flex !important; }' +
+            '#je-gp-status { width: 100% !important; margin-bottom: 12px; }' +
+            '#je-gp-binds { width: 100% !important; display: flex !important; flex-direction: column !important; }' +
+            '#je-tab-vg .je-setting { width: 100% !important; display: flex !important; align-items: center !important; justify-content: space-between !important; }' +
             '#je-tab-kb .je-bind-headers,' +
             '#je-tab-kb .je-bind-row { grid-template-columns: 1fr 100px 100px !important; }' +
             '#je-tab-gp .je-bind-headers,' +
@@ -554,23 +689,40 @@
 
     function buildKeyboardBinds() {
         var panel = document.getElementById('je-tab-kb');
-        var activeMap = getActiveInputMap();
+        if (!panel) return;
+        var schemeDef = getActiveSchemeDefinition();
+        var buttons = getActiveInputButtons();
+
         panel.innerHTML =
+            '<div class="je-platform-bind-header">' +
+                '<span>Platform Layout: <strong>' + _jeEscapeHtml(schemeDef.name) + '</strong></span>' +
+                '<span style="font-size:10.5px; opacity:0.8;">' + buttons.length + ' Inputs</span>' +
+            '</div>' +
             '<div class="je-bind-headers">' +
-                '<span>Action</span>' +
+                '<span>Action (ID)</span>' +
                 '<span>KB 1</span>' +
                 '<span>KB 2</span>' +
             '</div>';
 
-        Object.keys(activeMap).forEach(function (keyStr) {
-            var idx = parseInt(keyStr, 10);
+        buttons.forEach(function (btn) {
+            var idx = btn.id;
             var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
             var row = document.createElement('div');
             row.className = 'je-bind-row';
 
             var label = document.createElement('span');
             label.className = 'je-bind-label';
-            label.textContent = activeMap[idx];
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'je-bind-name';
+            nameSpan.textContent = btn.label;
+
+            var idBadge = document.createElement('span');
+            idBadge.className = 'je-bind-id-badge' + (idx >= 24 ? ' je-hotkey-badge' : '');
+            idBadge.textContent = 'ID ' + idx;
+
+            label.appendChild(nameSpan);
+            label.appendChild(idBadge);
             row.appendChild(label);
 
             ['kb1', 'kb2'].forEach(function (field) {
@@ -716,23 +868,39 @@
         if (!bindsPanel) return;
         if (!forceRebuild && bindsPanel.children.length > 0) return;
 
-        var activeMap = getActiveInputMap();
+        var schemeDef = getActiveSchemeDefinition();
+        var buttons = getActiveInputButtons();
+
         bindsPanel.innerHTML =
+            '<div class="je-platform-bind-header">' +
+                '<span>Platform Layout: <strong>' + _jeEscapeHtml(schemeDef.name) + '</strong></span>' +
+                '<span style="font-size:10.5px; opacity:0.8;">' + buttons.length + ' Inputs</span>' +
+            '</div>' +
             '<div class="je-bind-headers">' +
-                '<span>Action</span>' +
+                '<span>Action (ID)</span>' +
                 '<span>GP 1</span>' +
                 '<span>GP 2</span>' +
             '</div>';
 
-        Object.keys(activeMap).forEach(function (keyStr) {
-            var idx = parseInt(keyStr, 10);
+        buttons.forEach(function (btn) {
+            var idx = btn.id;
             var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
             var row = document.createElement('div');
             row.className = 'je-bind-row';
 
             var label = document.createElement('span');
             label.className = 'je-bind-label';
-            label.textContent = activeMap[idx];
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'je-bind-name';
+            nameSpan.textContent = btn.label;
+
+            var idBadge = document.createElement('span');
+            idBadge.className = 'je-bind-id-badge' + (idx >= 24 ? ' je-hotkey-badge' : '');
+            idBadge.textContent = 'ID ' + idx;
+
+            label.appendChild(nameSpan);
+            label.appendChild(idBadge);
             row.appendChild(label);
 
             ['gp1', 'gp2'].forEach(function (field) {
@@ -764,67 +932,49 @@
         document.addEventListener('keydown', onKey, true);
     }
 
-    // - Gamepad listen
+    // - Gamepad listen (Uses direct raw Gamepad poller) -
     function _jeListenGamepad(idx, field, row) {
         var col = field === 'gp1' ? 1 : 2;
         var bk  = row.children[col];
         if (!bk || bk.classList.contains('je-listening')) return;
+
+        // Cancel previous listener if any
+        if (_jeActiveGpListen) {
+            clearTimeout(_jeActiveGpListen.timeoutId);
+            _jeActiveGpListen.bk.classList.remove('je-listening');
+            _jeActiveGpListen.bk.textContent = _jeGpName(_jeBindings[_jeActiveGpListen.idx][_jeActiveGpListen.field]);
+            _jeActiveGpListen = null;
+        }
+
         bk.classList.add('je-listening');
         bk.textContent = 'Move/press…';
 
-        var baseAxes = {};
-        var pads0 = navigator.getGamepads ? navigator.getGamepads() : [];
-        for (var gi0 = 0; gi0 < pads0.length; gi0++) {
-            var p0 = pads0[gi0]; if (!p0) continue;
-            baseAxes[p0.index] = [];
-            for (var ai0 = 0; ai0 < p0.axes.length; ai0++) {
-                baseAxes[p0.index][ai0] = p0.axes[ai0];
+        // Snapshot initial axes to avoid drifting stick false-triggers
+        var initAxes = {};
+        var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        for (var gi = 0; gi < pads.length; gi++) {
+            if (pads[gi] && pads[gi].axes) {
+                initAxes[pads[gi].index] = pads[gi].axes.slice();
             }
         }
 
-        var pollId = setInterval(function () {
-            var pads = navigator.getGamepads ? navigator.getGamepads() : [];
-            for (var gi = 0; gi < pads.length; gi++) {
-                var p = pads[gi]; if (!p) continue;
-
-                for (var bi = 0; bi < p.buttons.length; bi++) {
-                    var btn = p.buttons[bi];
-                    var pressed = (typeof btn === 'object') ? btn.pressed : (btn === 1.0);
-                    if (pressed) {
-                        clearInterval(pollId);
-                        var bindStr = _jeButtonLabel(bi);
-                        _jeBindings[idx][field] = bindStr;
-                        bk.classList.remove('je-listening');
-                        bk.textContent = _jeGpName(bindStr);
-                        _jeSyncBindingsToServer();
-                        return;
-                    }
-                }
-
-                var origAxes = baseAxes[p.index] || [];
-                for (var ai = 0; ai < p.axes.length; ai++) {
-                    var val = p.axes[ai];
-                    var initVal = origAxes[ai] !== undefined ? origAxes[ai] : 0;
-                    if (Math.abs(val - initVal) > 0.45 && Math.abs(val) > 0.5) {
-                        clearInterval(pollId);
-                        var axisStr = _jeAxisLabel(ai, val);
-                        _jeBindings[idx][field] = axisStr;
-                        bk.classList.remove('je-listening');
-                        bk.textContent = _jeGpName(axisStr);
-                        _jeSyncBindingsToServer();
-                        return;
-                    }
-                }
-            }
-        }, 50);
-
-        setTimeout(function () {
-            if (bk.classList.contains('je-listening')) {
-                clearInterval(pollId);
+        var timeoutId = setTimeout(function () {
+            if (_jeActiveGpListen && _jeActiveGpListen.bk === bk) {
+                _jeActiveGpListen = null;
                 bk.classList.remove('je-listening');
                 bk.textContent = _jeGpName(_jeBindings[idx][field]);
             }
         }, 10000);
+
+        _jeActiveGpListen = {
+            idx: idx,
+            field: field,
+            row: row,
+            bk: bk,
+            timeoutId: timeoutId,
+            initialAxes: initAxes
+        };
+        console.log('[JellyEmu Gamepad] Listening for raw input on Action ID ' + idx + ' (' + field + ')...');
     }
 
     // - Virtual gamepad toggles -
@@ -858,54 +1008,67 @@
         }).catch(function (err) { console.warn('[JellyEmu] VG prefs sync failed:', err); });
     }
 
-    document.getElementById('je-vg-toggle').addEventListener('change', function () {
-        var e = emu();
-        if (e && e.toggleVirtualGamepad) {
-            e.toggleVirtualGamepad(this.checked);
-        }
-        _jeSyncVGPrefs();
-    });
-    document.getElementById('je-vg-lefty').addEventListener('change', function () {
-        var e = emu();
-        if (e && e.toggleVirtualGamepadLeftHanded) {
-            e.toggleVirtualGamepadLeftHanded(this.checked);
-        }
-        _jeSyncVGPrefs();
-    });
+    var vgToggle = document.getElementById('je-vg-toggle');
+    if (vgToggle) {
+        vgToggle.addEventListener('change', function () {
+            var e = emu();
+            if (e && e.toggleVirtualGamepad) {
+                e.toggleVirtualGamepad(this.checked);
+            }
+            _jeSyncVGPrefs();
+        });
+    }
+
+    var vgLefty = document.getElementById('je-vg-lefty');
+    if (vgLefty) {
+        vgLefty.addEventListener('change', function () {
+            var e = emu();
+            if (e && e.toggleVirtualGamepadLeftHanded) {
+                e.toggleVirtualGamepadLeftHanded(this.checked);
+            }
+            _jeSyncVGPrefs();
+        });
+    }
 
     window.addEventListener('jeLoaded', function () {
         syncVGTogglesLocal();
     });
 
     // - Reset to defaults -
-    document.getElementById('je-input-reset').addEventListener('click', function () {
-        _jeBindings = JSON.parse(JSON.stringify(_jeDefaultBindings));
-        buildKeyboardBinds();
-        buildGamepadBinds(true);
-        _jeSyncBindingsToServer();
+    var resetBtn = document.getElementById('je-input-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            _jeBindings = JSON.parse(JSON.stringify(_jeGetDefaultBindings()));
+            buildKeyboardBinds();
+            buildGamepadBinds(true);
+            _jeSyncBindingsToServer();
 
-        var vgOn = document.getElementById('je-vg-toggle');
-        if (vgOn) {
-            vgOn.checked = false;
-            var e = emu();
-            if (e && e.toggleVirtualGamepad) e.toggleVirtualGamepad(false);
-        }
-        var vgLefty = document.getElementById('je-vg-lefty');
-        if (vgLefty) {
-            vgLefty.checked = false;
-            var e = emu();
-            if (e && e.toggleVirtualGamepadLeftHanded) e.toggleVirtualGamepadLeftHanded(false);
-        }
-        _jeSyncVGPrefs();
-    });
+            var vgOn = document.getElementById('je-vg-toggle');
+            if (vgOn) {
+                vgOn.checked = false;
+                var e = emu();
+                if (e && e.toggleVirtualGamepad) e.toggleVirtualGamepad(false);
+            }
+            var vgL = document.getElementById('je-vg-lefty');
+            if (vgL) {
+                vgL.checked = false;
+                var e = emu();
+                if (e && e.toggleVirtualGamepadLeftHanded) e.toggleVirtualGamepadLeftHanded(false);
+            }
+            _jeSyncVGPrefs();
+        });
+    }
 
     // - Wire up the dock button -
-    document.getElementById('je-btn-inputmap').addEventListener('click', function () {
-        buildKeyboardBinds();
-        buildGamepadBinds(true);
-        syncVGTogglesLocal();
-        openPopup('je-pop-inputmap');
-    });
+    var mapBtn = document.getElementById('je-btn-inputmap');
+    if (mapBtn) {
+        mapBtn.addEventListener('click', function () {
+            buildKeyboardBinds();
+            buildGamepadBinds(true);
+            syncVGTogglesLocal();
+            openPopup('je-pop-inputmap');
+        });
+    }
 
     function _popupOpen() {
         var pop = document.getElementById('je-pop-inputmap');
@@ -971,8 +1134,11 @@
         }
     });
 
-    // - Expose build functions for external callers if needed -
-    window._jeBuildKeyboardBinds = buildKeyboardBinds;
-    window._jeBuildGamepadBinds  = buildGamepadBinds;
+    // - Expose functions for external callers if needed -
+    window._jeBuildKeyboardBinds       = buildKeyboardBinds;
+    window._jeBuildGamepadBinds        = buildGamepadBinds;
+    window._jeGetActiveControlScheme   = getActiveControlScheme;
+    window._jeGetActiveSchemeDefinition = getActiveSchemeDefinition;
+    window._jeGetActiveInputButtons    = getActiveInputButtons;
 
 })();

@@ -277,18 +277,18 @@
                     <button class="je-tab" data-tab="gp">Gamepad</button>
                     <button class="je-tab" data-tab="vg">Virtual Controls</button>
                 </div>
-                <div class="je-tab-panel je-tab-active" id="je-tab-kb"></div>
-                <div class="je-tab-panel" id="je-tab-gp">
-                    <div class="je-gp-status" id="je-gp-status">No gamepad detected</div>
-                    <div id="je-gp-binds"></div>
+                <div class="je-tab-panel je-tab-active" id="je-tab-kb" style="display:flex; flex-direction:column; width:100%;"></div>
+                <div class="je-tab-panel" id="je-tab-gp" style="display:none; flex-direction:column; width:100%;">
+                    <div class="je-gp-status" id="je-gp-status" style="width:100%;">No gamepad detected</div>
+                    <div id="je-gp-binds" style="width:100%; display:flex; flex-direction:column;"></div>
                 </div>
-                <div class="je-tab-panel" id="je-tab-vg">
-                    <div class="je-setting">
+                <div class="je-tab-panel" id="je-tab-vg" style="display:none; flex-direction:column; width:100%;">
+                    <div class="je-setting" style="width:100%; display:flex; align-items:center; justify-content:space-between;">
                         <span class="je-setting-label">Enable Virtual Controls</span>
                         <label class="je-toggle"><input type="checkbox" id="je-vg-toggle"><span
                                 class="je-toggle-track"></span></label>
                     </div>
-                    <div class="je-setting">
+                    <div class="je-setting" style="width:100%; display:flex; align-items:center; justify-content:space-between;">
                         <span class="je-setting-label">Left-Handed Mode</span>
                         <label class="je-toggle"><input type="checkbox" id="je-vg-lefty"><span
                                 class="je-toggle-track"></span></label>
@@ -452,7 +452,9 @@
                 showFps: '{{ show_fps }}',
                 scale: '{{ scale }}',
                 volume: '{{ volume }}',
-                mute: '{{ mute }}'
+                mute: '{{ mute }}',
+                inputScheme: {{ input_scheme_json }},
+                customBindings: {{ custom_bindings_json }}
             };
 
             window.EJS_core = '{{ core }}';
@@ -821,6 +823,8 @@
                     if (target) {
                         target.classList.add('je-tab-active');
                         target.style.display = 'flex';
+                        target.style.flexDirection = 'column';
+                        target.style.width = '100%';
                     }
                 });
             });
@@ -848,6 +852,7 @@
 
             // Focus management: EJS listens for keyboard on ejs_parent, not document
             function refocusGame() {
+                try { window.focus(); } catch (e) {}
                 var e = emu();
                 if (e && e.elements && e.elements.parent) {
                     e.elements.parent.focus();
@@ -856,6 +861,9 @@
                     if (gp) gp.focus();
                 }
             }
+            window.addEventListener('click', function () {
+                try { window.focus(); } catch (e) {}
+            });
 
             // Server sync for controls & settings
             var _syncTimer = null;
