@@ -213,11 +213,23 @@ namespace JellyEmu.Controllers
             var relBios = biosService?.ResolveBiosRelativePath(platformTag, resolvedCore);
             var biosUrl = !string.IsNullOrEmpty(relBios) ? $"/jellyemu/bios/file/{relBios}" : string.Empty;
 
+            var inputService = HttpContext.RequestServices.GetService(typeof(JellyEmuInputService)) as JellyEmuInputService;
+            var inputScheme = inputService?.GetScheme(platformTag ?? resolvedCore);
+            var inputSchemeJson = inputScheme != null
+                ? System.Text.Json.JsonSerializer.Serialize(inputScheme, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase })
+                : "null";
+
+            var customBindingsJson = !string.IsNullOrWhiteSpace(effectivePrefs.Controls) && effectivePrefs.Controls.Trim().StartsWith("{")
+                ? effectivePrefs.Controls.Trim()
+                : "null";
+
             var html = template.Render(new
             {
                 game_name = gameName,
                 core = resolvedCore,
                 platform_tag = platformTag,
+                input_scheme_json = inputSchemeJson,
+                custom_bindings_json = customBindingsJson,
                 available_cores_json = availableCoresJson,
                 rom_url = romUrl,
                 ejs_base = ejsBase,

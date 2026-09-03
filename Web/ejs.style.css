@@ -695,10 +695,35 @@ body {
 
 .je-tab-panel {
     display: none;
+    flex-direction: column;
+    width: 100%;
 }
 
 .je-tab-panel.je-tab-active {
-    display: block;
+    display: flex;
+    flex-direction: column;
+}
+
+#je-tab-kb,
+#je-tab-gp,
+#je-tab-vg {
+    width: 100%;
+    flex-direction: column;
+}
+
+#je-gp-binds {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#je-tab-vg .je-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
 
 /* Input Mapping Grid */
@@ -730,9 +755,57 @@ body {
 }
 
 .je-bind-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.je-bind-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
+}
+
+.je-bind-id-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #00E5FF;
+    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid rgba(0, 229, 255, 0.28);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    font-family: monospace;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.je-bind-id-badge.je-hotkey-badge {
+    color: #FBBF24;
+    background: rgba(251, 191, 36, 0.12);
+    border-color: rgba(251, 191, 36, 0.3);
+}
+
+.je-platform-bind-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 164, 220, 0.1);
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    border-radius: 6px;
+    padding: 6px 12px;
+    margin-bottom: 10px;
+    font-size: 11.5px;
+    color: #E2E8F0;
+}
+
+.je-platform-bind-header strong {
+    color: #00E5FF;
+    font-weight: 600;
 }
 
 .je-bind-key {

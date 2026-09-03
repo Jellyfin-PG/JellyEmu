@@ -242,6 +242,8 @@ namespace JellyEmu.Services
         public async Task<EffectiveUserPrefs> GetEffectivePreferencesAsync(string userId, string? platformTag = null)
         {
             var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var canonical = !string.IsNullOrWhiteSpace(platformTag) ? JellyEmuInputService.ResolveSchemeKey(platformTag) : null;
+            if (canonical == "default") canonical = null;
 
             try
             {
@@ -254,15 +256,17 @@ namespace JellyEmu.Services
                     FROM UserPreferences
                     WHERE UserId = $userId AND (
                         (Scope = 'global' AND TargetId = '') OR
-                        ($platformTag IS NOT NULL AND Scope = 'system' AND TargetId = $platformTag)
+                        ($platformTag IS NOT NULL AND Scope = 'system' AND (TargetId = $platformTag OR ($canonical IS NOT NULL AND TargetId = $canonical)))
                     )
                     ORDER BY CASE Scope 
                         WHEN 'global' THEN 1 
                         WHEN 'system' THEN 2 
-                        ELSE 0 END;
+                        ELSE 0 END,
+                        CASE WHEN TargetId = $canonical THEN 2 ELSE 1 END;
                 ";
                 cmd.Parameters.AddWithValue("$userId", userId);
                 cmd.Parameters.AddWithValue("$platformTag", (object?)platformTag ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$canonical", (object?)canonical ?? DBNull.Value);
 
                 await using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
@@ -556,7 +560,9 @@ namespace JellyEmu.Services
         private static string NormalizeTarget(string scope, string? targetId)
         {
             if (scope == "global") return string.Empty;
-            return targetId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(targetId)) return string.Empty;
+            var canonical = JellyEmuInputService.ResolveSchemeKey(targetId);
+            return !string.IsNullOrEmpty(canonical) && canonical != "default" ? canonical : targetId.Trim();
         }
     }
 }

@@ -113,7 +113,7 @@ namespace JellyEmu.Controllers
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> PostPrefs(string userId)
+        public async Task<IActionResult> PostPrefs(string userId, [FromQuery] string? scope, [FromQuery] string? targetId)
         {
             try
             {
@@ -123,14 +123,14 @@ namespace JellyEmu.Controllers
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
 
-                string scope = "global";
-                string targetId = string.Empty;
+                string targetScope = !string.IsNullOrWhiteSpace(scope) ? scope : "global";
+                string finalTargetId = targetId ?? string.Empty;
                 var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
                 if (root.TryGetProperty("preferences", out var prefsProp) && prefsProp.ValueKind == JsonValueKind.Object)
                 {
-                    if (root.TryGetProperty("scope", out var sProp)) scope = sProp.GetString() ?? "global";
-                    if (root.TryGetProperty("targetId", out var tProp)) targetId = tProp.GetString() ?? string.Empty;
+                    if (root.TryGetProperty("scope", out var sProp)) targetScope = sProp.GetString() ?? targetScope;
+                    if (root.TryGetProperty("targetId", out var tProp)) finalTargetId = tProp.GetString() ?? finalTargetId;
 
                     foreach (var prop in prefsProp.EnumerateObject())
                     {
@@ -140,8 +140,8 @@ namespace JellyEmu.Controllers
                 else
                 {
                     // Direct property bag format
-                    if (root.TryGetProperty("scope", out var sProp)) scope = sProp.GetString() ?? "global";
-                    if (root.TryGetProperty("targetId", out var tProp)) targetId = tProp.GetString() ?? string.Empty;
+                    if (root.TryGetProperty("scope", out var sProp)) targetScope = sProp.GetString() ?? targetScope;
+                    if (root.TryGetProperty("targetId", out var tProp)) finalTargetId = tProp.GetString() ?? finalTargetId;
 
                     foreach (var prop in root.EnumerateObject())
                     {
@@ -150,21 +150,25 @@ namespace JellyEmu.Controllers
                     }
                 }
 
-                // Handle aliases like jeBindings -> controls
+                // Handle aliases like jeBindings <-> controls
                 if (dict.TryGetValue("jeBindings", out var jeVal) && !dict.ContainsKey("controls"))
                 {
                     dict["controls"] = jeVal;
                 }
+                if (dict.TryGetValue("controls", out var ctrlVal) && !dict.ContainsKey("jeBindings"))
+                {
+                    dict["jeBindings"] = ctrlVal;
+                }
 
-                await PreferenceService.SetPreferencesAsync(userId, scope, targetId, dict);
-                Logger.LogInformation("[JellyEmu] Preferences saved for user {UserId}, scope={Scope}, target={TargetId}", userId, scope, targetId);
+                await PreferenceService.SetPreferencesAsync(userId, targetScope, finalTargetId, dict);
+                Logger.LogInformation("[JellyEmu] Preferences saved for user {UserId}, scope={Scope}, target={TargetId}", userId, targetScope, finalTargetId);
 
-                var updated = await PreferenceService.GetScopedPreferencesAsync(userId, scope, targetId);
+                var updated = await PreferenceService.GetScopedPreferencesAsync(userId, targetScope, finalTargetId);
                 return Ok(new
                 {
                     userId,
-                    scope,
-                    targetId,
+                    scope = targetScope,
+                    targetId = finalTargetId,
                     preferences = updated
                 });
             }
