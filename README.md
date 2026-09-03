@@ -4,6 +4,7 @@
   <p>A plugin for jellyfin 10.11+ to import, manage, play and share your roms and pico-8 games with users.</p>
   <p><sub>Now with romm integration, pico-8, VR/AR, and Playnite support.</sub></p>
   <p><sub>The <a href="https://github.com/Jellyfin-PG/JellyEmu-Playnite">Playnite Addon</a> to play platforms not supported in web.</sub></p>
+  <p><sub>The <a href="https://github.com/Jellyfin-PG/JellyEmu-HomeAssistant-Plugin">HomeAssistant Plugin</a> to manage and integrate with your library.</sub></p>
 </div>
 
 <p align="center">
