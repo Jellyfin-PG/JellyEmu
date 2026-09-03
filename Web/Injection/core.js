@@ -122,7 +122,7 @@
                 } else {
                     var iframe = document.createElement('iframe');
                     iframe.id = 'jellyemu-iframe';
-                    iframe.allow = 'autoplay; fullscreen; gamepad *; xr-spatial-tracking';
+                    iframe.allow = 'autoplay; fullscreen; gamepad *; xr-spatial-tracking; microphone';
                     iframe.tabIndex = 0;
                     iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
                     iframe.src = playUrl;
