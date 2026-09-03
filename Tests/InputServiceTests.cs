@@ -164,6 +164,27 @@ namespace JellyEmu.Tests
         }
 
         [Fact]
+        public void GetScheme_NintendoDS_ShouldIncludeMicrophoneButton()
+        {
+            var scheme = _inputService.GetScheme("Nintendo DS");
+
+            Assert.Equal("nds", scheme.Id);
+            Assert.Contains(scheme.Buttons, b => b.Id == 14 && b.Label == "MICROPHONE");
+
+            // Verify Microphone default bindings (M key, Left Stick L3 click)
+            Assert.True(scheme.DefaultBindings.ContainsKey(14));
+            Assert.Equal(77, scheme.DefaultBindings[14].Kb1); // 'M' key
+            Assert.Equal("LEFT_STICK", scheme.DefaultBindings[14].Gp1);
+            Assert.Equal("RIGHT_STICK", scheme.DefaultBindings[14].Gp2);
+
+            // Verify EVERY button in NDS scheme has a default binding
+            foreach (var btn in scheme.Buttons)
+            {
+                Assert.True(scheme.DefaultBindings.ContainsKey(btn.Id), $"Missing default binding for button {btn.Id} ({btn.Label})");
+            }
+        }
+
+        [Fact]
         public void GetAllSchemes_ShouldReturnAllSupportedSystems()
         {
             var all = _inputService.GetAllSchemes();

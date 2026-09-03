@@ -120,6 +120,24 @@ namespace JellyEmu.Services
                     }
                 },
                 {
+                    "nds", new()
+                    {
+                        { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } },                        // A -> Right (Xbox B / PS Circle)
+                        { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },                        // B -> Bottom (Xbox A / PS Cross)
+                        { 9,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } },                        // X -> Top (Xbox Y / PS Triangle)
+                        { 1,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } },                        // Y -> Left (Xbox X / PS Square)
+                        { 2,  new() { Kb1 = 86, Kb2 = 0, Gp1 = "SELECT", Gp2 = "" } },                          // SELECT
+                        { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },                           // START
+                        { 4,  new() { Kb1 = 38, Kb2 = 0, Gp1 = "DPAD_UP", Gp2 = "LEFT_STICK_Y:-1" } },         // UP
+                        { 5,  new() { Kb1 = 40, Kb2 = 0, Gp1 = "DPAD_DOWN", Gp2 = "LEFT_STICK_Y:+1" } },       // DOWN
+                        { 6,  new() { Kb1 = 37, Kb2 = 0, Gp1 = "DPAD_LEFT", Gp2 = "LEFT_STICK_X:-1" } },       // LEFT
+                        { 7,  new() { Kb1 = 39, Kb2 = 0, Gp1 = "DPAD_RIGHT", Gp2 = "LEFT_STICK_X:+1" } },      // RIGHT
+                        { 10, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_TOP_SHOULDER", Gp2 = "" } },               // L
+                        { 11, new() { Kb1 = 69, Kb2 = 0, Gp1 = "RIGHT_TOP_SHOULDER", Gp2 = "" } },              // R
+                        { 14, new() { Kb1 = 77, Kb2 = 0, Gp1 = "LEFT_STICK", Gp2 = "RIGHT_STICK" } }             // MICROPHONE -> M key / L3 / R3
+                    }
+                },
+                {
                     "n64", new()
                     {
                         { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },
