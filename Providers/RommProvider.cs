@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Jellyfin.Data.Enums;
+using JellyEmu.Utilities;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -248,7 +249,12 @@ namespace JellyEmu.Providers
                         var creatorName = creator.TryGetProperty("name", out var cName) ? cName.GetString() : creator.GetString();
                         if (!string.IsNullOrWhiteSpace(creatorName))
                         {
-                            var pInfo = new PersonInfo { Name = creatorName, Type = PersonKind.Author, Role = "Creator" };
+                            var pInfo = new PersonInfo
+                            {
+                                Name = GamingPersonHelper.ToGamingPersonName(creatorName),
+                                Type = PersonKind.Creator,
+                                Role = "Creator"
+                            };
                             if (creator.ValueKind == JsonValueKind.Object && creator.TryGetProperty("id", out var cId))
                                 pInfo.ProviderIds = new Dictionary<string, string> { { "Romm", cId.ToString() } };
                             result.AddPerson(pInfo);

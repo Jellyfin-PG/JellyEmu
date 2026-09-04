@@ -24,7 +24,8 @@ namespace JellyEmu.Controllers
             "cards.js",
             "details.js",
             "settings.js",
-            "saves.js"
+            "saves.js",
+            "people.js"
         };
 
         private static readonly string[] InjectionCssModules =
