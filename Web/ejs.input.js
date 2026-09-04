@@ -49,6 +49,31 @@
         analogAxes: []
     };
 
+    var _jeCoreOrTagToScheme = {
+        'melonds': 'nds', 'desmume': 'nds', 'desmume2015': 'nds', 'nds': 'nds', 'nintendo ds': 'nds', 'ds': 'nds',
+        'mgba': 'gba', 'vba_next': 'gba', 'gba': 'gba', 'game boy advance': 'gba',
+        'gambatte': 'gb', 'sameboy': 'gb', 'gb': 'gb', 'gbc': 'gb', 'game boy': 'gb', 'game boy color': 'gb',
+        'nestopia': 'nes', 'fceumm': 'nes', 'nes': 'nes', 'famicom': 'nes',
+        'snes9x': 'snes', 'bsnes': 'snes', 'snes9x2010': 'snes', 'snes9x2005': 'snes', 'snes': 'snes', 'super nintendo': 'snes',
+        'mupen64plus_next': 'n64', 'parallel_n64': 'n64', 'n64': 'n64', 'nintendo 64': 'n64',
+        'beetle_vb': 'vb', 'vb': 'vb', 'virtual boy': 'vb',
+        'genesis_plus_gx': 'segaMD', 'genesis_plus_gx_wide': 'segaMD', 'picodrive': 'segaMD', 'segamd': 'segaMD', 'genesis': 'segaMD', 'sega genesis': 'segaMD', 'mega drive': 'segaMD',
+        'smsplus': 'segaMS', 'segams': 'segaMS', 'master system': 'segaMS',
+        'segagg': 'segaGG', 'game gear': 'segaGG',
+        'yabause': 'segaSaturn', 'saturn': 'segaSaturn', 'sega saturn': 'segaSaturn',
+        'pcsx_rearmed': 'psx', 'mednafen_psx_hw': 'psx', 'psx': 'psx', 'playstation': 'psx', 'ps1': 'psx',
+        'ppsspp': 'psp', 'psp': 'psp', 'playstation portable': 'psp'
+    };
+
+    function _jeResolveSchemeKey(input) {
+        if (!input) return '';
+        var s = String(input).toLowerCase().trim();
+        if (_jeCoreOrTagToScheme[s]) return _jeCoreOrTagToScheme[s];
+        var clean = s.replace(/_/g, ' ');
+        if (_jeCoreOrTagToScheme[clean]) return _jeCoreOrTagToScheme[clean];
+        return s;
+    }
+
     function getActiveControlScheme() {
         if (_activeBackendScheme && _activeBackendScheme.id) {
             return _activeBackendScheme.id;
@@ -58,12 +83,20 @@
             try {
                 var cs = e.getControlScheme();
                 if (cs && SYSTEM_SCHEMES[cs]) return cs;
+                var mappedCs = _jeResolveSchemeKey(cs);
+                if (mappedCs && SYSTEM_SCHEMES[mappedCs]) return mappedCs;
             } catch (err) {}
         }
         var core = (window.EJS_core || '').toLowerCase();
-        if (core) return core;
-        var tag = (window.EJS_platformTag || '').toUpperCase().trim();
-        if (tag) return tag;
+        var mappedCore = _jeResolveSchemeKey(core);
+        if (mappedCore && SYSTEM_SCHEMES[mappedCore]) return mappedCore;
+
+        var tag = (window.EJS_platformTag || '').toLowerCase().trim();
+        var mappedTag = _jeResolveSchemeKey(tag);
+        if (mappedTag && SYSTEM_SCHEMES[mappedTag]) return mappedTag;
+
+        if (mappedCore) return mappedCore;
+        if (mappedTag) return mappedTag;
         return 'default';
     }
 
@@ -225,7 +258,7 @@
         11: { kb1:69,  kb2:0, gp1:'RIGHT_TOP_SHOULDER',    gp2:'' },
         12: { kb1:9,   kb2:0, gp1:'LEFT_BOTTOM_SHOULDER',  gp2:'' },
         13: { kb1:82,  kb2:0, gp1:'RIGHT_BOTTOM_SHOULDER', gp2:'' },
-        14: { kb1:0,   kb2:0, gp1:'LEFT_STICK',            gp2:'' },
+        14: { kb1:77,  kb2:0, gp1:'LEFT_STICK',            gp2:'RIGHT_STICK' },
         15: { kb1:0,   kb2:0, gp1:'RIGHT_STICK',           gp2:'' },
         16: { kb1:72,  kb2:0, gp1:'LEFT_STICK_X:+1',       gp2:'' },
         17: { kb1:70,  kb2:0, gp1:'LEFT_STICK_X:-1',       gp2:'' },
@@ -246,17 +279,19 @@
 
     function _jeGetDefaultBindings() {
         var schemeDef = getActiveSchemeDefinition();
+        var result = {};
         if (schemeDef && schemeDef.defaultBindings && Object.keys(schemeDef.defaultBindings).length > 0) {
-            return JSON.parse(JSON.stringify(schemeDef.defaultBindings));
+            result = JSON.parse(JSON.stringify(schemeDef.defaultBindings));
         }
         var buttons = getActiveInputButtons();
-        var result = {};
         for (var i = 0; i < buttons.length; i++) {
             var id = buttons[i].id;
-            if (_jeBaseDefaultBindings[id]) {
-                result[id] = JSON.parse(JSON.stringify(_jeBaseDefaultBindings[id]));
-            } else {
-                result[id] = { kb1: 0, kb2: 0, gp1: '', gp2: '' };
+            if (!result[id]) {
+                if (_jeBaseDefaultBindings[id]) {
+                    result[id] = JSON.parse(JSON.stringify(_jeBaseDefaultBindings[id]));
+                } else {
+                    result[id] = { kb1: 0, kb2: 0, gp1: '', gp2: '' };
+                }
             }
         }
         return result;
@@ -264,6 +299,21 @@
 
     // - Live binding map -
     var _jeBindings = {};
+
+    function _jeEnsureBinding(idx) {
+        if (!_jeBindings[idx] || typeof _jeBindings[idx] !== 'object') {
+            var defaults = _jeGetDefaultBindings();
+            _jeBindings[idx] = (defaults && defaults[idx])
+                ? JSON.parse(JSON.stringify(defaults[idx]))
+                : (_jeBaseDefaultBindings[idx] ? JSON.parse(JSON.stringify(_jeBaseDefaultBindings[idx])) : { kb1: 0, kb2: 0, gp1: '', gp2: '' });
+        }
+        if (_jeBindings[idx].kb1 === undefined) _jeBindings[idx].kb1 = 0;
+        if (_jeBindings[idx].kb2 === undefined) _jeBindings[idx].kb2 = 0;
+        if (_jeBindings[idx].gp1 === undefined) _jeBindings[idx].gp1 = '';
+        if (_jeBindings[idx].gp2 === undefined) _jeBindings[idx].gp2 = '';
+        return _jeBindings[idx];
+    }
+
     function _jeLoadBindings(serverPrefs) {
         var defaults = _jeGetDefaultBindings();
         try {
@@ -271,18 +321,19 @@
                 ? (serverPrefs.jeBindings || serverPrefs.controls)
                 : (cfg.customBindings || null);
             var saved = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
-            _jeBindings = saved || JSON.parse(JSON.stringify(defaults));
+            _jeBindings = (saved && typeof saved === 'object') ? saved : JSON.parse(JSON.stringify(defaults));
         } catch (e) {
+            _jeBindings = JSON.parse(JSON.stringify(defaults));
+        }
+
+        if (!_jeBindings || typeof _jeBindings !== 'object') {
             _jeBindings = JSON.parse(JSON.stringify(defaults));
         }
 
         // Ensure all active buttons for current scheme exist in _jeBindings
         var buttons = getActiveInputButtons();
         for (var i = 0; i < buttons.length; i++) {
-            var id = buttons[i].id;
-            if (!_jeBindings[id]) {
-                _jeBindings[id] = defaults[id] ? JSON.parse(JSON.stringify(defaults[id])) : { kb1: 0, kb2: 0, gp1: '', gp2: '' };
-            }
+            _jeEnsureBinding(buttons[i].id);
         }
 
         if (_jeIsN64()) {
@@ -410,6 +461,7 @@
         _jeKbDown[kc] = true;
         for (var idx in _jeBindings) {
             var b = _jeBindings[idx];
+            if (!b) continue;
             if (b.kb1 === kc || b.kb2 === kc) {
                 ev.preventDefault();
                 _jeSimulate(parseInt(idx, 10), true);
@@ -422,6 +474,7 @@
         _jeKbDown[kc] = false;
         for (var idx in _jeBindings) {
             var b = _jeBindings[idx];
+            if (!b) continue;
             if (b.kb1 === kc || b.kb2 === kc) _jeSimulate(parseInt(idx, 10), false);
         }
     }, true);
@@ -494,7 +547,8 @@
                         _jeActiveGpListen = null;
                         clearTimeout(listen.timeoutId);
                         listen.bk.classList.remove('je-listening');
-                        _jeBindings[listen.idx][listen.field] = label;
+                        var bind = _jeEnsureBinding(listen.idx);
+                        bind[listen.field] = label;
                         listen.bk.textContent = _jeGpName(label);
                         _jeSyncBindingsToServer();
                         continue;
@@ -550,7 +604,8 @@
                             _jeActiveGpListen = null;
                             clearTimeout(listen.timeoutId);
                             listen.bk.classList.remove('je-listening');
-                            _jeBindings[listen.idx][listen.field] = posLabel;
+                            var bind = _jeEnsureBinding(listen.idx);
+                            bind[listen.field] = posLabel;
                             listen.bk.textContent = _jeGpName(posLabel);
                             _jeSyncBindingsToServer();
                             continue;
@@ -570,7 +625,8 @@
                             _jeActiveGpListen = null;
                             clearTimeout(listen.timeoutId);
                             listen.bk.classList.remove('je-listening');
-                            _jeBindings[listen.idx][listen.field] = negLabel;
+                            var bind = _jeEnsureBinding(listen.idx);
+                            bind[listen.field] = negLabel;
                             listen.bk.textContent = _jeGpName(negLabel);
                             _jeSyncBindingsToServer();
                             continue;
@@ -706,7 +762,7 @@
 
         buttons.forEach(function (btn) {
             var idx = btn.id;
-            var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
+            var b   = _jeEnsureBinding(idx);
             var row = document.createElement('div');
             row.className = 'je-bind-row';
 
@@ -884,7 +940,7 @@
 
         buttons.forEach(function (btn) {
             var idx = btn.id;
-            var b   = _jeBindings[idx] || { kb1:0, kb2:0, gp1:'', gp2:'' };
+            var b   = _jeEnsureBinding(idx);
             var row = document.createElement('div');
             row.className = 'je-bind-row';
 
@@ -924,8 +980,9 @@
             ev.preventDefault(); ev.stopPropagation();
             document.removeEventListener('keydown', onKey, true);
             bk.classList.remove('je-listening');
-            if (ev.keyCode === 27) { bk.textContent = _jeKeyName(_jeBindings[idx][field]); return; }
-            _jeBindings[idx][field] = ev.keyCode;
+            var bind = _jeEnsureBinding(idx);
+            if (ev.keyCode === 27) { bk.textContent = _jeKeyName(bind[field]); return; }
+            bind[field] = ev.keyCode;
             bk.textContent = _jeKeyName(ev.keyCode);
             _jeSyncBindingsToServer();
         }
@@ -942,7 +999,8 @@
         if (_jeActiveGpListen) {
             clearTimeout(_jeActiveGpListen.timeoutId);
             _jeActiveGpListen.bk.classList.remove('je-listening');
-            _jeActiveGpListen.bk.textContent = _jeGpName(_jeBindings[_jeActiveGpListen.idx][_jeActiveGpListen.field]);
+            var prevBind = _jeEnsureBinding(_jeActiveGpListen.idx);
+            _jeActiveGpListen.bk.textContent = _jeGpName(prevBind[_jeActiveGpListen.field]);
             _jeActiveGpListen = null;
         }
 
@@ -962,7 +1020,8 @@
             if (_jeActiveGpListen && _jeActiveGpListen.bk === bk) {
                 _jeActiveGpListen = null;
                 bk.classList.remove('je-listening');
-                bk.textContent = _jeGpName(_jeBindings[idx][field]);
+                var currBind = _jeEnsureBinding(idx);
+                bk.textContent = _jeGpName(currBind[field]);
             }
         }, 10000);
 
