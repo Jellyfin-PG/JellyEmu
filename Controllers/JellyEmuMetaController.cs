@@ -166,8 +166,9 @@ namespace JellyEmu.Controllers
 
         public static readonly List<SelectOption> AvailableFps = new()
         {
-            new("0", "Disabled (Default)"),
-            new("1", "Enabled (Display Framerate Badge)")
+            new("0", "None"),
+            new("1", "FPS"),
+            new("2", "Detailed")
         };
 
         public static readonly List<SelectOption> AvailableAutosave = new()

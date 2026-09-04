@@ -189,41 +189,115 @@
     }
 
     var fpsEl = document.getElementById('je-fps');
-    var fpsOn = false;
+    var fpsMode = '0';
     var _fpsRafId = null;
     var fpsFrames = 0;
     var fpsLast = performance.now();
+    var _prevFrameTime = performance.now();
+    var _frameDeltas = [];
+    var _stutterCount = 0;
 
     function fpsLoop(now) {
-        if (!fpsOn) {
+        if (fpsMode === '0') {
             _fpsRafId = null;
             return;
         }
+
+        var delta = now - _prevFrameTime;
+        _prevFrameTime = now;
+
+        if (delta > 0 && delta < 500) {
+            _frameDeltas.push(delta);
+            if (delta > 24) { // Stutter detection (>24ms on ~16.6ms target)
+                _stutterCount++;
+            }
+        }
         fpsFrames++;
+
         if (now - fpsLast >= 1000) {
-            if (fpsEl) fpsEl.textContent = Math.round((fpsFrames * 1000) / (now - fpsLast)) + ' FPS';
+            var elapsed = now - fpsLast;
+            var currentFps = ((fpsFrames * 1000) / elapsed).toFixed(1);
+
+            if (fpsEl) {
+                if (fpsMode === '1') {
+                    fpsEl.innerHTML = '<div class="je-fps-row"><span class="material-icons">speed</span><span>' + Math.round(currentFps) + ' FPS</span></div>';
+                } else if (fpsMode === '2') {
+                    var avgMs = (elapsed / fpsFrames).toFixed(1);
+                    var minMs = _frameDeltas.length ? Math.min.apply(null, _frameDeltas).toFixed(1) : avgMs;
+                    var maxMs = _frameDeltas.length ? Math.max.apply(null, _frameDeltas).toFixed(1) : avgMs;
+
+                    var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('#game canvas') || document.querySelector('canvas');
+                    var bufInfo = canvas ? (canvas.width + '×' + canvas.height) : 'N/A';
+                    var dispInfo = 'N/A';
+                    if (canvas) {
+                        var r = canvas.getBoundingClientRect();
+                        dispInfo = Math.round(r.width) + '×' + Math.round(r.height);
+                    }
+
+                    var rows = [
+                        '<div class="je-fps-row"><span class="material-icons">speed</span><span>' + currentFps + ' FPS (' + avgMs + ' ms)</span></div>',
+                        '<div class="je-fps-row"><span class="material-icons">timer</span><span>Timing: ' + minMs + ' - ' + maxMs + ' ms' + (_stutterCount > 0 ? ' (' + _stutterCount + ' stutters)' : '') + '</span></div>',
+                        '<div class="je-fps-row"><span class="material-icons">tv</span><span>Canvas: ' + bufInfo + ' → ' + dispInfo + '</span></div>'
+                    ];
+
+                    var coreName = window.EJS_core || (window.JellyEmuConfig && window.JellyEmuConfig.platformTag);
+                    if (coreName) {
+                        rows.push('<div class="je-fps-row"><span class="material-icons">sports_esports</span><span>Core: ' + coreName + '</span></div>');
+                    }
+
+                    if (window.performance && window.performance.memory && window.performance.memory.usedJSHeapSize) {
+                        var mb = Math.round(window.performance.memory.usedJSHeapSize / (1024 * 1024));
+                        rows.push('<div class="je-fps-row"><span class="material-icons">memory</span><span>Heap: ' + mb + ' MB</span></div>');
+                    }
+
+                    fpsEl.innerHTML = rows.join('');
+                }
+            }
+
             fpsFrames = 0;
             fpsLast = now;
+            _frameDeltas = [];
+            _stutterCount = 0;
         }
+
         _fpsRafId = requestAnimationFrame(fpsLoop);
     }
 
     function applyLiveFps() {
-        var v = getEffectivePref('showFps', '0');
-        var shouldBeOn = (v === '1' || v === true || v === 'true' || v === 1);
+        var raw = getEffectivePref('showFps', '0');
+        var v = String(raw).trim().toLowerCase();
         if (!fpsEl) fpsEl = document.getElementById('je-fps');
 
-        if (shouldBeOn) {
-            fpsOn = true;
-            if (fpsEl) fpsEl.classList.add('je-active');
+        if (v === '1' || v === 'fps' || v === 'true') {
+            fpsMode = '1';
+        } else if (v === '2' || v === 'detailed') {
+            fpsMode = '2';
+        } else {
+            fpsMode = '0';
+        }
+
+        if (fpsMode !== '0') {
+            if (fpsEl) {
+                fpsEl.classList.add('je-active');
+                if (fpsMode === '2') {
+                    fpsEl.classList.add('je-detailed');
+                } else {
+                    fpsEl.classList.remove('je-detailed');
+                }
+            }
             if (!_fpsRafId) {
                 fpsFrames = 0;
                 fpsLast = performance.now();
+                _prevFrameTime = performance.now();
+                _frameDeltas = [];
+                _stutterCount = 0;
                 _fpsRafId = requestAnimationFrame(fpsLoop);
             }
         } else {
-            fpsOn = false;
-            if (fpsEl) fpsEl.classList.remove('je-active');
+            if (fpsEl) {
+                fpsEl.classList.remove('je-active');
+                fpsEl.classList.remove('je-detailed');
+            }
             if (_fpsRafId) {
                 cancelAnimationFrame(_fpsRafId);
                 _fpsRafId = null;

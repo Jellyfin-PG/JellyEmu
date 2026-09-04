@@ -289,11 +289,11 @@
                             </div>
 
                             <div class="je-input-container">
-                                <label class="je-input-label">Show FPS Overlay</label>
+                                <label class="je-input-label">Performance Overlay</label>
                                 <select id="je-pref-fps" class="je-select">
                                     ${renderOptions(_settingOptions.fps, p.showFps || '0')}
                                 </select>
-                                <div class="je-field-desc">Real-time frames per second counter overlay.</div>
+                                <div class="je-field-desc">Real-time framerate and timing metrics overlay.</div>
                             </div>
                         </div>
                     </div>
