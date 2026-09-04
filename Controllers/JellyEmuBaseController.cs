@@ -601,7 +601,7 @@ namespace JellyEmu.Controllers
             return true;
         }
 
-        protected static string MapLegacyCore(string core)
+        protected static string MapLegacyCore(string? core)
         {
             var lower = (core ?? string.Empty).ToLowerInvariant();
             return lower switch
@@ -633,7 +633,7 @@ namespace JellyEmu.Controllers
                 "vb" => "beetle_vb",
                 "mednafen_psx" => "mednafen_psx_hw",
                 "3ds" or "citra" or "citra_canary" => "azahar",
-                _ => core
+                _ => core ?? string.Empty
             };
         }
 
