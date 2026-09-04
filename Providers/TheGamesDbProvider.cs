@@ -93,11 +93,7 @@ namespace JellyEmu.Providers
         public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
-            {
-                using var response = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
-                return Task.FromResult(response);
-            }
-
+                return Task.FromException<HttpResponseMessage>(new ArgumentException("URL must be a well-formed absolute URI.", nameof(url)));
             return GetHttpClient().GetAsync(url, cancellationToken);
         }
     }
