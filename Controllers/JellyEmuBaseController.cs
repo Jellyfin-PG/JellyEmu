@@ -489,7 +489,7 @@ namespace JellyEmu.Controllers
         {
             var dir = GetSafeUserSavesDir(userId);
             Directory.CreateDirectory(dir);
-            var filePath = Path.GetFullPath(Path.Combine(dir, "playtime.json"));
+            var filePath = Path.GetFullPath(Path.Join(dir, "playtime.json"));
             if (!filePath.StartsWith(dir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in playtime path.");
             return filePath;
