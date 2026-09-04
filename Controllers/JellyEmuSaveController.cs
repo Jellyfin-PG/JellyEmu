@@ -1,13 +1,15 @@
+using System.IO;
+using System.Linq;
 using System.Net.Mime;
+using System.Text.Json;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.Security.Claims;
-using MediaBrowser.Controller.Entities;
 
 namespace JellyEmu.Controllers
 {
@@ -36,13 +38,17 @@ namespace JellyEmu.Controllers
         [HttpHead("/jellyemu/save/{itemId}/{userId}")]
         [HttpHead("/jellyemu/save/{itemId}/{userId}/{slotRoute:int}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult HeadSave(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             var targetSlot = slot ?? slotRoute;
             if (targetSlot.HasValue)
             {
-                var path = GetSavePath(userId, itemId, targetSlot.Value);
+                var path = GetSavePath(userId, itemId, Math.Max(1, targetSlot.Value));
                 if (System.IO.File.Exists(path))
                 {
                     var lastModified = System.IO.File.GetLastWriteTimeUtc(path);
@@ -53,12 +59,16 @@ namespace JellyEmu.Controllers
                 return NotFound();
             }
 
-            var userDir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
+            var userDir = GetSafeUserSavesDir(userId);
             if (Directory.Exists(userDir))
             {
-                foreach (var slotDir in Directory.GetDirectories(userDir, "slot*"))
+                var slotDirs = Directory.GetDirectories(userDir, "slot*")
+                    .Where(d => int.TryParse(Path.GetFileName(d).AsSpan(4), out _));
+
+                foreach (var slotDir in slotDirs)
                 {
-                    var stateFile = Path.Combine(slotDir, $"{itemId}.state");
+                    var slotNumber = int.Parse(Path.GetFileName(slotDir).AsSpan(4));
+                    var stateFile = GetSafeSaveFilePath(userId, itemId, slotNumber, "state");
                     if (System.IO.File.Exists(stateFile))
                     {
                         var lastModified = System.IO.File.GetLastWriteTimeUtc(stateFile);
@@ -79,20 +89,25 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/save/{itemId}/{userId}")]
         [HttpGet("/jellyemu/save/{itemId}/{userId}/{slotRoute:int}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetSave(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
-            var slotNum = slot ?? slotRoute ?? 1;
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
-                Logger.LogInformation("[JellyEmu] No save found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogInformation("[JellyEmu] No save found for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NotFound();
             }
 
             var fileInfo = new System.IO.FileInfo(path);
             Logger.LogInformation("[JellyEmu] Pipeline STAGE 3 (Server Send): Serving save for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                itemId, userId, slotNum, fileInfo.Length);
+                SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, fileInfo.Length);
             var stream = System.IO.File.OpenRead(path);
             return File(stream, "application/octet-stream", $"{itemId}.state");
         }
@@ -112,13 +127,15 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> PostSave(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!VerifyUser(userId)) return Forbid();
             if (Request.ContentLength is 0)
                 return BadRequest("Empty save body.");
 
-            var slotNum = slot ?? slotRoute ?? 1;
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSavePath(userId, itemId, slotNum);
-
             var tempPath = path + ".tmp";
 
             try
@@ -135,11 +152,13 @@ namespace JellyEmu.Controllers
                 }
 
                 Logger.LogInformation("[JellyEmu] Pipeline STAGE 2 (Server Receive): Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                    itemId, userId, slotNum, writtenFile.Length);
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, writtenFile.Length);
                 System.IO.File.Move(tempPath, path, overwrite: true);
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogError(ex, "[JellyEmu] Failed to write save state for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 if (System.IO.File.Exists(tempPath))
                     System.IO.File.Delete(tempPath);
                 throw;
@@ -156,35 +175,42 @@ namespace JellyEmu.Controllers
         [HttpDelete("/jellyemu/save/{itemId}/{userId}/{slotRoute:int}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public IActionResult DeleteSave(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!VerifyUser(userId))
             {
                 Logger.LogWarning("[JellyEmu] Unauthorized delete attempt.");
                 return Forbid();
             }
 
-            var slotNum = slot ?? slotRoute ?? 1;
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSavePath(userId, itemId, slotNum);
 
             if (!System.IO.File.Exists(path))
             {
-                Logger.LogInformation("[JellyEmu] Cannot delete: No save found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogInformation("[JellyEmu] Cannot delete: No save found for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NotFound();
             }
 
             try
             {
                 System.IO.File.Delete(path);
-                Logger.LogInformation("[JellyEmu] Successfully deleted save for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogInformation("[JellyEmu] Successfully deleted save for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Failed to delete save file for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogError(ex, "[JellyEmu] Failed to delete save file for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
         }
@@ -200,24 +226,26 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/saves/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult GetItemSaveSlots(string itemId, string userId)
         {
-            var userDir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
+            var userDir = GetSafeUserSavesDir(userId);
             if (!Directory.Exists(userDir))
             {
                 return Ok(Array.Empty<object>());
             }
 
             var results = new List<object>();
-            foreach (var slotDir in Directory.GetDirectories(userDir, "slot*"))
-            {
-                var slotName = Path.GetFileName(slotDir);
-                if (!int.TryParse(slotName.AsSpan(4), out var slotNumber))
-                {
-                    continue;
-                }
+            var slotDirs = Directory.GetDirectories(userDir, "slot*")
+                .Where(d => int.TryParse(Path.GetFileName(d).AsSpan(4), out _));
 
-                var stateFile = Path.Combine(slotDir, $"{itemId}.state");
+            foreach (var slotDir in slotDirs)
+            {
+                var slotNumber = int.Parse(Path.GetFileName(slotDir).AsSpan(4));
+                var stateFile = GetSafeSaveFilePath(userId, itemId, slotNumber, "state");
                 if (System.IO.File.Exists(stateFile))
                 {
                     var fi = new System.IO.FileInfo(stateFile);
@@ -250,11 +278,15 @@ namespace JellyEmu.Controllers
         [Authorize]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public IActionResult ListSaves(string userId)
         {
+            if (!IsValidId(userId))
+                return BadRequest("Invalid user ID.");
+
             if (!VerifyUser(userId)) return Forbid();
-            var userDir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
+            var userDir = GetSafeUserSavesDir(userId);
             if (!Directory.Exists(userDir))
                 return Ok(Array.Empty<object>());
 
@@ -266,15 +298,18 @@ namespace JellyEmu.Controllers
             };
 
             var results = new List<object>();
+            var slotDirs = Directory.GetDirectories(userDir, "slot*")
+                .Where(d => int.TryParse(Path.GetFileName(d).AsSpan(4), out _));
 
-            foreach (var slotDir in Directory.GetDirectories(userDir, "slot*"))
+            foreach (var slotDir in slotDirs)
             {
-                var slotName = Path.GetFileName(slotDir);
-                if (!int.TryParse(slotName.AsSpan(4), out var slotNumber)) continue;
+                var slotNumber = int.Parse(Path.GetFileName(slotDir).AsSpan(4));
 
                 foreach (var stateFile in Directory.GetFiles(slotDir, "*.state"))
                 {
                     var itemId = Path.GetFileNameWithoutExtension(stateFile);
+                    if (!IsValidId(itemId)) continue;
+
                     var fi = new System.IO.FileInfo(stateFile);
 
                     string gameName = itemId, platform = string.Empty, region = string.Empty;
@@ -298,7 +333,10 @@ namespace JellyEmu.Controllers
                             }
                         }
                     }
-                    catch { /* item may have been removed from library */ }
+                    catch (Exception ex)
+                    {
+                        Logger.LogDebug(ex, "Failed to resolve item metadata for item {ItemId}", SanitizeForLog(itemId));
+                    }
 
                     results.Add(new
                     {
@@ -333,10 +371,15 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/save-screenshot/{itemId}/{userId}/{slot}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetSaveScreenshot(string itemId, string userId, int slot)
         {
-            var path = GetSaveScreenshotPath(userId, itemId, slot);
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
+            var slotNum = Math.Max(1, slot);
+            var path = GetSaveScreenshotPath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path)) return NotFound();
             try
             {
@@ -344,7 +387,12 @@ namespace JellyEmu.Controllers
                 Response.Headers["Cache-Control"] = "no-cache";
                 return Content(json, MediaTypeNames.Application.Json);
             }
-            catch { return NotFound(); }
+            catch (Exception ex) when (ex is IOException or JsonException)
+            {
+                Logger.LogDebug(ex, "Could not read screenshot data for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
+                return NotFound();
+            }
         }
 
         /// <summary>
@@ -359,26 +407,36 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> PostSaveScreenshot(string itemId, string userId, int slot)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!VerifyUser(userId)) return Forbid();
+            var slotNum = Math.Max(1, slot);
             try
             {
-                var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync().ConfigureAwait(false);
+                using var reader = new System.IO.StreamReader(Request.Body);
+                var body = await reader.ReadToEndAsync().ConfigureAwait(false);
                 using var doc = System.Text.Json.JsonDocument.Parse(body);
                 var dataUrl = doc.RootElement.TryGetProperty("dataUrl", out var d)
                     ? d.GetString() ?? string.Empty : string.Empty;
                 if (!dataUrl.StartsWith("data:image"))
                     return BadRequest("Body must contain a valid dataUrl.");
 
-                var path = GetSaveScreenshotPath(userId, itemId, slot);
+                var path = GetSaveScreenshotPath(userId, itemId, slotNum);
                 await System.IO.File.WriteAllTextAsync(path,
                     System.Text.Json.JsonSerializer.Serialize(new { dataUrl }),
                     System.Text.Encoding.UTF8).ConfigureAwait(false);
 
                 Logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} user {UserId} slot {Slot}",
-                    itemId, userId, slot);
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return Ok(new { saved = true });
             }
-            catch { return BadRequest("Could not read image data."); }
+            catch (Exception ex) when (ex is IOException or JsonException)
+            {
+                Logger.LogWarning(ex, "Failed to parse/save screenshot data for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
+                return BadRequest("Could not read image data.");
+            }
         }
 
         /// <summary>
@@ -389,10 +447,14 @@ namespace JellyEmu.Controllers
         [HttpHead("/jellyemu/sram/{itemId}/{userId}")]
         [HttpHead("/jellyemu/sram/{itemId}/{userId}/{slotRoute:int}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult HeadSram(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
-            var slotNum = slot ?? slotRoute ?? 1;
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSramPath(userId, itemId, slotNum);
 
             if (System.IO.File.Exists(path))
@@ -413,20 +475,25 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/sram/{itemId}/{userId}")]
         [HttpGet("/jellyemu/sram/{itemId}/{userId}/{slotRoute:int}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetSram(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
-            var slotNum = slot ?? slotRoute ?? 1;
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSramPath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
-                Logger.LogInformation("[JellyEmu] No SRAM found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogInformation("[JellyEmu] No SRAM found for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NotFound();
             }
 
             var fileInfo = new System.IO.FileInfo(path);
             Logger.LogInformation("[JellyEmu] Pipeline: Serving SRAM for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                itemId, userId, slotNum, fileInfo.Length);
+                SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, fileInfo.Length);
             var stream = System.IO.File.OpenRead(path);
             return File(stream, "application/octet-stream", $"{itemId}.sav");
         }
@@ -446,13 +513,15 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> PostSram(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!VerifyUser(userId)) return Forbid();
             if (Request.ContentLength is 0)
                 return BadRequest("Empty SRAM body.");
 
-            var slotNum = slot ?? slotRoute ?? 1;
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSramPath(userId, itemId, slotNum);
-
             var tempPath = path + ".tmp";
 
             try
@@ -469,11 +538,13 @@ namespace JellyEmu.Controllers
                 }
 
                 Logger.LogInformation("[JellyEmu] Pipeline: Saved SRAM for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
-                    itemId, userId, slotNum, writtenFile.Length);
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, writtenFile.Length);
                 System.IO.File.Move(tempPath, path, overwrite: true);
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogError(ex, "[JellyEmu] Failed to write SRAM for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 if (System.IO.File.Exists(tempPath))
                     System.IO.File.Delete(tempPath);
                 throw;
@@ -490,35 +561,42 @@ namespace JellyEmu.Controllers
         [HttpDelete("/jellyemu/sram/{itemId}/{userId}/{slotRoute:int}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public IActionResult DeleteSram(string itemId, string userId, [FromQuery] int? slot, [FromRoute] int? slotRoute = null)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!VerifyUser(userId))
             {
                 Logger.LogWarning("[JellyEmu] Unauthorized SRAM delete attempt.");
                 return Forbid();
             }
 
-            var slotNum = slot ?? slotRoute ?? 1;
+            var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSramPath(userId, itemId, slotNum);
 
             if (!System.IO.File.Exists(path))
             {
-                Logger.LogInformation("[JellyEmu] Cannot delete: No SRAM found for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogInformation("[JellyEmu] Cannot delete: No SRAM found for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NotFound();
             }
 
             try
             {
                 System.IO.File.Delete(path);
-                Logger.LogInformation("[JellyEmu] Successfully deleted SRAM for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogInformation("[JellyEmu] Successfully deleted SRAM for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Failed to delete SRAM file for item {ItemId} user {UserId} slot {Slot}", itemId, userId, slotNum);
+                Logger.LogError(ex, "[JellyEmu] Failed to delete SRAM file for item {ItemId} user {UserId} slot {Slot}",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
         }
