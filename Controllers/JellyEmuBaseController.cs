@@ -446,7 +446,7 @@ namespace JellyEmu.Controllers
             var userDir = GetSafeUserSavesDir(userId);
             var slotNum = Math.Max(1, slot);
             var safeSlotName = $"slot{slotNum}".TrimStart('/', '\\');
-            var slotDir = Path.GetFullPath(Path.Combine(userDir, safeSlotName));
+            var slotDir = Path.GetFullPath(Path.Join(userDir, safeSlotName));
             if (!slotDir.StartsWith(userDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in slot.");
 
