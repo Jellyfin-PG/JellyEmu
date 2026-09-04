@@ -463,7 +463,7 @@ namespace JellyEmu.Controllers
             var slotDir = GetSafeSlotDir(userId, slot);
             var cleanExt = extension.TrimStart('.', '/', '\\');
             var safeFileName = $"{itemId}.{cleanExt}".TrimStart('/', '\\');
-            var filePath = Path.GetFullPath(Path.Combine(slotDir, safeFileName));
+            var filePath = Path.GetFullPath(Path.Join(slotDir, safeFileName));
             if (!filePath.StartsWith(slotDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in item ID.");
 
