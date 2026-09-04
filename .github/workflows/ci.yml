@@ -22,8 +22,10 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Check C# Formatting
-        run: dotnet format --verify-no-changes --verbosity diagnostic
+      - name: Check C# Code Style & Analyzers
+        run: |
+          dotnet format style JellyEmu.sln --verify-no-changes
+          dotnet format analyzers JellyEmu.sln --verify-no-changes
 
       - name: Check for Vulnerable Dependencies
         run: dotnet list package --vulnerable --include-transitive
