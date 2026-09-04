@@ -63,11 +63,11 @@ namespace JellyEmu.Controllers
             if (Directory.Exists(userDir))
             {
                 var slotDirs = Directory.GetDirectories(userDir, "slot*")
-                    .Where(d => int.TryParse(Path.GetFileName(d).AsSpan(4), out _));
+                    .Where(d => int.TryParse(Path.GetFileName(d).AsSpan(4), out _))
+                    .Select(d => int.Parse(Path.GetFileName(d).AsSpan(4)));
 
-                foreach (var slotDir in slotDirs)
+                foreach (var slotNumber in slotDirs)
                 {
-                    var slotNumber = int.Parse(Path.GetFileName(slotDir).AsSpan(4));
                     var stateFile = GetSafeSaveFilePath(userId, itemId, slotNumber, "state");
                     if (System.IO.File.Exists(stateFile))
                     {
