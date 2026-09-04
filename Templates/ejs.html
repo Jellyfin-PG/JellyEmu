@@ -1304,6 +1304,18 @@
 
             // Screenshot
             document.getElementById('je-btn-screenshot').addEventListener('click', function () {
+                var dataUrl = _jeCaptureCanvas('image/png');
+                if (dataUrl && dataUrl.startsWith('data:image')) {
+                    var a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = (window.EJS_gameName || 'screenshot') + '.png';
+                    a.click();
+                    try {
+                        window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: dataUrl }, '*');
+                    } catch (ex) { }
+                    return;
+                }
+
                 var g = gm(); if (!g) return;
                 g.screenshot().then(function (pngBytes) {
                     var blob = new Blob([pngBytes], { type: 'image/png' });
@@ -1479,13 +1491,49 @@
         // Record session start time for playtime tracking
         var _jellyEmuSessionStart = Date.now();
 
-        function _jeCaptureCanvas() {
+        function _jeCaptureCanvas(format, quality) {
             try {
                 var canvas = document.querySelector('canvas.ejs_canvas') ||
                     document.querySelector('#game canvas') ||
                     document.querySelector('canvas');
                 if (canvas && canvas.width > 0 && canvas.height > 0) {
-                    return canvas.toDataURL('image/jpeg', 0.88);
+                    var mime = format || 'image/jpeg';
+                    var qual = (typeof quality === 'number') ? quality : (mime === 'image/png' ? undefined : 0.90);
+
+                    var rect = canvas.getBoundingClientRect();
+                    var displayW = Math.round(rect.width);
+                    var displayH = Math.round(rect.height);
+
+                    var targetW = displayW;
+                    var targetH = displayH;
+
+                    // If displayed with object-fit: contain, compute actual rendered image dimensions inside canvas element
+                    var style = window.getComputedStyle(canvas);
+                    var objectFit = style.objectFit || 'contain';
+
+                    if (objectFit === 'contain' && displayW > 0 && displayH > 0 && canvas.height > 0) {
+                        var aspect = canvas.width / canvas.height;
+                        targetW = displayW;
+                        targetH = Math.round(displayW / aspect);
+                        if (targetH > displayH) {
+                            targetH = displayH;
+                            targetW = Math.round(displayH * aspect);
+                        }
+                    }
+
+                    if (targetW > 0 && targetH > 0 && (targetW !== canvas.width || targetH !== canvas.height)) {
+                        var offscreen = document.createElement('canvas');
+                        offscreen.width = targetW;
+                        offscreen.height = targetH;
+                        var ctx = offscreen.getContext('2d');
+                        if (ctx) {
+                            ctx.imageSmoothingEnabled = false;
+                            ctx.drawImage(canvas, 0, 0, targetW, targetH);
+                            return offscreen.toDataURL(mime, qual);
+                        }
+                    }
+
+                    return canvas.toDataURL(mime, qual);
                 }
             } catch (e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
             return null;
