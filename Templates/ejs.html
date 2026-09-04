@@ -1046,11 +1046,42 @@
                 var e = emu(); if (!e || !e.started) return;
                 e.pause();
                 btnPause.style.display = 'none'; btnPlay.style.display = '';
+                if (typeof window._jePauseSessionTracking === 'function') window._jePauseSessionTracking();
             });
             btnPlay.addEventListener('click', function () {
                 var e = emu(); if (!e || !e.started) return;
                 e.play();
                 btnPlay.style.display = 'none'; btnPause.style.display = '';
+                if (typeof window._jeResumeSessionTracking === 'function') window._jeResumeSessionTracking();
+            });
+
+            // Auto-Pause (Reduces battery & CPU usage when tab is hidden)
+            var _autoPausedByBackground = false;
+            document.addEventListener('visibilitychange', function () {
+                var e = emu();
+                if (!e || !e.started) return;
+
+                if (document.hidden) {
+                    if (!e.paused) {
+                        _autoPausedByBackground = true;
+                        try { e.pause(); } catch (_) { }
+                        if (btnPause && btnPlay) {
+                            btnPause.style.display = 'none';
+                            btnPlay.style.display = '';
+                        }
+                        if (typeof window._jePauseSessionTracking === 'function') window._jePauseSessionTracking();
+                    }
+                } else {
+                    if (_autoPausedByBackground) {
+                        _autoPausedByBackground = false;
+                        try { e.play(); } catch (_) { }
+                        if (btnPause && btnPlay) {
+                            btnPlay.style.display = 'none';
+                            btnPause.style.display = '';
+                        }
+                        if (typeof window._jeResumeSessionTracking === 'function') window._jeResumeSessionTracking();
+                    }
+                }
             });
 
             // Restart
@@ -1438,13 +1469,58 @@
         var _jellyToken = window._jellyToken || '';
         var _jellyEmuSessionStarted = false;
         var _jellyEmuPingInterval = null;
-        var _jellyEmuSessionStart = Date.now();
+        var _totalActivePlaytimeMs = 0;
+        var _lastActiveResumeTime = Date.now();
+        var _isSessionActive = true;
+
+        function _jeGetActivePlaytimeSeconds() {
+            var total = _totalActivePlaytimeMs;
+            if (_isSessionActive) {
+                total += (Date.now() - _lastActiveResumeTime);
+            }
+            return Math.max(0, Math.round(total / 1000));
+        }
+
+        function _jeSendSessionPing(isPaused) {
+            if (!_jellyEmuSessionStarted) return;
+            var pingHeaders = {};
+            if (typeof _jellyToken !== 'undefined' && _jellyToken) {
+                pingHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
+            }
+            var secs = _jeGetActivePlaytimeSeconds();
+            var query = '?isPaused=' + (isPaused ? 'true' : 'false') + '&seconds=' + secs;
+            fetch('/jellyemu/session/ping/{{ item_id }}/{{ user_id }}' + query, {
+                method: 'POST',
+                headers: pingHeaders
+            }).catch(function () { });
+        }
+
+        function _jePauseSessionTracking() {
+            if (_isSessionActive) {
+                _totalActivePlaytimeMs += (Date.now() - _lastActiveResumeTime);
+                _isSessionActive = false;
+                _jeSendSessionPing(true);
+            }
+        }
+
+        function _jeResumeSessionTracking() {
+            if (!_isSessionActive) {
+                _lastActiveResumeTime = Date.now();
+                _isSessionActive = true;
+                _jeSendSessionPing(false);
+            }
+        }
+
+        window._jePauseSessionTracking = _jePauseSessionTracking;
+        window._jeResumeSessionTracking = _jeResumeSessionTracking;
 
         // Single Session Guarantee: Start session ONLY after game actually boots
         window.addEventListener('jellyemu:gamestart', function () {
             if (_jellyEmuSessionStarted) return;
             _jellyEmuSessionStarted = true;
-            _jellyEmuSessionStart = Date.now();
+            _totalActivePlaytimeMs = 0;
+            _lastActiveResumeTime = Date.now();
+            _isSessionActive = true;
 
             // Mark game as played in Jellyfin when the game starts
             fetch('/Users/{{ user_id }}/PlayedItems/{{ item_id }}', {
@@ -1472,14 +1548,12 @@
 
             // Ping the session every 30 s to keep it alive and advance the elapsed timer
             _jellyEmuPingInterval = setInterval(function () {
-                var pingHeaders = {};
-                if (typeof _jellyToken !== 'undefined' && _jellyToken) {
-                    pingHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
-                }
-                fetch('/jellyemu/session/ping/{{ item_id }}/{{ user_id }}', {
-                    method: 'POST',
-                    headers: pingHeaders
-                }).catch(function () { });
+                // Do not report active session when in background or paused
+                if (document.hidden || !_isSessionActive) return;
+                var e = (typeof emu === 'function') ? emu() : null;
+                if (e && e.paused) return;
+
+                _jeSendSessionPing(false);
             }, 30000);
 
             try {
@@ -1488,9 +1562,6 @@
                 }));
             } catch (_) {}
         });
-
-        // Record session start time for playtime tracking
-        var _jellyEmuSessionStart = Date.now();
 
         function _jeCaptureCanvas(format, quality) {
             try {
@@ -1590,17 +1661,19 @@
 
             // Stop the session ping and close the Jellyfin session
             clearInterval(_jellyEmuPingInterval);
+            _jePauseSessionTracking();
+            var sessionSeconds = _jeGetActivePlaytimeSeconds();
+
             var stopHeaders = {};
             if (typeof _jellyToken !== 'undefined' && _jellyToken) {
                 stopHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
             }
-            var sessionStop = fetch('/jellyemu/session/stop/{{ item_id }}/{{ user_id }}', {
+            var sessionStop = fetch('/jellyemu/session/stop/{{ item_id }}/{{ user_id }}?seconds=' + sessionSeconds, {
                 method: 'POST',
                 headers: stopHeaders
             }).catch(function () { });
 
-            // Always record playtime for this session
-            var sessionSeconds = Math.round((Date.now() - (_jellyEmuSessionStart || Date.now())) / 1000);
+            // Always record playtime for this session (excluding paused/background time)
             var playtimeFlush = sessionSeconds > 0
                 ? fetch('/jellyemu/playtime/{{ item_id }}/{{ user_id }}', {
                     method: 'POST',

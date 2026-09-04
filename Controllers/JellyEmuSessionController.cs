@@ -53,9 +53,9 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/session/ping/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> SessionPing(string itemId, string userId)
+        public async Task<IActionResult> SessionPing(string itemId, string userId, [FromQuery] long? seconds = null, [FromQuery] bool isPaused = false)
         {
-            await SessionService.PingSessionAsync(userId, itemId).ConfigureAwait(false);
+            await SessionService.PingSessionAsync(userId, itemId, seconds, isPaused).ConfigureAwait(false);
             return Ok(new { alive = true });
         }
 
@@ -65,9 +65,9 @@ namespace JellyEmu.Controllers
         /// </summary>
         [HttpPost("/jellyemu/session/stop/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> SessionStop(string itemId, string userId)
+        public async Task<IActionResult> SessionStop(string itemId, string userId, [FromQuery] long? seconds = null)
         {
-            await SessionService.StopSessionAsync(userId, itemId).ConfigureAwait(false);
+            await SessionService.StopSessionAsync(userId, itemId, seconds).ConfigureAwait(false);
             return Ok(new { stopped = true });
         }
     }

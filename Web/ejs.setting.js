@@ -305,6 +305,16 @@
         }
     }
 
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && fpsMode !== '0') {
+            fpsFrames = 0;
+            fpsLast = performance.now();
+            _prevFrameTime = performance.now();
+            _frameDeltas = [];
+            _stutterCount = 0;
+        }
+    });
+
     function applyAllLiveSettings() {
         applyLiveShader();
         applyLiveRotation();
