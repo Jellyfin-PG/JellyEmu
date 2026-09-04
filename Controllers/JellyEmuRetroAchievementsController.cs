@@ -77,6 +77,10 @@ namespace JellyEmu.Controllers
                     ["raApiKey"] = newApiKey
                 });
 
+                CacheService.EvictByPrefix(JellyEmuCacheKeys.EffectivePrefsUserPrefix(userId));
+                CacheService.EvictByPrefix(JellyEmuCacheKeys.ScopedPrefsUserPrefix(userId));
+                CacheService.Evict(JellyEmuCacheKeys.PrefsSummary(userId));
+
                 return Ok(new { success = true, raUsername = newUsername });
             }
             catch (Exception ex)

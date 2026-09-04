@@ -67,6 +67,12 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetSystems()
         {
+            var cacheKey = JellyEmuCacheKeys.Systems();
+            if (CacheService.TryGetValue<object>(cacheKey, out var cachedSystems) && cachedSystems != null)
+            {
+                return Ok(cachedSystems);
+            }
+
             var systems = PlatformCoreRegistry.Select(kvp => new
             {
                 name = kvp.Key,
@@ -78,11 +84,13 @@ namespace JellyEmu.Controllers
                 })
             });
 
-            return Ok(new
+            var result = new
             {
                 systems,
                 platformCoreMap = PlatformCoreRegistry
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(24));
+            return Ok(result);
         }
 
         public record ShaderOption(string Id, string Label);
@@ -205,29 +213,41 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetSettingOptions([FromQuery] string? scope = null, [FromQuery] string? category = null)
         {
+            var cacheKey = JellyEmuCacheKeys.SettingOptions(scope, category);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cachedOptions) && cachedOptions != null)
+            {
+                return Ok(cachedOptions);
+            }
+
             var filter = (scope ?? category)?.Trim().ToLowerInvariant();
+            object result;
 
             if (!string.IsNullOrEmpty(filter))
             {
-                return filter switch
+                result = filter switch
                 {
-                    "shaders" or "shader" => Ok(AvailableShaders.Select(s => new { id = s.Id, label = s.Label })),
-                    "scaling" or "scale" => Ok(AvailableScaling.Select(s => new { id = s.Id, label = s.Label })),
-                    "rotation" => Ok(AvailableRotations.Select(s => new { id = s.Id, label = s.Label })),
-                    "ffrate" or "fastforwardrates" => Ok(AvailableFastForwardRates.Select(s => new { id = s.Id, label = s.Label })),
-                    "smrate" or "slowmotionrates" => Ok(AvailableSlowMotionRates.Select(s => new { id = s.Id, label = s.Label })),
-                    "volume" => Ok(AvailableVolume.Select(s => new { id = s.Id, label = s.Label })),
-                    "mute" => Ok(AvailableMute.Select(s => new { id = s.Id, label = s.Label })),
-                    "fps" or "showfps" => Ok(AvailableFps.Select(s => new { id = s.Id, label = s.Label })),
-                    "autosave" => Ok(AvailableAutosave.Select(s => new { id = s.Id, label = s.Label })),
-                    "haptics" => Ok(AvailableHaptics.Select(s => new { id = s.Id, label = s.Label })),
-                    "virtualgamepad" => Ok(AvailableVirtualGamepad.Select(s => new { id = s.Id, label = s.Label })),
-                    "virtualgamepadlefty" => Ok(AvailableVirtualGamepadLefty.Select(s => new { id = s.Id, label = s.Label })),
-                    _ => Ok(GetAllSettingOptions())
+                    "shaders" or "shader" => AvailableShaders.Select(s => new { id = s.Id, label = s.Label }),
+                    "scaling" or "scale" => AvailableScaling.Select(s => new { id = s.Id, label = s.Label }),
+                    "rotation" => AvailableRotations.Select(s => new { id = s.Id, label = s.Label }),
+                    "ffrate" or "fastforwardrates" => AvailableFastForwardRates.Select(s => new { id = s.Id, label = s.Label }),
+                    "smrate" or "slowmotionrates" => AvailableSlowMotionRates.Select(s => new { id = s.Id, label = s.Label }),
+                    "volume" => AvailableVolume.Select(s => new { id = s.Id, label = s.Label }),
+                    "mute" => AvailableMute.Select(s => new { id = s.Id, label = s.Label }),
+                    "fps" or "showfps" => AvailableFps.Select(s => new { id = s.Id, label = s.Label }),
+                    "autosave" => AvailableAutosave.Select(s => new { id = s.Id, label = s.Label }),
+                    "haptics" => AvailableHaptics.Select(s => new { id = s.Id, label = s.Label }),
+                    "virtualgamepad" => AvailableVirtualGamepad.Select(s => new { id = s.Id, label = s.Label }),
+                    "virtualgamepadlefty" => AvailableVirtualGamepadLefty.Select(s => new { id = s.Id, label = s.Label }),
+                    _ => GetAllSettingOptions()
                 };
             }
+            else
+            {
+                result = GetAllSettingOptions();
+            }
 
-            return Ok(GetAllSettingOptions());
+            CacheService.Set(cacheKey, result, slidingExpiration: TimeSpan.FromHours(24));
+            return Ok(result);
         }
 
         private object GetAllSettingOptions() => new

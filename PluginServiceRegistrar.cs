@@ -37,6 +37,8 @@ namespace JellyEmu
             serviceCollection.AddSingleton<JellyEmuBiosService>();
             serviceCollection.AddSingleton<JellyEmuPreferenceService>();
             serviceCollection.AddSingleton<JellyEmuInputService>();
+            serviceCollection.AddMemoryCache();
+            serviceCollection.AddSingleton<JellyEmuCacheService>();
 
             serviceCollection.AddHostedService<JellyEmuInjectorService>();
         }

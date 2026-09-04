@@ -37,8 +37,14 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetEffectivePrefs(string userId, [FromQuery] string? platform)
         {
+            var cacheKey = JellyEmuCacheKeys.EffectivePrefs(userId, platform);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cachedDto) && cachedDto != null)
+            {
+                return Ok(cachedDto);
+            }
+
             var prefs = await PreferenceService.GetEffectivePreferencesAsync(userId, platform);
-            return Ok(new
+            var result = new
             {
                 userId,
                 platform,
@@ -60,7 +66,9 @@ namespace JellyEmu.Controllers
                 ffrate              = prefs.FfRate,
                 smrate              = prefs.SmRate,
                 showFps             = prefs.ShowFps
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(2));
+            return Ok(result);
         }
 
         /// <summary>
@@ -74,15 +82,22 @@ namespace JellyEmu.Controllers
         {
             var targetScope = string.IsNullOrWhiteSpace(scope) ? "global" : scope;
             var target = targetId ?? string.Empty;
-            var prefs = await PreferenceService.GetScopedPreferencesAsync(userId, targetScope, target);
+            var cacheKey = JellyEmuCacheKeys.ScopedPrefs(userId, targetScope, target);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cached) && cached != null)
+            {
+                return Ok(cached);
+            }
 
-            return Ok(new
+            var prefs = await PreferenceService.GetScopedPreferencesAsync(userId, targetScope, target);
+            var result = new
             {
                 userId,
                 scope = targetScope,
                 targetId = target,
                 preferences = prefs
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(2));
+            return Ok(result);
         }
 
         /// <summary>
@@ -94,12 +109,20 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetOverridesSummary(string userId)
         {
+            var cacheKey = JellyEmuCacheKeys.PrefsSummary(userId);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cached) && cached != null)
+            {
+                return Ok(cached);
+            }
+
             var list = await PreferenceService.GetAllOverridesSummaryAsync(userId);
-            return Ok(new
+            var result = new
             {
                 userId,
                 overrides = list
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(2));
+            return Ok(result);
         }
 
         /// <summary>
@@ -163,6 +186,11 @@ namespace JellyEmu.Controllers
                 await PreferenceService.SetPreferencesAsync(userId, targetScope, finalTargetId, dict);
                 Logger.LogInformation("[JellyEmu] Preferences saved for user {UserId}, scope={Scope}, target={TargetId}", userId, targetScope, finalTargetId);
 
+                // Evict effective, scoped, and summary caches for this user
+                CacheService.EvictByPrefix(JellyEmuCacheKeys.EffectivePrefsUserPrefix(userId));
+                CacheService.EvictByPrefix(JellyEmuCacheKeys.ScopedPrefsUserPrefix(userId));
+                CacheService.Evict(JellyEmuCacheKeys.PrefsSummary(userId));
+
                 var updated = await PreferenceService.GetScopedPreferencesAsync(userId, targetScope, finalTargetId);
                 return Ok(new
                 {
@@ -189,6 +217,12 @@ namespace JellyEmu.Controllers
         public async Task<IActionResult> DeletePref(string userId, [FromQuery] string scope, [FromQuery] string targetId, [FromQuery] string? key)
         {
             var success = await PreferenceService.DeletePreferenceAsync(userId, scope, targetId, key);
+
+            // Evict effective, scoped, and summary caches for this user
+            CacheService.EvictByPrefix(JellyEmuCacheKeys.EffectivePrefsUserPrefix(userId));
+            CacheService.EvictByPrefix(JellyEmuCacheKeys.ScopedPrefsUserPrefix(userId));
+            CacheService.Evict(JellyEmuCacheKeys.PrefsSummary(userId));
+
             return Ok(new
             {
                 success,
@@ -209,6 +243,12 @@ namespace JellyEmu.Controllers
         public async Task<IActionResult> ResetPrefs(string userId)
         {
             var success = await PreferenceService.ResetUserPreferencesAsync(userId);
+
+            // Evict effective, scoped, and summary caches for this user
+            CacheService.EvictByPrefix(JellyEmuCacheKeys.EffectivePrefsUserPrefix(userId));
+            CacheService.EvictByPrefix(JellyEmuCacheKeys.ScopedPrefsUserPrefix(userId));
+            CacheService.Evict(JellyEmuCacheKeys.PrefsSummary(userId));
+
             return Ok(new
             {
                 success,

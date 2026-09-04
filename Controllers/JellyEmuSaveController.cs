@@ -97,6 +97,14 @@ namespace JellyEmu.Controllers
                 return BadRequest("Invalid item or user ID.");
 
             var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
+            var cacheKey = JellyEmuCacheKeys.Save(itemId, userId, slotNum);
+            if (CacheService.TryGetValue<byte[]>(cacheKey, out var cachedBytes) && cachedBytes != null)
+            {
+                Logger.LogInformation("[JellyEmu] Pipeline STAGE 3 (Server Send): Serving save from cache for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, cachedBytes.Length);
+                return File(cachedBytes, "application/octet-stream", $"{itemId}.state");
+            }
+
             var path = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
@@ -108,6 +116,14 @@ namespace JellyEmu.Controllers
             var fileInfo = new System.IO.FileInfo(path);
             Logger.LogInformation("[JellyEmu] Pipeline STAGE 3 (Server Send): Serving save for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
                 SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, fileInfo.Length);
+
+            if (CacheService.ShouldCacheBinary(fileInfo.Length))
+            {
+                var bytes = System.IO.File.ReadAllBytes(path);
+                CacheService.Set(cacheKey, bytes, slidingExpiration: TimeSpan.FromMinutes(60));
+                return File(bytes, "application/octet-stream", $"{itemId}.state");
+            }
+
             var stream = System.IO.File.OpenRead(path);
             return File(stream, "application/octet-stream", $"{itemId}.state");
         }
@@ -154,6 +170,11 @@ namespace JellyEmu.Controllers
                 Logger.LogInformation("[JellyEmu] Pipeline STAGE 2 (Server Receive): Saved state for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
                     SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, writtenFile.Length);
                 System.IO.File.Move(tempPath, path, overwrite: true);
+
+                // Evict cache entries
+                CacheService.Evict(JellyEmuCacheKeys.Save(itemId, userId, slotNum));
+                CacheService.Evict(JellyEmuCacheKeys.SaveSlots(itemId, userId));
+                CacheService.Evict(JellyEmuCacheKeys.UserSaves(userId));
             }
             catch (Exception ex)
             {
@@ -203,6 +224,10 @@ namespace JellyEmu.Controllers
             try
             {
                 System.IO.File.Delete(path);
+                CacheService.Evict(JellyEmuCacheKeys.Save(itemId, userId, slotNum));
+                CacheService.Evict(JellyEmuCacheKeys.SaveSlots(itemId, userId));
+                CacheService.Evict(JellyEmuCacheKeys.UserSaves(userId));
+
                 Logger.LogInformation("[JellyEmu] Successfully deleted save for item {ItemId} user {UserId} slot {Slot}",
                     SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NoContent();
@@ -232,10 +257,18 @@ namespace JellyEmu.Controllers
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
 
+            var cacheKey = JellyEmuCacheKeys.SaveSlots(itemId, userId);
+            if (CacheService.TryGetValue<List<object>>(cacheKey, out var cachedSlots) && cachedSlots != null)
+            {
+                return Ok(cachedSlots);
+            }
+
             var userDir = GetSafeUserSavesDir(userId);
             if (!Directory.Exists(userDir))
             {
-                return Ok(Array.Empty<object>());
+                var empty = new List<object>();
+                CacheService.Set(cacheKey, empty, slidingExpiration: TimeSpan.FromMinutes(60));
+                return Ok(empty);
             }
 
             var results = new List<object>();
@@ -267,6 +300,7 @@ namespace JellyEmu.Controllers
                 return aSlot.CompareTo(bSlot);
             });
 
+            CacheService.Set(cacheKey, results, slidingExpiration: TimeSpan.FromMinutes(60));
             return Ok(results);
         }
 
@@ -286,9 +320,20 @@ namespace JellyEmu.Controllers
                 return BadRequest("Invalid user ID.");
 
             if (!VerifyUser(userId)) return Forbid();
+
+            var cacheKey = JellyEmuCacheKeys.UserSaves(userId);
+            if (CacheService.TryGetValue<List<object>>(cacheKey, out var cachedList) && cachedList != null)
+            {
+                return Ok(cachedList);
+            }
+
             var userDir = GetSafeUserSavesDir(userId);
             if (!Directory.Exists(userDir))
-                return Ok(Array.Empty<object>());
+            {
+                var empty = new List<object>();
+                CacheService.Set(cacheKey, empty, slidingExpiration: TimeSpan.FromMinutes(30));
+                return Ok(empty);
+            }
 
             var knownRegions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -361,6 +406,7 @@ namespace JellyEmu.Controllers
                 return string.Compare(bDate, aDate, StringComparison.Ordinal);
             });
 
+            CacheService.Set(cacheKey, results, slidingExpiration: TimeSpan.FromMinutes(30));
             return Ok(results);
         }
 
@@ -379,11 +425,19 @@ namespace JellyEmu.Controllers
                 return BadRequest("Invalid item or user ID.");
 
             var slotNum = Math.Max(1, slot);
+            var cacheKey = JellyEmuCacheKeys.SaveScreenshot(itemId, userId, slotNum);
+            if (CacheService.TryGetValue<string>(cacheKey, out var cachedJson) && cachedJson != null)
+            {
+                Response.Headers["Cache-Control"] = "no-cache";
+                return Content(cachedJson, MediaTypeNames.Application.Json);
+            }
+
             var path = GetSaveScreenshotPath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path)) return NotFound();
             try
             {
                 var json = await System.IO.File.ReadAllTextAsync(path).ConfigureAwait(false);
+                CacheService.Set(cacheKey, json, slidingExpiration: TimeSpan.FromMinutes(60));
                 Response.Headers["Cache-Control"] = "no-cache";
                 return Content(json, MediaTypeNames.Application.Json);
             }
@@ -426,6 +480,11 @@ namespace JellyEmu.Controllers
                 await System.IO.File.WriteAllTextAsync(path,
                     System.Text.Json.JsonSerializer.Serialize(new { dataUrl }),
                     System.Text.Encoding.UTF8).ConfigureAwait(false);
+
+                // Evict cache entries
+                CacheService.Evict(JellyEmuCacheKeys.SaveScreenshot(itemId, userId, slotNum));
+                CacheService.Evict(JellyEmuCacheKeys.SaveSlots(itemId, userId));
+                CacheService.Evict(JellyEmuCacheKeys.UserSaves(userId));
 
                 Logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} user {UserId} slot {Slot}",
                     SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
@@ -483,6 +542,14 @@ namespace JellyEmu.Controllers
                 return BadRequest("Invalid item or user ID.");
 
             var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
+            var cacheKey = JellyEmuCacheKeys.Sram(itemId, userId, slotNum);
+            if (CacheService.TryGetValue<byte[]>(cacheKey, out var cachedBytes) && cachedBytes != null)
+            {
+                Logger.LogInformation("[JellyEmu] Pipeline: Serving SRAM from cache for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
+                    SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, cachedBytes.Length);
+                return File(cachedBytes, "application/octet-stream", $"{itemId}.sav");
+            }
+
             var path = GetSramPath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(path))
             {
@@ -494,6 +561,14 @@ namespace JellyEmu.Controllers
             var fileInfo = new System.IO.FileInfo(path);
             Logger.LogInformation("[JellyEmu] Pipeline: Serving SRAM for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
                 SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, fileInfo.Length);
+
+            if (CacheService.ShouldCacheBinary(fileInfo.Length))
+            {
+                var bytes = System.IO.File.ReadAllBytes(path);
+                CacheService.Set(cacheKey, bytes, slidingExpiration: TimeSpan.FromMinutes(60));
+                return File(bytes, "application/octet-stream", $"{itemId}.sav");
+            }
+
             var stream = System.IO.File.OpenRead(path);
             return File(stream, "application/octet-stream", $"{itemId}.sav");
         }
@@ -540,6 +615,10 @@ namespace JellyEmu.Controllers
                 Logger.LogInformation("[JellyEmu] Pipeline: Saved SRAM for item {ItemId} user {UserId} slot {Slot} ({Bytes} bytes)",
                     SanitizeForLog(itemId), SanitizeForLog(userId), slotNum, writtenFile.Length);
                 System.IO.File.Move(tempPath, path, overwrite: true);
+
+                // Evict cache entries
+                CacheService.Evict(JellyEmuCacheKeys.Sram(itemId, userId, slotNum));
+                CacheService.Evict(JellyEmuCacheKeys.SaveSlots(itemId, userId));
             }
             catch (Exception ex)
             {
@@ -589,6 +668,9 @@ namespace JellyEmu.Controllers
             try
             {
                 System.IO.File.Delete(path);
+                CacheService.Evict(JellyEmuCacheKeys.Sram(itemId, userId, slotNum));
+                CacheService.Evict(JellyEmuCacheKeys.SaveSlots(itemId, userId));
+
                 Logger.LogInformation("[JellyEmu] Successfully deleted SRAM for item {ItemId} user {UserId} slot {Slot}",
                     SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return NoContent();

@@ -39,12 +39,20 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetAllSchemes()
         {
+            var cacheKey = JellyEmuCacheKeys.InputSchemes();
+            if (CacheService.TryGetValue<object>(cacheKey, out var cached) && cached != null)
+            {
+                return Ok(cached);
+            }
+
             var schemes = _inputService.GetAllSchemes();
-            return Ok(new
+            var result = new
             {
                 hotkeys = JellyEmuInputService.Hotkeys,
                 schemes
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(24));
+            return Ok(result);
         }
 
         /// <summary>
@@ -56,13 +64,21 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetScheme(string platformOrCore)
         {
+            var cacheKey = JellyEmuCacheKeys.InputScheme(platformOrCore);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cached) && cached != null)
+            {
+                return Ok(cached);
+            }
+
             var scheme = _inputService.GetScheme(platformOrCore);
-            return Ok(new
+            var result = new
             {
                 query = platformOrCore,
                 hotkeys = JellyEmuInputService.Hotkeys,
                 scheme
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(24));
+            return Ok(result);
         }
     }
 }
