@@ -7,7 +7,6 @@
     align-items: center;
 }
 .jellyemu-ttb-pill,
-.jellyemu-slot-pill,
 .jellyemu-playtime-pill,
 .jellyemu-romm-sync-pill,
 .jellyemu-platform-status-pill {
@@ -16,9 +15,16 @@
     gap: 4px;
     cursor: default;
 }
+.jellyemu-slot-pill,
 .jellyemu-ra-pill {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
+    transition: opacity 0.15s ease;
 }
+.jellyemu-slot-pill:hover,
+.jellyemu-ra-pill:hover {
+    opacity: 0.85;
+}
+

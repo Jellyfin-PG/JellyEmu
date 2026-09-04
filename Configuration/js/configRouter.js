@@ -332,6 +332,8 @@
             if (rawg) rawg.value = config.RawgApiKey || '';
             var sgdb = page.querySelector('#steamGridDbApiKey');
             if (sgdb) sgdb.value = config.SteamGridDbApiKey || '';
+            var tgdb = page.querySelector('#theGamesDbApiKey');
+            if (tgdb) tgdb.value = config.TheGamesDbApiKey || '';
             var rommUrl = page.querySelector('#rommInstanceUrl');
             if (rommUrl) rommUrl.value = config.RommInstanceUrl || '';
             var rommUser = page.querySelector('#rommUsername');
@@ -377,6 +379,8 @@
             if (rawg) config.RawgApiKey = rawg.value.trim();
             var sgdb = page.querySelector('#steamGridDbApiKey');
             if (sgdb) config.SteamGridDbApiKey = sgdb.value.trim();
+            var tgdb = page.querySelector('#theGamesDbApiKey');
+            if (tgdb) config.TheGamesDbApiKey = tgdb.value.trim();
             
             var rEnabled = page.querySelector('#rommEnabled');
             if (rEnabled) config.RommEnabled = rEnabled.value === 'true';

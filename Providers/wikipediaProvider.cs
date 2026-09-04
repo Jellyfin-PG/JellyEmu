@@ -22,7 +22,10 @@ namespace JellyEmu.Providers
         protected HttpClient GetHttpClient()
         {
             var client = HttpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0 (https://github.com/grimmdev/JellyEmu)");
+            if (!client.DefaultRequestHeaders.Contains("User-Agent"))
+            {
+                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "JellyEmu/1.0 (https://github.com/grimmdev/JellyEmu)");
+            }
             return client;
         }
 
@@ -41,14 +44,19 @@ namespace JellyEmu.Providers
             var cleanName = RomExtensions.CleanName(name);
             if (string.IsNullOrEmpty(cleanName)) return null;
 
-            var candidates = new[] { cleanName, RomExtensions.NormalizeForSearch(cleanName) }
-                .Distinct(StringComparer.OrdinalIgnoreCase);
+            var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
+            var queries = new List<string> { cleanName + " video game", cleanName };
+            if (!string.Equals(normalizedName, cleanName, StringComparison.OrdinalIgnoreCase))
+            {
+                queries.Add(normalizedName + " video game");
+                queries.Add(normalizedName);
+            }
 
-            foreach (var query in candidates)
+            foreach (var query in queries.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 try
                 {
-                    var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={Uri.EscapeDataString(query + " video game")}&utf8=&format=json";
+                    var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={Uri.EscapeDataString(query)}&utf8=&format=json";
                     var response = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
 
                     if (response.IsSuccessStatusCode)
@@ -105,7 +113,7 @@ namespace JellyEmu.Providers
             {
                 try
                 {
-                    var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=300&pageids={directId}&format=json";
+                    var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=600&pilicense=any&pageids={directId}&format=json";
                     var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
 
                     if (response.IsSuccessStatusCode)
@@ -139,14 +147,29 @@ namespace JellyEmu.Providers
                 return results;
             }
 
-            var cleanName = RomExtensions.CleanName(searchInfo.Name);
+            var rawName = !string.IsNullOrWhiteSpace(searchInfo.Name)
+                ? searchInfo.Name
+                : Path.GetFileNameWithoutExtension(searchInfo.Path ?? string.Empty);
+            var cleanName = RomExtensions.CleanName(rawName);
             var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
 
-            foreach (var query in new[] { cleanName, normalizedName }.Distinct(StringComparer.OrdinalIgnoreCase))
+            var queries = new List<string>();
+            if (!string.IsNullOrWhiteSpace(cleanName))
+            {
+                queries.Add(cleanName + " video game");
+                queries.Add(cleanName);
+            }
+            if (!string.IsNullOrWhiteSpace(normalizedName) && !string.Equals(normalizedName, cleanName, StringComparison.OrdinalIgnoreCase))
+            {
+                queries.Add(normalizedName + " video game");
+                queries.Add(normalizedName);
+            }
+
+            foreach (var query in queries.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 try
                 {
-                    var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={Uri.EscapeDataString(query + " video game")}&gsrlimit=5&prop=pageimages&pithumbsize=300&format=json";
+                    var searchUrl = $"https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={Uri.EscapeDataString(query)}&gsrlimit=5&prop=pageimages&pithumbsize=600&pilicense=any&format=json";
                     var response = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
 
                     if (response.IsSuccessStatusCode)
@@ -155,11 +178,13 @@ namespace JellyEmu.Providers
                         if (document.RootElement.TryGetProperty("query", out var q) &&
                             q.TryGetProperty("pages", out var pages))
                         {
+                            var pageList = new List<(int index, RemoteSearchResult result)>();
                             foreach (var page in pages.EnumerateObject())
                             {
                                 var pageEl = page.Value;
                                 var pageId = pageEl.TryGetProperty("pageid", out var pid) ? pid.GetInt32().ToString() : string.Empty;
                                 var title = pageEl.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+                                var index = pageEl.TryGetProperty("index", out var idx) ? idx.GetInt32() : 999;
 
                                 if (string.IsNullOrEmpty(pageId)) continue;
 
@@ -178,7 +203,12 @@ namespace JellyEmu.Providers
                                         sr.ImageUrl = imgUrl;
                                 }
 
-                                results.Add(sr);
+                                pageList.Add((index, sr));
+                            }
+
+                            foreach (var item in pageList.OrderBy(p => p.index))
+                            {
+                                results.Add(item.result);
                             }
 
                             if (results.Count > 0) break;
@@ -216,7 +246,7 @@ namespace JellyEmu.Providers
                     {
                         var isJ3u = string.Equals(Path.GetExtension(info.Path), ".j3u", StringComparison.OrdinalIgnoreCase);
                         var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(info.Path));
- 
+
                         var tags = new List<string> { "JellyEmu", "Game", consoleTag };
                         if (string.Equals(consoleTag, "Windows", StringComparison.OrdinalIgnoreCase))
                         {
@@ -268,13 +298,22 @@ namespace JellyEmu.Providers
             var list = new List<RemoteImageInfo>();
             if (!string.IsNullOrEmpty(item.Path) && (!RomExtensions.IsRomPath(item.Path) || RomExtensions.IsWindowsRom(item.Path))) return list;
 
-            var pageId = item.GetProviderId("Wikipedia") ?? await ResolvePageIdAsync(
-                item.Name ?? Path.GetFileNameWithoutExtension(item.Path ?? string.Empty), cancellationToken).ConfigureAwait(false);
+            var rawName = !string.IsNullOrWhiteSpace(item.Name)
+                ? item.Name
+                : Path.GetFileNameWithoutExtension(item.Path ?? string.Empty);
+
+            var pageId = item.GetProviderId("Wikipedia");
+            if (string.IsNullOrEmpty(pageId))
+                pageId = TryExtractEmbeddedWikiId(item.Path);
+            if (string.IsNullOrEmpty(pageId))
+                pageId = await ResolvePageIdAsync(rawName, cancellationToken).ConfigureAwait(false);
+
             if (string.IsNullOrEmpty(pageId)) return list;
 
             try
             {
-                var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=1000&pageids={pageId}&format=json";
+                // 1. Primary: Use pageimages with pilicense=any to fetch the lead infobox cover art
+                var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=1000&pilicense=any&pageids={pageId}&format=json";
                 var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
@@ -295,6 +334,7 @@ namespace JellyEmu.Providers
                     }
                 }
 
+                // 2. Strict Fallback: Only accept images that explicitly indicate game cover art (never arbitrary jpg/png!)
                 var imagesUrl = $"https://en.wikipedia.org/w/api.php?action=query&prop=images&pageids={pageId}&format=json&imlimit=20";
                 var imagesResponse = await GetHttpClient().GetAsync(imagesUrl, cancellationToken).ConfigureAwait(false);
 
@@ -311,16 +351,22 @@ namespace JellyEmu.Providers
                             if (!img.TryGetProperty("title", out var titleEl)) continue;
                             var title = titleEl.GetString() ?? string.Empty;
 
+                            // Skip non-game files, logos, icons, hardware, etc.
                             if (title.Contains("Flag", StringComparison.OrdinalIgnoreCase) ||
                                 title.Contains("Icon", StringComparison.OrdinalIgnoreCase) ||
                                 title.Contains("Commons-logo", StringComparison.OrdinalIgnoreCase) ||
-                                title.Contains("Wikidata", StringComparison.OrdinalIgnoreCase)) continue;
+                                title.Contains("Wikidata", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("iPod", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("Console", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("Controller", StringComparison.OrdinalIgnoreCase)) continue;
 
+                            // ONLY match if filename explicitly contains cover / box / packshot / poster
                             if (title.Contains("cover", StringComparison.OrdinalIgnoreCase) ||
-                                title.Contains("box", StringComparison.OrdinalIgnoreCase) ||
-                                title.Contains("art", StringComparison.OrdinalIgnoreCase) ||
-                                title.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                                title.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                                title.Contains("boxart", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("box_art", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("box-art", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("packshot", StringComparison.OrdinalIgnoreCase) ||
+                                title.Contains("poster", StringComparison.OrdinalIgnoreCase))
                             {
                                 var fileName = Uri.EscapeDataString(title.Replace("File:", "").Replace(" ", "_"));
                                 var thumbUrl = $"https://en.wikipedia.org/w/index.php?title=Special:Redirect/file/{fileName}&width=600";
@@ -331,7 +377,10 @@ namespace JellyEmu.Providers
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "[JellyEmu] Failed fetching image from Wikipedia for page {PageId}", pageId);
+            }
             return list;
         }
     }
@@ -342,8 +391,7 @@ namespace JellyEmu.Providers
         public string Key => "Wikipedia";
         public ExternalIdMediaType? Type => null;
         public string UrlFormatString => "https://en.wikipedia.org/?curid={0}";
-        public bool Supports(IHasProviderIds item) 
-            => item is Book && RomExtensions.IsRomPath((item as BaseItem)?.Path) && !RomExtensions.IsWindowsRom((item as BaseItem)?.Path);
+        public bool Supports(IHasProviderIds item) => item is Book || item is BookInfo;
     }
 
     public class WikipediaExternalUrlProvider : IExternalUrlProvider
