@@ -433,7 +433,7 @@ namespace JellyEmu.Controllers
 
             var safeUserId = userId.TrimStart('/', '\\');
             var baseDir = Path.GetFullPath(Path.Combine(AppPaths.DataPath, "jellyemu-saves"));
-            var userDir = Path.GetFullPath(Path.Combine(baseDir, safeUserId));
+            var userDir = Path.GetFullPath(Path.Join(baseDir, safeUserId));
             if (!userDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in user ID.");
 
