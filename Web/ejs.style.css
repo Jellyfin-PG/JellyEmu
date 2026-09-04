@@ -19,6 +19,14 @@ body {
     height: 100%;
 }
 
+.ejs_canvas_parent,
+canvas.ejs_canvas,
+#game canvas {
+    transform: translateZ(0);
+    will-change: transform;
+    background-color: #000;
+}
+
 /* EJS Elements */
 .ejs_menu_bar,
 .ejs_parent>div:not(.ejs_canvas_parent):not(.ejs_virtualGamepad_parent),

@@ -488,7 +488,21 @@
             var _origGetContext = HTMLCanvasElement.prototype.getContext;
             HTMLCanvasElement.prototype.getContext = function (type, attrs) {
                 if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
-                    attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
+                    attrs = Object.assign({
+                        alpha: false,
+                        desynchronized: true,
+                        powerPreference: 'high-performance',
+                        preserveDrawingBuffer: true
+                    }, attrs || {});
+                    attrs.alpha = false;
+                    attrs.preserveDrawingBuffer = true;
+                } else if (type === '2d') {
+                    attrs = Object.assign({
+                        alpha: false,
+                        desynchronized: true,
+                        willReadFrequently: false
+                    }, attrs || {});
+                    attrs.alpha = false;
                 }
                 return _origGetContext.call(this, type, attrs);
             };
