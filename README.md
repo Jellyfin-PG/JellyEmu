@@ -20,6 +20,14 @@
     <img src="https://img.shields.io/badge/Project-Board-blue" />
   </a>
 
+  <a href="https://github.com/Jellyfin-PG/JellyEmu/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/ci.yml?branch=main&label=CI%20%26%20Tests" alt="CI Status" />
+  </a>
+  
+  <a href="https://github.com/Jellyfin-PG/JellyEmu/actions/workflows/codeql.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/codeql.yml?branch=main&label=CodeQL%20Security" alt="CodeQL Status" />
+  </a>
+
   <a href="https://discord.gg/v7P9CAvCKZ">
     <img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white" />
   </a>
