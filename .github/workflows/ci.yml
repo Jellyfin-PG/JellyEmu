@@ -1,0 +1,38 @@
+name: CI & Code Quality
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-lint:
+    name: Build, Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Check C# Formatting
+        run: dotnet format --verify-no-changes --verbosity diagnostic
+
+      - name: Check for Vulnerable Dependencies
+        run: dotnet list package --vulnerable --include-transitive
+
+      - name: Run Unit Tests with Coverage
+        run: dotnet test --configuration Release --no-restore --collect:"XPlat Code Coverage"
+
+      - name: Validate JavaScript Syntax
+        run: |
+          for f in $(find Web Configuration -name "*.js"); do
+            node -c "$f" || exit 1
+          done
