@@ -93,7 +93,11 @@ namespace JellyEmu.Providers
         public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
-                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
+            {
+                using var response = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
+                return Task.FromResult(response);
+            }
+
             return GetHttpClient().GetAsync(url, cancellationToken);
         }
     }
