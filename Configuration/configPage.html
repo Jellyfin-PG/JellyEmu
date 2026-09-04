@@ -424,6 +424,253 @@
                     background: #00a4dc !important;
                     color: #fff !important;
                 }
+
+                /* Streamlined Settings Tab Styles */
+                .je-settings-toolbar {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 1.5em;
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 10px;
+                    padding: 12px 16px;
+                }
+                .je-settings-top-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }
+                .je-settings-search-wrap {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: rgba(0, 0, 0, 0.35);
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                    flex: 1;
+                    min-width: 220px;
+                    max-width: 420px;
+                }
+                .je-settings-search-wrap .material-icons {
+                    font-size: 18px;
+                    color: #888;
+                }
+                .je-settings-search-input {
+                    background: transparent !important;
+                    border: none !important;
+                    outline: none !important;
+                    color: #fff !important;
+                    font-size: 0.9em !important;
+                    width: 100% !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                }
+                .je-settings-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .je-settings-btn-action {
+                    background: rgba(255, 255, 255, 0.05) !important;
+                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                    border-radius: 6px !important;
+                    color: #aaa !important;
+                    padding: 6px 12px !important;
+                    font-size: 0.82em !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 6px !important;
+                    transition: all 0.15s ease !important;
+                }
+                .je-settings-btn-action:hover {
+                    background: rgba(255, 255, 255, 0.1) !important;
+                    color: #fff !important;
+                }
+                .je-settings-btn-action .material-icons {
+                    font-size: 16px;
+                }
+                .je-settings-chips {
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                    align-items: center;
+                }
+                .je-chip {
+                    background: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    color: #aaa;
+                    border-radius: 20px;
+                    padding: 5px 14px;
+                    font-size: 0.82em;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    transition: all 0.15s ease;
+                    user-select: none;
+                }
+                .je-chip .material-icons {
+                    font-size: 16px;
+                }
+                .je-chip:hover {
+                    background: rgba(255, 255, 255, 0.08);
+                    color: #fff;
+                    border-color: rgba(255, 255, 255, 0.16);
+                }
+                .je-chip.active {
+                    background: rgba(0, 164, 220, 0.18);
+                    border-color: #00a4dc;
+                    color: #fff;
+                }
+
+                .je-settings-group {
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.07);
+                    border-radius: 10px;
+                    margin-bottom: 1.25em;
+                    overflow: hidden;
+                    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+                }
+                .je-settings-group:hover {
+                    border-color: rgba(255, 255, 255, 0.12);
+                }
+                .je-settings-group-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 14px 18px;
+                    cursor: pointer;
+                    user-select: none;
+                    background: rgba(255, 255, 255, 0.02);
+                    transition: background 0.15s ease;
+                }
+                .je-settings-group-header:hover {
+                    background: rgba(255, 255, 255, 0.04);
+                }
+                .je-settings-group-title-wrap {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                }
+                .je-settings-group-icon {
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 8px;
+                    background: rgba(0, 164, 220, 0.12);
+                    color: #00a4dc;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+                .je-settings-group-icon .material-icons {
+                    font-size: 20px;
+                }
+                .je-settings-group-title {
+                    margin: 0;
+                    font-size: 1.15em;
+                    font-weight: 600;
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .je-settings-group-desc {
+                    margin: 2px 0 0 0;
+                    font-size: 0.82em;
+                    color: #888;
+                }
+                .je-group-chevron {
+                    color: #777;
+                    transition: transform 0.2s ease, color 0.2s ease;
+                    font-size: 24px;
+                }
+                .je-settings-group:not(.collapsed) .je-group-chevron {
+                    transform: rotate(180deg);
+                    color: #00a4dc;
+                }
+                .je-settings-group-body {
+                    padding: 18px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.05);
+                }
+                .je-settings-group.collapsed .je-settings-group-body {
+                    display: none;
+                }
+
+                .je-provider-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                    gap: 16px;
+                }
+                .je-provider-subcard {
+                    background: rgba(0, 0, 0, 0.25);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 8px;
+                    padding: 16px;
+                    transition: border-color 0.15s ease;
+                }
+                .je-provider-subcard:hover {
+                    border-color: rgba(255, 255, 255, 0.12);
+                }
+                .je-provider-subcard-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 8px;
+                }
+                .je-provider-subcard-title {
+                    font-weight: 600;
+                    color: #fff;
+                    font-size: 0.95em;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .je-provider-subcard-badge {
+                    font-size: 0.72em;
+                    font-weight: 600;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    background: rgba(255, 255, 255, 0.06);
+                    color: #aaa;
+                }
+                .je-provider-subcard-desc {
+                    color: #aaa;
+                    font-size: 0.85em;
+                    line-height: 1.4;
+                    margin-bottom: 12px;
+                }
+                .je-provider-subcard .inputContainer {
+                    margin-bottom: 10px;
+                }
+                .je-provider-subcard .inputContainer:last-child {
+                    margin-bottom: 0;
+                }
+
+                .je-settings-sticky-footer {
+                    position: sticky;
+                    bottom: 0;
+                    background: rgba(18, 18, 18, 0.92);
+                    backdrop-filter: blur(8px);
+                    border-top: 1px solid rgba(255, 255, 255, 0.08);
+                    padding: 12px 18px;
+                    margin: 2em -6px -10px -6px;
+                    border-radius: 0 0 10px 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    z-index: 10;
+                }
+                .je-settings-sticky-footer button {
+                    margin: 0 !important;
+                }
             </style>
 
             <!-- Dynamic Tab Content View Shell -->
@@ -435,6 +682,7 @@
     </div>
 
     <!-- Modular Script Controllers -->
+    <script type="text/javascript" src="/jellyemu/config/js/settings"></script>
     <script type="text/javascript" src="/jellyemu/config/js/community"></script>
     <script type="text/javascript" src="/jellyemu/config/js/configRouter"></script>
 </div>
