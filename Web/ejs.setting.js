@@ -579,4 +579,98 @@
             });
         });
     }
+
+    // Game Cache Deletion (Targeting EmulatorJS-roms IndexedDB database)
+    function deleteGameCache() {
+        var gameUrl = window.EJS_gameUrl || '';
+        var filename = gameUrl ? gameUrl.split('/').pop() : '';
+        var decFilename = decodeURIComponent(filename);
+        var bareName = filename.split('?')[0];
+        var decBare = decFilename.split('?')[0];
+        var itemId = (cfg && cfg.itemId) || '';
+
+        function matches(k) {
+            if (!k || typeof k !== 'string') return false;
+            var s = k.toLowerCase();
+            return (filename && s.indexOf(filename.toLowerCase()) !== -1) ||
+                   (decFilename && s.indexOf(decFilename.toLowerCase()) !== -1) ||
+                   (bareName && s.indexOf(bareName.toLowerCase()) !== -1) ||
+                   (decBare && s.indexOf(decBare.toLowerCase()) !== -1) ||
+                   (itemId && s.indexOf(itemId.toLowerCase()) !== -1);
+        }
+
+        return new Promise(function (resolve) {
+            if (!window.indexedDB) return resolve(0);
+            var req = indexedDB.open('EmulatorJS-roms');
+            req.onerror = req.onblocked = function () { resolve(0); };
+            req.onsuccess = function (ev) {
+                var db = ev.target.result;
+                if (!db.objectStoreNames.contains('rom')) { db.close(); return resolve(0); }
+
+                var tx = db.transaction('rom', 'readwrite');
+                var store = tx.objectStore('rom');
+                var count = 0;
+
+                // Clean ?EJS_KEYS! index array
+                var indexReq = store.get('?EJS_KEYS!');
+                indexReq.onsuccess = function () {
+                    var keys = indexReq.result;
+                    if (Array.isArray(keys)) {
+                        var filtered = keys.filter(function (k) { return !matches(k); });
+                        if (filtered.length !== keys.length) {
+                            count += (keys.length - filtered.length);
+                            store.put(filtered, '?EJS_KEYS!');
+                        }
+                    }
+                };
+
+                // Scan and delete matching ROM entries
+                var curReq = store.openCursor();
+                curReq.onsuccess = function (e) {
+                    var cursor = e.target.result;
+                    if (cursor) {
+                        if (cursor.key !== '?EJS_KEYS!' && matches(cursor.key)) {
+                            cursor.delete();
+                            count++;
+                        }
+                        cursor.continue();
+                    }
+                };
+
+                tx.oncomplete = tx.onerror = function () {
+                    db.close();
+                    resolve(count);
+                };
+            };
+        });
+    }
+
+    // Delete Game Cache Button
+    var btnClearCache = document.getElementById('je-btn-clear-cache');
+    if (btnClearCache) {
+        btnClearCache.addEventListener('click', function () {
+            var btn = this;
+            if (!confirm('Delete this game\'s downloaded cache from browser storage?\n\nIt will be re-downloaded on next launch.')) return;
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+
+            deleteGameCache().then(function (count) {
+                btn.textContent = 'Cache Deleted!';
+                btn.style.color = '#52B54B';
+                btn.style.borderColor = 'rgba(82, 181, 75, 0.4)';
+                alert('Local game cache deleted (' + count + ' entry removed).\n\nThe ROM will re-download on next start.');
+                setTimeout(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Delete Cache';
+                    btn.style.color = '#ff6b6b';
+                    btn.style.borderColor = 'rgba(255,100,100,0.3)';
+                }, 2500);
+            }).catch(function (err) {
+                console.error('[JellyEmu] Error clearing cache:', err);
+                alert('Failed to clear cache: ' + err);
+                btn.disabled = false;
+                btn.textContent = 'Delete Cache';
+            });
+        });
+    }
 })();

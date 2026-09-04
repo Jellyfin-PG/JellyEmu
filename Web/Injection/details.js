@@ -66,20 +66,41 @@
         const userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : null;
         const itemId = JE.currentItemId;
 
-        if (userId && itemId && !wrap.querySelector('.jellyemu-save-pill')) {
-            fetch('/jellyemu/save/' + itemId + '/' + userId, { method: 'HEAD' })
-                .then(r => {
-                    if (r.ok) {
-                        const pill = document.createElement('div');
-                        pill.className = 'mediaInfoItem jellyemu-save-pill';
-                        pill.title = 'Saved Game State Available';
-                        pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:default;';
-                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">save</span>' +
-                            'Saved State';
-                        wrap.appendChild(pill);
+        const saveSlotsPromise = (userId && itemId)
+            ? fetch('/jellyemu/save-slots/' + itemId + '/' + userId)
+                .then(r => r.ok ? r.json() : [])
+                .catch(() => [])
+            : Promise.resolve([]);
+
+        if (userId && itemId && !wrap.querySelector('.jellyemu-slot-pill')) {
+            saveSlotsPromise.then(slots => {
+                if (!Array.isArray(slots) || !slots.length) return;
+                slots.forEach(s => {
+                    if (wrap.querySelector('.jellyemu-slot-pill[data-slot="' + s.slot + '"]')) return;
+                    const pill = document.createElement('div');
+                    pill.className = 'mediaInfoItem jellyemu-slot-pill';
+                    pill.setAttribute('data-slot', s.slot);
+                    pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;';
+                    let title = 'Save in Slot ' + s.slot;
+                    if (s.lastModified) {
+                        try {
+                            const d = new Date(s.lastModified);
+                            title += ' (' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+                                d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + ')';
+                        } catch {}
                     }
-                })
-                .catch(() => {});
+                    title += ' \u2014 Click to play';
+                    pill.title = title;
+                    pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">save</span>' +
+                        'Slot ' + s.slot;
+                    pill.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        JE.launchEmulator(itemId, s.slot);
+                    });
+                    wrap.appendChild(pill);
+                });
+            }).catch(() => {});
         }
 
         if (userId && itemId && !wrap.querySelector('.jellyemu-playtime-pill')) {
@@ -107,9 +128,9 @@
         }
 
         if (userId && itemId && !wrap.querySelector('.jellyemu-romm-sync-pill')) {
-            slotPromise
-                .then(slotData => {
-                    const activeSlot = slotData ? slotData.slot : 1;
+            saveSlotsPromise
+                .then(slots => {
+                    const activeSlot = (slots && slots.length > 0) ? slots[0].slot : 1;
                     return fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + activeSlot);
                 })
                 .then(r => r.ok ? r.json() : null)

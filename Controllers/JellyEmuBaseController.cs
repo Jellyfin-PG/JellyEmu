@@ -4,9 +4,11 @@ using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MediaBrowser.Model.Entities;
-using System.Security.Cryptography;
 using System.IO;
+using System.Security;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 
 namespace JellyEmu.Controllers
@@ -408,32 +410,89 @@ namespace JellyEmu.Controllers
         // Full prefs: {DataPath}/jellyemu-saves/{userId}/prefs.json
         // Playtime:  {DataPath}/jellyemu-saves/{userId}/playtime.json
 
+        private static readonly Regex SafeIdRegex = new Regex("^[a-zA-Z0-9_-]{1,64}$", RegexOptions.Compiled);
+
+        [NonAction]
+        public static bool IsValidId(string? id)
+        {
+            return !string.IsNullOrWhiteSpace(id) && SafeIdRegex.IsMatch(id);
+        }
+
+        [NonAction]
+        public static string SanitizeForLog(string? input)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+            return input.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        }
+
+        [NonAction]
+        protected string GetSafeUserSavesDir(string userId)
+        {
+            if (!IsValidId(userId))
+                throw new ArgumentException("Invalid user ID format.", nameof(userId));
+
+            var safeUserId = userId.TrimStart('/', '\\');
+            var baseDir = Path.GetFullPath(Path.Join(AppPaths.DataPath, "jellyemu-saves"));
+            var userDir = Path.GetFullPath(Path.Join(baseDir, safeUserId));
+            if (!userDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new SecurityException("Path traversal detected in user ID.");
+
+            return userDir;
+        }
+
+        [NonAction]
+        protected string GetSafeSlotDir(string userId, int slot)
+        {
+            var userDir = GetSafeUserSavesDir(userId);
+            var slotNum = Math.Max(1, slot);
+            var safeSlotName = $"slot{slotNum}".TrimStart('/', '\\');
+            var slotDir = Path.GetFullPath(Path.Join(userDir, safeSlotName));
+            if (!slotDir.StartsWith(userDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new SecurityException("Path traversal detected in slot.");
+
+            Directory.CreateDirectory(slotDir);
+            return slotDir;
+        }
+
+        [NonAction]
+        protected string GetSafeSaveFilePath(string userId, string itemId, int slot, string extension)
+        {
+            if (!IsValidId(itemId))
+                throw new ArgumentException("Invalid item ID format.", nameof(itemId));
+
+            var slotDir = GetSafeSlotDir(userId, slot);
+            var cleanExt = extension.TrimStart('.', '/', '\\');
+            var safeFileName = $"{itemId}.{cleanExt}".TrimStart('/', '\\');
+            var filePath = Path.GetFullPath(Path.Join(slotDir, safeFileName));
+            if (!filePath.StartsWith(slotDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new SecurityException("Path traversal detected in item ID.");
+
+            return filePath;
+        }
+
         protected string GetSavePath(string userId, string itemId, int slot)
         {
-            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, $"{itemId}.state");
+            return GetSafeSaveFilePath(userId, itemId, slot, "state");
         }
 
         protected string GetSramPath(string userId, string itemId, int slot)
         {
-            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, $"{itemId}.sav");
+            return GetSafeSaveFilePath(userId, itemId, slot, "sav");
         }
 
         protected string GetSaveScreenshotPath(string userId, string itemId, int slot)
         {
-            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"slot{slot}");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, $"{itemId}.screenshot.json");
+            return GetSafeSaveFilePath(userId, itemId, slot, "screenshot.json");
         }
 
         protected string GetPlaytimePath(string userId)
         {
-            var dir = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId);
+            var dir = GetSafeUserSavesDir(userId);
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "playtime.json");
+            var filePath = Path.GetFullPath(Path.Join(dir, "playtime.json"));
+            if (!filePath.StartsWith(dir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new SecurityException("Path traversal detected in playtime path.");
+            return filePath;
         }
 
         private static bool _dbInitialized = false;
@@ -601,7 +660,7 @@ namespace JellyEmu.Controllers
             return true;
         }
 
-        protected static string MapLegacyCore(string core)
+        protected static string MapLegacyCore(string? core)
         {
             var lower = (core ?? string.Empty).ToLowerInvariant();
             return lower switch
@@ -633,7 +692,7 @@ namespace JellyEmu.Controllers
                 "vb" => "beetle_vb",
                 "mednafen_psx" => "mednafen_psx_hw",
                 "3ds" or "citra" or "citra_canary" => "azahar",
-                _ => core
+                _ => core ?? string.Empty
             };
         }
 

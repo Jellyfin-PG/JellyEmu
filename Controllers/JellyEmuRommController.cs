@@ -71,15 +71,20 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/romm/sync-status/{itemId}/{userId}/{slot}
         /// Returns: { "status": "Pushed"|"RemoteWins"|"InSync"|"LocalOnly"|"RemoteOnly"|"Disabled"|"Error" }
         /// </summary>
-        [HttpGet("/jellyemu/romm/sync-status/{itemId}/{userId}/{slot}")]
+        [HttpGet("/jellyemu/romm/sync-status/{itemId}/{userId}/{slot:int}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RommSyncStatus(string itemId, string userId, int slot)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { status = "Disabled" });
 
-            var localPath = GetSavePath(userId, itemId, slot);
+            var slotNum   = Math.Max(1, slot);
+            var localPath = GetSavePath(userId, itemId, slotNum);
             var hasLocal  = System.IO.File.Exists(localPath);
             var romId     = GetRommIdForItem(itemId);
 
@@ -101,7 +106,7 @@ namespace JellyEmu.Controllers
                 DateTimeOffset? remoteModified = null;
                 foreach (var s in items.EnumerateArray())
                 {
-                    if (s.TryGetProperty("slot", out var sl) && sl.GetInt32() == slot)
+                    if (s.TryGetProperty("slot", out var sl) && sl.GetInt32() == slotNum)
                     {
                         if (s.TryGetProperty("updated_at", out var ua))
                             remoteModified = DateTimeOffset.Parse(ua.GetString() ?? string.Empty);
@@ -120,7 +125,7 @@ namespace JellyEmu.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[JellyEmu] Romm sync-status check failed for {ItemId}", itemId);
+                Logger.LogWarning(ex, "[JellyEmu] Romm sync-status check failed for {ItemId}", SanitizeForLog(itemId));
                 return Ok(new { status = "Error" });
             }
         }
@@ -129,17 +134,22 @@ namespace JellyEmu.Controllers
         /// Force-pushes a local save state to Romm.
         /// Path: POST /jellyemu/romm/push/{itemId}/{userId}/{slot}
         /// </summary>
-        [HttpPost("/jellyemu/romm/push/{itemId}/{userId}/{slot}")]
+        [HttpPost("/jellyemu/romm/push/{itemId}/{userId}/{slot:int}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> RommPush(string itemId, string userId, int slot)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return StatusCode(503, new { error = "Romm save sync disabled" });
 
-            var localPath = GetSavePath(userId, itemId, slot);
+            var slotNum   = Math.Max(1, slot);
+            var localPath = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(localPath))
                 return NotFound(new { error = "No local save found" });
 
@@ -166,7 +176,7 @@ namespace JellyEmu.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Romm push error for {ItemId}", itemId);
+                Logger.LogError(ex, "[JellyEmu] Romm push error for {ItemId}", SanitizeForLog(itemId));
                 return StatusCode(502, new { error = ex.Message });
             }
         }
@@ -175,16 +185,21 @@ namespace JellyEmu.Controllers
         /// Force-pulls a save state from Romm to local storage.
         /// Path: POST /jellyemu/romm/pull/{itemId}/{userId}/{slot}
         /// </summary>
-        [HttpPost("/jellyemu/romm/pull/{itemId}/{userId}/{slot}")]
+        [HttpPost("/jellyemu/romm/pull/{itemId}/{userId}/{slot:int}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> RommPull(string itemId, string userId, int slot)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return StatusCode(503, new { error = "Romm save sync disabled" });
 
+            var slotNum = Math.Max(1, slot);
             var romId = GetRommIdForItem(itemId);
             if (string.IsNullOrEmpty(romId))
                 return StatusCode(503, new { error = "Item has no Romm ID" });
@@ -205,7 +220,7 @@ namespace JellyEmu.Controllers
                 string? downloadUrl = null;
                 foreach (var s in arr.EnumerateArray())
                 {
-                    if (s.TryGetProperty("slot", out var sl) && sl.GetInt32() == slot)
+                    if (s.TryGetProperty("slot", out var sl) && sl.GetInt32() == slotNum)
                     {
                         downloadUrl = s.TryGetProperty("download_path", out var dp) ? dp.GetString() : null;
                         break;
@@ -213,7 +228,7 @@ namespace JellyEmu.Controllers
                 }
 
                 if (string.IsNullOrEmpty(downloadUrl))
-                    return NotFound(new { error = $"No Romm save for slot {slot}" });
+                    return NotFound(new { error = $"No Romm save for slot {slotNum}" });
 
                 if (!Uri.IsWellFormedUriString(downloadUrl, UriKind.Absolute))
                     downloadUrl = $"{RommInstanceUrl}{(downloadUrl.StartsWith("/") ? "" : "/")}{downloadUrl}";
@@ -223,15 +238,16 @@ namespace JellyEmu.Controllers
                     return StatusCode(502, new { error = "Romm download failed" });
 
                 var bytes     = await dataResp.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-                var localPath = GetSavePath(userId, itemId, slot);
+                var localPath = GetSavePath(userId, itemId, slotNum);
                 await System.IO.File.WriteAllBytesAsync(localPath, bytes).ConfigureAwait(false);
 
-                Logger.LogInformation("[JellyEmu] Romm pull: wrote {Bytes}b to {Path}", bytes.Length, localPath);
+                Logger.LogInformation("[JellyEmu] Romm pull: wrote {Bytes}b for item {ItemId} user {UserId} slot {Slot}",
+                    bytes.Length, SanitizeForLog(itemId), SanitizeForLog(userId), slotNum);
                 return Ok(new { pulled = true, bytes = bytes.Length });
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Romm pull error for {ItemId}", itemId);
+                Logger.LogError(ex, "[JellyEmu] Romm pull error for {ItemId}", SanitizeForLog(itemId));
                 return StatusCode(502, new { error = ex.Message });
             }
         }
@@ -243,12 +259,16 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/romm/sync-on-launch/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RommSyncOnLaunch(string itemId, string userId, [FromQuery] int? slot)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { pulled = false, reason = "disabled" });
 
-            var slotNum   = slot.HasValue ? slot.Value : 1;
+            var slotNum   = Math.Max(1, slot ?? 1);
             var localPath = GetSavePath(userId, itemId, slotNum);
             var romId     = GetRommIdForItem(itemId);
             if (string.IsNullOrEmpty(romId))
@@ -271,7 +291,7 @@ namespace JellyEmu.Controllers
                 string? downloadUrl = null;
                 foreach (var s in arr.EnumerateArray())
                 {
-                    if (s.TryGetProperty("slot", out var sl) && sl.GetInt32() == slot)
+                    if (s.TryGetProperty("slot", out var sl) && sl.GetInt32() == slotNum)
                     {
                         if (s.TryGetProperty("updated_at", out var ua))
                             remoteModified = DateTimeOffset.Parse(ua.GetString() ?? string.Empty);
@@ -299,12 +319,12 @@ namespace JellyEmu.Controllers
 
                 var bytes = await dataResp.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
                 await System.IO.File.WriteAllBytesAsync(localPath, bytes).ConfigureAwait(false);
-                Logger.LogInformation("[JellyEmu] Romm sync-on-launch: pulled {Bytes}b for {ItemId}", bytes.Length, itemId);
+                Logger.LogInformation("[JellyEmu] Romm sync-on-launch: pulled {Bytes}b for {ItemId}", bytes.Length, SanitizeForLog(itemId));
                 return Ok(new { pulled = true });
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[JellyEmu] Romm sync-on-launch error for {ItemId}", itemId);
+                Logger.LogWarning(ex, "[JellyEmu] Romm sync-on-launch error for {ItemId}", SanitizeForLog(itemId));
                 return Ok(new { pulled = false, reason = "exception" });
             }
         }
@@ -316,12 +336,16 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/romm/sync-after-save/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RommSyncAfterSave(string itemId, string userId, [FromQuery] int? slot)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+                return BadRequest("Invalid item or user ID.");
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { pushed = false, reason = "disabled" });
 
-            var slotNum   = slot.HasValue ? slot.Value : 1;
+            var slotNum   = Math.Max(1, slot ?? 1);
             var localPath = GetSavePath(userId, itemId, slotNum);
             if (!System.IO.File.Exists(localPath))
                 return Ok(new { pushed = false, reason = "no_local_save" });
@@ -348,7 +372,7 @@ namespace JellyEmu.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[JellyEmu] Romm sync-after-save error for {ItemId}", itemId);
+                Logger.LogWarning(ex, "[JellyEmu] Romm sync-after-save error for {ItemId}", SanitizeForLog(itemId));
                 return Ok(new { pushed = false, reason = "exception" });
             }
         }
@@ -363,6 +387,11 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> RommReportPlaytime(string itemId, string userId)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+            {
+                return BadRequest("Invalid itemId or userId format.");
+            }
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommPlaytimeReportEnabled == true))
                 return Ok(new { reported = false, reason = "disabled" });
 
@@ -373,7 +402,8 @@ namespace JellyEmu.Controllers
             long seconds = 0;
             try
             {
-                var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync().ConfigureAwait(false);
+                using var reader = new System.IO.StreamReader(Request.Body);
+                var body = await reader.ReadToEndAsync().ConfigureAwait(false);
                 body = body.Trim();
                 if (body.StartsWith("{"))
                 {
@@ -401,7 +431,7 @@ namespace JellyEmu.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[JellyEmu] Romm playtime report error for {ItemId}", itemId);
+                Logger.LogWarning(ex, "[JellyEmu] Romm playtime report error for {ItemId}", SanitizeForLog(itemId));
                 return Ok(new { reported = false, reason = "exception" });
             }
         }
@@ -586,6 +616,11 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> RommPushScreenshot(string itemId, string userId)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+            {
+                return BadRequest("Invalid itemId or userId format.");
+            }
+
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommScreenshotPushEnabled == true))
                 return StatusCode(503, new { error = "Romm screenshot push disabled" });
 
@@ -601,7 +636,8 @@ namespace JellyEmu.Controllers
                 var contentType = Request.ContentType ?? string.Empty;
                 if (contentType.Contains("application/json"))
                 {
-                    var body = await new System.IO.StreamReader(Request.Body).ReadToEndAsync().ConfigureAwait(false);
+                    using var reader = new System.IO.StreamReader(Request.Body);
+                    var body = await reader.ReadToEndAsync().ConfigureAwait(false);
                     using var doc = System.Text.Json.JsonDocument.Parse(body);
                     var dataUrl = doc.RootElement.TryGetProperty("dataUrl", out var d) ? d.GetString() ?? string.Empty : string.Empty;
                     var comma = dataUrl.IndexOf(',');
@@ -638,7 +674,7 @@ namespace JellyEmu.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Romm screenshot push error for {ItemId}", itemId);
+                Logger.LogError(ex, "[JellyEmu] Romm screenshot push error for {ItemId}", SanitizeForLog(itemId));
                 return StatusCode(502, new { error = ex.Message });
             }
         }
