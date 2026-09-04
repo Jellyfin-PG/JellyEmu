@@ -139,7 +139,7 @@ namespace JellyEmu.Providers
                         if (sr != null) return new[] { sr };
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
                 {
                     Logger.LogWarning(ex, "[JellyEmu] TheGamesDB direct lookup failed for ID {Id}", directId);
                 }
@@ -154,9 +154,8 @@ namespace JellyEmu.Providers
             var consoleTag = _platformResolver.Resolve(RomExtensions.EffectiveRomPath(searchInfo.Path));
             var platformId = ResolvePlatformId(consoleTag);
 
-            foreach (var query in candidates)
+            foreach (var query in candidates.Where(q => !string.IsNullOrWhiteSpace(q)))
             {
-                if (string.IsNullOrWhiteSpace(query)) continue;
 
                 // First attempt: with platform filter if resolved
                 if (platformId.HasValue)
@@ -193,9 +192,9 @@ namespace JellyEmu.Providers
                     {
                         var boxartMap = ExtractBoxartMap(root);
 
-                        foreach (var game in games.EnumerateArray().Take(5))
+                        foreach (var game in games.EnumerateArray().Take(5).Where(g => g.TryGetProperty("id", out _)))
                         {
-                            if (!game.TryGetProperty("id", out var idEl)) continue;
+                            var idEl = game.GetProperty("id");
                             var idStr = idEl.GetInt32().ToString();
                             var title = game.TryGetProperty("game_title", out var titleEl) ? titleEl.GetString() ?? string.Empty : string.Empty;
 
@@ -223,7 +222,7 @@ namespace JellyEmu.Providers
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
             {
                 Logger.LogDebug(ex, "[JellyEmu] TheGamesDB query failed for URL {Url}", url);
             }
@@ -345,13 +344,10 @@ namespace JellyEmu.Providers
                 JsonElement gameItems = default;
                 if (!bData.TryGetProperty(gameId.Trim(), out gameItems))
                 {
-                    foreach (var prop in bData.EnumerateObject())
+                    var prop = bData.EnumerateObject().FirstOrDefault(p => string.Equals(p.Name, gameId.Trim(), StringComparison.OrdinalIgnoreCase));
+                    if (!prop.Equals(default(JsonProperty)))
                     {
-                        if (string.Equals(prop.Name, gameId.Trim(), StringComparison.OrdinalIgnoreCase))
-                        {
-                            gameItems = prop.Value;
-                            break;
-                        }
+                        gameItems = prop.Value;
                     }
                 }
 
@@ -459,7 +455,7 @@ namespace JellyEmu.Providers
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
             {
                 Logger.LogError(ex, "[JellyEmu] TheGamesDB metadata retrieval failed for game ID {GameId}", gameId);
             }
@@ -536,7 +532,7 @@ namespace JellyEmu.Providers
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
             {
                 Logger.LogDebug(ex, "[JellyEmu] ByGameID boxart lookup failed for TheGamesDB game ID {GameId}", gameId);
             }
@@ -580,13 +576,10 @@ namespace JellyEmu.Providers
                             {
                                 if (!imagesElement.TryGetProperty(gameId.Trim(), out gameImages))
                                 {
-                                    foreach (var prop in imagesElement.EnumerateObject())
+                                    var prop = imagesElement.EnumerateObject().FirstOrDefault(p => string.Equals(p.Name, gameId.Trim(), StringComparison.OrdinalIgnoreCase));
+                                    if (!prop.Equals(default(JsonProperty)))
                                     {
-                                        if (string.Equals(prop.Name, gameId.Trim(), StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            gameImages = prop.Value;
-                                            break;
-                                        }
+                                        gameImages = prop.Value;
                                     }
                                 }
                             }
@@ -619,21 +612,19 @@ namespace JellyEmu.Providers
                                                 primaryImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = fullUrl });
                                         }
                                     }
-                                    else if (string.Equals(type, "fanart", StringComparison.OrdinalIgnoreCase) ||
-                                             string.Equals(type, "screenshot", StringComparison.OrdinalIgnoreCase))
+                                    else if ((string.Equals(type, "fanart", StringComparison.OrdinalIgnoreCase) ||
+                                             string.Equals(type, "screenshot", StringComparison.OrdinalIgnoreCase)) &&
+                                             backdropImages.Count < 5)
                                     {
-                                        if (backdropImages.Count < 5)
-                                            backdropImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Backdrop, Url = fullUrl });
+                                        backdropImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Backdrop, Url = fullUrl });
                                     }
-                                    else if (string.Equals(type, "banner", StringComparison.OrdinalIgnoreCase))
+                                    else if (string.Equals(type, "banner", StringComparison.OrdinalIgnoreCase) && bannerImages.Count < 2)
                                     {
-                                        if (bannerImages.Count < 2)
-                                            bannerImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Banner, Url = fullUrl });
+                                        bannerImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Banner, Url = fullUrl });
                                     }
-                                    else if (string.Equals(type, "clearlogo", StringComparison.OrdinalIgnoreCase))
+                                    else if (string.Equals(type, "clearlogo", StringComparison.OrdinalIgnoreCase) && logoImages.Count < 2)
                                     {
-                                        if (logoImages.Count < 2)
-                                            logoImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Logo, Url = fullUrl });
+                                        logoImages.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Logo, Url = fullUrl });
                                     }
                                 }
                             }
@@ -641,7 +632,7 @@ namespace JellyEmu.Providers
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
             {
                 Logger.LogDebug(ex, "[JellyEmu] Extra image fetching from TheGamesDB skipped for game ID {GameId}", gameId);
             }
@@ -668,9 +659,8 @@ namespace JellyEmu.Providers
                 : null;
             var platformId = ResolvePlatformId(consoleTag);
 
-            foreach (var query in candidates)
+            foreach (var query in candidates.Where(q => !string.IsNullOrWhiteSpace(q)))
             {
-                if (string.IsNullOrWhiteSpace(query)) continue;
                 try
                 {
                     var url = $"{BaseUrl}Games/ByGameName?apikey={ApiKey}&name={Uri.EscapeDataString(query)}&fields=platform";
@@ -699,7 +689,7 @@ namespace JellyEmu.Providers
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
                 {
                     Logger.LogDebug(ex, "[JellyEmu] Failed resolving TheGamesDB game ID for {Name}", query);
                 }

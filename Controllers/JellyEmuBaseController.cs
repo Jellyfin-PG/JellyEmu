@@ -412,35 +412,41 @@ namespace JellyEmu.Controllers
 
         private static readonly Regex SafeIdRegex = new Regex("^[a-zA-Z0-9_-]{1,64}$", RegexOptions.Compiled);
 
+        [NonAction]
         public static bool IsValidId(string? id)
         {
             return !string.IsNullOrWhiteSpace(id) && SafeIdRegex.IsMatch(id);
         }
 
+        [NonAction]
         public static string SanitizeForLog(string? input)
         {
             if (string.IsNullOrEmpty(input)) return string.Empty;
             return input.Replace("\r", string.Empty).Replace("\n", string.Empty);
         }
 
-        public string GetSafeUserSavesDir(string userId)
+        [NonAction]
+        protected string GetSafeUserSavesDir(string userId)
         {
             if (!IsValidId(userId))
                 throw new ArgumentException("Invalid user ID format.", nameof(userId));
 
+            var safeUserId = userId.TrimStart('/', '\\');
             var baseDir = Path.GetFullPath(Path.Combine(AppPaths.DataPath, "jellyemu-saves"));
-            var userDir = Path.GetFullPath(Path.Combine(baseDir, userId));
+            var userDir = Path.GetFullPath(Path.Combine(baseDir, safeUserId));
             if (!userDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in user ID.");
 
             return userDir;
         }
 
-        public string GetSafeSlotDir(string userId, int slot)
+        [NonAction]
+        protected string GetSafeSlotDir(string userId, int slot)
         {
             var userDir = GetSafeUserSavesDir(userId);
             var slotNum = Math.Max(1, slot);
-            var slotDir = Path.GetFullPath(Path.Combine(userDir, $"slot{slotNum}"));
+            var safeSlotName = $"slot{slotNum}".TrimStart('/', '\\');
+            var slotDir = Path.GetFullPath(Path.Combine(userDir, safeSlotName));
             if (!slotDir.StartsWith(userDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in slot.");
 
@@ -448,15 +454,16 @@ namespace JellyEmu.Controllers
             return slotDir;
         }
 
-        public string GetSafeSaveFilePath(string userId, string itemId, int slot, string extension)
+        [NonAction]
+        protected string GetSafeSaveFilePath(string userId, string itemId, int slot, string extension)
         {
             if (!IsValidId(itemId))
                 throw new ArgumentException("Invalid item ID format.", nameof(itemId));
 
             var slotDir = GetSafeSlotDir(userId, slot);
-            var cleanExt = extension.TrimStart('.');
-            var fileName = $"{itemId}.{cleanExt}";
-            var filePath = Path.GetFullPath(Path.Combine(slotDir, fileName));
+            var cleanExt = extension.TrimStart('.', '/', '\\');
+            var safeFileName = $"{itemId}.{cleanExt}".TrimStart('/', '\\');
+            var filePath = Path.GetFullPath(Path.Combine(slotDir, safeFileName));
             if (!filePath.StartsWith(slotDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new SecurityException("Path traversal detected in item ID.");
 

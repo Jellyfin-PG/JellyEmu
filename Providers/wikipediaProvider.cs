@@ -377,7 +377,7 @@ namespace JellyEmu.Providers
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
             {
                 Logger.LogDebug(ex, "[JellyEmu] Failed fetching image from Wikipedia for page {PageId}", pageId);
             }

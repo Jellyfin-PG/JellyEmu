@@ -30,6 +30,9 @@ namespace JellyEmu.Controllers
         public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot, [FromQuery] string? core,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
+            if (!IsValidId(itemId) || (!string.IsNullOrEmpty(userId) && !IsValidId(userId)))
+                return BadRequest("Invalid item or user ID.");
+
             var item = LibraryManager.GetItemById(itemId);
             if (item == null) return NotFound();
 
@@ -56,13 +59,17 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/pico8/play/{itemId}")]
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult PlayPico8(string itemId)
         {
+            if (!IsValidId(itemId))
+                return BadRequest("Invalid item ID.");
+
             var item = LibraryManager.GetItemById(itemId);
             if (item == null)
             {
-                Logger.LogWarning("[JellyEmu] Pico8Play: item {ItemId} not found", itemId);
+                Logger.LogWarning("[JellyEmu] Pico8Play: item {ItemId} not found", SanitizeForLog(itemId));
                 return NotFound();
             }
 
@@ -120,15 +127,19 @@ namespace JellyEmu.Controllers
         [HttpGet("/jellyemu/ejs/play/{itemId}")]
         [Produces(MediaTypeNames.Text.Html)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
         public async Task<IActionResult> PlayEjs(string itemId, [FromQuery] string? userId, [FromQuery] int? slot, [FromQuery] string? core,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
+            if (!IsValidId(itemId) || (!string.IsNullOrEmpty(userId) && !IsValidId(userId)))
+                return BadRequest("Invalid item or user ID.");
+
             var item = LibraryManager.GetItemById(itemId);
             if (item == null)
             {
-                Logger.LogWarning("[JellyEmu] Play: item {ItemId} not found", itemId);
+                Logger.LogWarning("[JellyEmu] Play: item {ItemId} not found", SanitizeForLog(itemId));
                 return NotFound();
             }
 
@@ -136,7 +147,7 @@ namespace JellyEmu.Controllers
             if (string.IsNullOrEmpty(resolvedCore))
             {
                 Logger.LogWarning("[JellyEmu] Play: could not resolve a core for {Name} ({ItemId}), path={Path}",
-                    item.Name, itemId, item.Path);
+                    item.Name, SanitizeForLog(itemId), item.Path);
                 return UnprocessableEntity(
                     $"JellyEmu could not determine which emulator core to use for \"{item.Name}\". " +
                     "Tag the item with its console name (e.g. \"SNES\") or rename the ROM to use a recognised file extension.");
@@ -170,7 +181,7 @@ namespace JellyEmu.Controllers
                 ? await PreferenceService.GetEffectivePreferencesAsync(userId!, platformTag)
                 : JellyEmuPreferenceService.SystemDefaults;
 
-            var activeSlot = (slot.HasValue && slot.Value > 0) ? slot.Value : 1;
+            var activeSlot = Math.Max(1, slot ?? 1);
             var activeShader = effectivePrefs.Shader;
             var videoRotation = effectivePrefs.VideoRotation;
             var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
