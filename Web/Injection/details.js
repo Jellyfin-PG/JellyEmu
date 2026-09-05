@@ -26,7 +26,6 @@
             miscBar.appendChild(wrap);
         }
 
-        JE.perf.mark('inject-misc-start');
 
         if (isNewWrap) {
             const systemTags = JE.cachedTags.filter(t => t !== 'Game' && t !== 'JellyEmu' && t !== 'Unsupported' && !JE.knownRegions.has(t) && !JE.isDiscTag(t));
@@ -290,8 +289,6 @@
                 .catch(() => {});
         }
 
-        JE.perf.mark('inject-misc-end');
-        JE.perf.measure('inject-misc', 'inject-misc-start', 'inject-misc-end');
     };
 
     JE.injectPlayButton = function(page) {
@@ -301,7 +298,6 @@
         if (!detailButtonsContainer) return;
         if (detailButtonsContainer.querySelector('#jellyemu-play-btn')) return;
 
-        JE.perf.mark('inject-play-start');
 
         page.classList.add('jellyemu-game-page');
 
@@ -336,8 +332,6 @@
             detailButtonsContainer.insertBefore(vBtn, btn.nextSibling);
         }
 
-        JE.perf.mark('inject-play-end');
-        JE.perf.measure('inject-play', 'inject-play-start', 'inject-play-end');
     };
 
     JE.injectAll = function(page) {
@@ -350,7 +344,6 @@
 
     JE.processItemDetails = function(id, page) {
         if (!window.ApiClient) return;
-        JE.perf.mark('details-start:' + id);
         JE.currentItemIsGame = false;
         JE.cachedTags        = [];
         JE.cachedProviderIds = {};
@@ -377,7 +370,6 @@
         if (cachedCardWithTags) {
             const tags = cachedCardWithTags.getAttribute('data-jellyemu-tags').split(',');
             if (tags.includes('JellyEmu')) {
-                JE.perf.mark('details-fast-path:' + id);
                 JE.currentItemIsGame = true;
                 JE.cachedTags        = tags;
                 JE.cachedProviderIds = {};
@@ -385,10 +377,8 @@
             }
         }
 
-        JE.perf.mark('details-getItem-start:' + id);
         window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), id).then(item => {
-            JE.perf.mark('details-getItem-end:' + id);
-            JE.perf.measure('details-getItem:' + id, 'details-getItem-start:' + id, 'details-getItem-end:' + id);
+            if (JE.currentItemId !== id) return;
             if (item && item.Tags && item.Tags.includes('JellyEmu')) {
                 JE.currentItemIsGame = true;
                 JE.cachedTags        = item.Tags;
@@ -406,13 +396,23 @@
 
                 if (!tryInject()) {
                     var detailTarget = visiblePage || JE.getVisibleDetailPage() || document.body;
-                    var itemObserver = new MutationObserver(function(mutations, obs) {
+                    if (_activeItemObserver) {
+                        _activeItemObserver.disconnect();
+                        _activeItemObserver = null;
+                    }
+                    _activeItemObserver = new MutationObserver(function(mutations, obs) {
                         if (tryInject()) {
                             obs.disconnect();
+                            if (_activeItemObserver === obs) _activeItemObserver = null;
                         }
                     });
-                    itemObserver.observe(detailTarget, { childList: true, subtree: true });
-                    setTimeout(function() { itemObserver.disconnect(); }, 3000);
+                    _activeItemObserver.observe(detailTarget, { childList: true, subtree: true });
+                    setTimeout(function() {
+                        if (_activeItemObserver) {
+                            _activeItemObserver.disconnect();
+                            _activeItemObserver = null;
+                        }
+                    }, 3000);
                 }
             } else {
                 JE.currentItemIsGame = false;
@@ -420,10 +420,10 @@
                 JE.cachedProviderIds = {};
                 if (visiblePage) visiblePage.classList.remove('jellyemu-game-page');
             }
-            JE.perf.mark('details-end:' + id);
-            JE.perf.measure('details-total:' + id, 'details-start:' + id, 'details-end:' + id);
-        });
+        }).catch(() => {});
     };
+
+    let _activeItemObserver = null;
 
     const detailObserver = new MutationObserver((mutations) => {
         let checkDetails = false;
@@ -464,6 +464,10 @@
     };
 
     JE._detailObserverDisconnect = function() {
+        if (_activeItemObserver) {
+            _activeItemObserver.disconnect();
+            _activeItemObserver = null;
+        }
         if (!_detailObserverTarget) return;
         detailObserver.disconnect();
         _detailObserverTarget = null;

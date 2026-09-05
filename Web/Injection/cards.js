@@ -10,7 +10,6 @@
     let _batchScheduled = false;
 
     JE.queueGetItem = function(cardId, resolve) {
-        JE.perf.mark('getItem-queued:' + cardId);
         _metaQueue.push({ cardId, resolve });
         if (!_batchScheduled) {
             _batchScheduled = true;
@@ -28,21 +27,14 @@
             const resolves = {};
             batch.forEach(b => {
                 resolves[b.cardId] = b.resolve;
-                JE.perf.mark('getItem-start:' + b.cardId);
             });
 
-            JE.perf.mark('batch-fetch-start:' + ids[0]);
             fetch('/jellyemu/cardmeta?ids=' + ids.join(','))
                 .then(r => r.ok ? r.json() : {})
                 .catch(() => ({}))
                 .then(function(data) {
-                    JE.perf.mark('batch-fetch-end:' + ids[0]);
-                    JE.perf.measure('batch-fetch[' + ids.length + ']:' + ids[0], 'batch-fetch-start:' + ids[0], 'batch-fetch-end:' + ids[0]);
-
                     batch.forEach(function(b) {
                         const meta = data[b.cardId];
-                        JE.perf.mark('getItem-end:' + b.cardId);
-                        JE.perf.measure('getItem-api:' + b.cardId, 'getItem-start:' + b.cardId, 'getItem-end:' + b.cardId);
                         b.resolve(meta ? {
                             Tags:            meta.tags            || [],
                             CommunityRating: meta.communityRating ?? null,
@@ -90,15 +82,11 @@
         _pendingCards.add(card);
         if (!_cardFlushScheduled) {
             _cardFlushScheduled = true;
-            JE.perf.mark('card-flush-scheduled');
             setTimeout(function() {
                 _cardFlushScheduled = false;
                 const batch = Array.from(_pendingCards);
                 _pendingCards.clear();
-                JE.perf.mark('card-flush-start');
                 batch.forEach(JE.processCard);
-                JE.perf.mark('card-flush-end');
-                JE.perf.measure('card-flush[' + batch.length + ']', 'card-flush-start', 'card-flush-end');
             }, 0);
         }
     }
@@ -106,10 +94,7 @@
     JE.applyGameCardTreatment = function(card) {
         card.setAttribute('data-jellyemu-game', '1');
 
-        const cardId0 = card.getAttribute('data-id') || 'unknown';
-        JE.perf.mark('card-rAF-scheduled:' + cardId0);
         requestAnimationFrame(function() {
-            JE.perf.mark('card-rAF-start:' + cardId0);
 
             card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(b) {
                 b.style.display = 'none';
@@ -131,8 +116,6 @@
 
                         const imgCtr = card.querySelector('.cardImageContainer');
                         if (!imgCtr) return;
-
-                        JE.perf.mark('badge-render-start:' + cardId);
 
                         card.setAttribute('data-jellyemu-tags', item.Tags.join(','));
 
@@ -202,14 +185,9 @@
                             });
                         }
 
-                        JE.perf.mark('badge-render-end:' + cardId);
-                        JE.perf.measure('badge-render:' + cardId, 'badge-render-start:' + cardId, 'badge-render-end:' + cardId);
                     });
                 }
             }
-
-            JE.perf.mark('card-rAF-end:' + cardId0);
-            JE.perf.measure('card-rAF:' + cardId0, 'card-rAF-start:' + cardId0, 'card-rAF-end:' + cardId0);
         });
     };
 
@@ -258,8 +236,6 @@
     };
 
     const cardObserver = new MutationObserver((mutations) => {
-        JE.perf.mark('observer-batch-start');
-
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType !== 1) return;
@@ -288,9 +264,6 @@
                 }
             });
         });
-
-        JE.perf.mark('observer-batch-end');
-        JE.perf.measure('observer-batch', 'observer-batch-start', 'observer-batch-end');
     });
 
     const _viewContainer = document.querySelector('.view-manager') || document.body;
