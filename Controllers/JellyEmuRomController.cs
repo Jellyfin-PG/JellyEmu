@@ -19,6 +19,7 @@ namespace JellyEmu.Controllers
     public class JellyEmuRomController : JellyEmuBaseController
     {
         private readonly PlatformResolver _platformResolver;
+        private readonly JellyEmuFileService _fileService;
 
         public JellyEmuRomController(
             ILibraryManager libraryManager,
@@ -27,10 +28,12 @@ namespace JellyEmu.Controllers
             JellyEmuEjsManager ejsManager,
             JellyEmuSessionService sessionService,
             IHttpClientFactory httpClientFactory,
-            PlatformResolver platformResolver)
+            PlatformResolver platformResolver,
+            JellyEmuFileService fileService)
             : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory)
         {
             _platformResolver = platformResolver;
+            _fileService = fileService;
         }
 
         [HttpGet("/jellyemu/rom/{itemId}/{filename?}")]
@@ -40,50 +43,14 @@ namespace JellyEmu.Controllers
         public IActionResult Rom(string itemId, string? filename = null, [FromQuery] string? userId = null)
         {
             var item = LibraryManager.GetItemById(itemId);
-            if (item == null || string.IsNullOrEmpty(item.Path) || !System.IO.File.Exists(item.Path))
+            if (item == null || string.IsNullOrEmpty(item.Path))
             {
                 Logger.LogWarning("[JellyEmu] Rom: item {ItemId} not found or path missing", itemId);
                 return NotFound();
             }
 
-            var romPath = item.Path;
-            if (item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase))
-            {
-                var discFiles = J3uParser.GetReferencedFiles(item.Path);
-                if (discFiles.Count == 0)
-                {
-                    Logger.LogWarning("[JellyEmu] Rom: playlist {Path} is empty", item.Path);
-                    return NotFound();
-                }
-
-                int activeDiscIndex = 1;
-                if (!string.IsNullOrEmpty(userId))
-                {
-                    var metaPath = Path.Combine(AppPaths.DataPath, "jellyemu-saves", userId, $"{itemId}-meta.json");
-                    if (System.IO.File.Exists(metaPath))
-                    {
-                        try
-                        {
-                            var json = System.IO.File.ReadAllText(metaPath);
-                            using var doc = System.Text.Json.JsonDocument.Parse(json);
-                            if (doc.RootElement.TryGetProperty("activeDiscIndex", out var prop))
-                            {
-                                activeDiscIndex = prop.GetInt32();
-                            }
-                        }
-                        catch { }
-                    }
-                }
-
-                if (activeDiscIndex < 1 || activeDiscIndex > discFiles.Count)
-                {
-                    activeDiscIndex = 1;
-                }
-
-                romPath = discFiles[activeDiscIndex - 1];
-            }
-
-            if (!System.IO.File.Exists(romPath))
+            var romPath = _fileService.ResolveActiveRomPath(item.Path, userId, itemId);
+            if (string.IsNullOrEmpty(romPath) || !System.IO.File.Exists(romPath))
             {
                 Logger.LogWarning("[JellyEmu] Rom: resolved path {Path} not found", romPath);
                 return NotFound();
@@ -114,18 +81,7 @@ namespace JellyEmu.Controllers
                 return;
             }
 
-            var filesToZip = new List<string>();
-            if (item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase))
-            {
-                filesToZip.AddRange(J3uParser.GetReferencedFiles(item.Path));
-            }
-            else
-            {
-                filesToZip.Add(item.Path);
-            }
-
-            filesToZip = filesToZip.Where(System.IO.File.Exists).ToList();
-
+            var filesToZip = _fileService.ResolveAllRomFiles(item.Path);
             if (filesToZip.Count == 0)
             {
                 Response.StatusCode = StatusCodes.Status404NotFound;

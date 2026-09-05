@@ -10,6 +10,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace JellyEmu.Controllers
 {
@@ -76,6 +77,11 @@ namespace JellyEmu.Controllers
         protected JellyEmuPreferenceService PreferenceService => _preferenceService ??= 
             HttpContext?.RequestServices?.GetService(typeof(JellyEmuPreferenceService)) as JellyEmuPreferenceService 
             ?? new JellyEmuPreferenceService(AppPaths, null!);
+
+        private IJellyEmuCacheService? _cacheService;
+        protected IJellyEmuCacheService CacheService => _cacheService ??=
+            HttpContext?.RequestServices?.GetService(typeof(JellyEmuCacheService)) as IJellyEmuCacheService
+            ?? new JellyEmuCacheService(new MemoryCache(new MemoryCacheOptions()), null);
 
         public record CoreInfo(string Core, bool NeedsThreads, string Launcher);
 

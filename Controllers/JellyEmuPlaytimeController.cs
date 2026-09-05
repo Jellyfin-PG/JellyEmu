@@ -47,6 +47,12 @@ namespace JellyEmu.Controllers
         {
             if (!VerifyUser(userId)) return Forbid();
 
+            var cacheKey = JellyEmuCacheKeys.UserPlaytime(userId);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cachedUserPlaytime) && cachedUserPlaytime != null)
+            {
+                return Ok(cachedUserPlaytime);
+            }
+
             var games = new List<object>();
             long totalSeconds = 0;
 
@@ -87,12 +93,14 @@ namespace JellyEmu.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to query database.");
             }
 
-            return Ok(new
+            var result = new
             {
                 userId,
                 totalSeconds,
                 games
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromMinutes(30));
+            return Ok(result);
         }
 
         /// <summary>
@@ -174,7 +182,14 @@ namespace JellyEmu.Controllers
         {
             if (!VerifyUser(userId)) return Forbid();
 
+            var cacheKey = JellyEmuCacheKeys.Playtime(itemId, userId);
+            if (CacheService.TryGetValue<long>(cacheKey, out var cachedSecs))
+            {
+                return Ok(new { userId, itemId, seconds = cachedSecs });
+            }
+
             var seconds = ReadPlaytimeSeconds(userId, itemId);
+            CacheService.Set(cacheKey, seconds, slidingExpiration: TimeSpan.FromHours(2));
             return Ok(new { userId, itemId, seconds });
         }
 
@@ -214,6 +229,11 @@ namespace JellyEmu.Controllers
 
             AddPlaytimeSeconds(userId, itemId, seconds);
             var total = ReadPlaytimeSeconds(userId, itemId);
+
+            // Write-through update item cache & evict user aggregate cache
+            CacheService.Set(JellyEmuCacheKeys.Playtime(itemId, userId), total, slidingExpiration: TimeSpan.FromHours(2));
+            CacheService.Evict(JellyEmuCacheKeys.UserPlaytime(userId));
+
             Logger.LogInformation("[JellyEmu] Playtime +{Seconds}s for item {ItemId} user {UserId} (total {Total}s)",
                 seconds, itemId, userId, total);
             return Ok(new { userId, itemId, added = seconds, total });

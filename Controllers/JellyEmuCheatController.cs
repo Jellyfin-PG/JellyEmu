@@ -40,11 +40,19 @@ namespace JellyEmu.Controllers
         public async Task<IActionResult> GetCheats(string itemId,
             [FromServices] IHttpClientFactory httpClientFactory)
         {
+            var cacheKey = JellyEmuCacheKeys.Cheats(itemId);
+            if (CacheService.TryGetValue<string>(cacheKey, out var cachedJson) && cachedJson != null)
+            {
+                return Content(cachedJson, "application/json");
+            }
+
             var item = LibraryManager.GetItemById(itemId);
             if (item == null) return Ok(Array.Empty<object>());
 
             var json = await GetCheatsJsonAsync(item, httpClientFactory);
-            return Content(json ?? "[]", "application/json");
+            var payload = json ?? "[]";
+            CacheService.Set(cacheKey, payload, slidingExpiration: TimeSpan.FromHours(24));
+            return Content(payload, "application/json");
         }
 
         /// <summary>

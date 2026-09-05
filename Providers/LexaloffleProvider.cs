@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Jellyfin.Data.Enums;
+using JellyEmu.Utilities;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
@@ -490,8 +491,9 @@ namespace JellyEmu.Providers
             {
                 result.AddPerson(new PersonInfo
                 {
-                    Name = scraped.Author,
-                    Type = PersonKind.Director,
+                    Name = GamingPersonHelper.ToGamingPersonName(scraped.Author),
+                    Type = PersonKind.Creator,
+                    Role = "Developer"
                 });
             }
 

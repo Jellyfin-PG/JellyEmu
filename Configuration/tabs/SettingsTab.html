@@ -54,7 +54,7 @@
                 <div>
                     <h3 class="je-settings-group-title">
                         Metadata &amp; Media Providers
-                        <span style="font-size: 0.68em; font-weight: 500; background: rgba(0, 164, 220, 0.15); color: #00a4dc; padding: 2px 8px; border-radius: 10px;">4 Providers</span>
+                        <span style="font-size: 0.68em; font-weight: 500; background: rgba(0, 164, 220, 0.15); color: #00a4dc; padding: 2px 8px; border-radius: 10px;">5 Providers</span>
                     </h3>
                     <p class="je-settings-group-desc">Configure game descriptions, box art, logos, banners, and screenshots</p>
                 </div>
@@ -150,6 +150,71 @@
                         <label class="inputLabel inputLabelUnfocused" for="rawgApiKey">RAWG API Key</label>
                         <input id="rawgApiKey" type="password" class="emby-input"
                             placeholder="Your RAWG API key" autocomplete="off" />
+                    </div>
+                </div>
+
+                <!-- ScreenScraper.fr -->
+                <div class="je-provider-subcard" style="grid-column: 1 / -1;">
+                    <div class="je-provider-subcard-header">
+                        <div class="je-provider-subcard-title">
+                            <span class="material-icons" style="color: #e67e22; font-size: 18px;">travel_explore</span>
+                            <span>ScreenScraper.fr</span>
+                        </div>
+                        <span class="je-provider-subcard-badge" style="background: rgba(230, 126, 34, 0.15); color: #e67e22;">Localized &amp; Hashes</span>
+                    </div>
+                    <p class="je-provider-subcard-desc">
+                        Specialized retro video game scraper featuring exact ROM checksum matching (MD5/CRC), multi-region artwork, and localized title resolution (Japan, Europe, USA, World).
+                        Register your account and developer credentials at <a href="https://www.screenscraper.fr" target="_blank"
+                            style="color: #00a4dc; text-decoration: none;">screenscraper.fr</a>.
+                    </p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 10px;">
+                        <div class="inputContainer" style="margin: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="screenScraperDevId">Developer ID (devid)</label>
+                            <input id="screenScraperDevId" type="text" class="emby-input"
+                                placeholder="Your ScreenScraper Dev ID" autocomplete="off" />
+                        </div>
+                        <div class="inputContainer" style="margin: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="screenScraperDevPassword">Developer Password (devpassword)</label>
+                            <input id="screenScraperDevPassword" type="password" class="emby-input"
+                                placeholder="Your ScreenScraper Dev Password" autocomplete="off" />
+                        </div>
+                        <div class="inputContainer" style="margin: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="screenScraperSoftName">Software Name (softname)</label>
+                            <input id="screenScraperSoftName" type="text" class="emby-input"
+                                placeholder="JellyEmu" autocomplete="off" />
+                        </div>
+                        <div class="inputContainer" style="margin: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="screenScraperUser">User Username (ssid - Optional)</label>
+                            <input id="screenScraperUser" type="text" class="emby-input"
+                                placeholder="Increases daily API quota" autocomplete="off" />
+                        </div>
+                        <div class="inputContainer" style="margin: 0;">
+                            <label class="inputLabel inputLabelUnfocused" for="screenScraperPassword">User Password (sspassword - Optional)</label>
+                            <input id="screenScraperPassword" type="password" class="emby-input"
+                                placeholder="Your ScreenScraper user password" autocomplete="off" />
+                        </div>
+                        <div class="selectContainer" style="margin: 0;">
+                            <label class="selectLabel" for="screenScraperRegionPreference">Preferred Region (Titles &amp; Media)</label>
+                            <select id="screenScraperRegionPreference" class="emby-select" style="width:100%; box-sizing:border-box; background: #000000 !important; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 10px; color: #fff;">
+                                <option value="auto">Auto (Match ROM tags / filename)</option>
+                                <option value="us">United States (us)</option>
+                                <option value="eu">Europe (eu)</option>
+                                <option value="jp">Japan (jp)</option>
+                                <option value="wor">World (wor)</option>
+                            </select>
+                        </div>
+                        <div class="selectContainer" style="margin: 0;">
+                            <label class="selectLabel" for="screenScraperLanguagePreference">Preferred Language (Synopses)</label>
+                            <select id="screenScraperLanguagePreference" class="emby-select" style="width:100%; box-sizing:border-box; background: #000000 !important; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 10px; color: #fff;">
+                                <option value="en">English (en)</option>
+                                <option value="fr">French (fr)</option>
+                                <option value="de">German (de)</option>
+                                <option value="es">Spanish (es)</option>
+                                <option value="it">Italian (it)</option>
+                                <option value="ja">Japanese (ja)</option>
+                                <option value="pt">Portuguese (pt)</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 

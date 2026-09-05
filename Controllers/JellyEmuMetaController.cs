@@ -1,3 +1,4 @@
+using JellyEmu.Providers;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
@@ -6,6 +7,7 @@ using MediaBrowser.Model.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.IO;
 using System.Net.Mime;
 using System.Text.Json;
 
@@ -17,14 +19,23 @@ namespace JellyEmu.Controllers
     /// </summary>
     public class JellyEmuMetaController : JellyEmuBaseController
     {
+        private readonly ScreenScraperService _screenScraperService;
+        private readonly JellyEmuFileService _fileService;
+
         public JellyEmuMetaController(
             ILibraryManager libraryManager,
             IApplicationPaths appPaths,
             ILogger<JellyEmuMetaController> logger,
             JellyEmuEjsManager ejsManager,
             JellyEmuSessionService sessionService,
-            IHttpClientFactory httpClientFactory)
-            : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory) { }
+            IHttpClientFactory httpClientFactory,
+            ScreenScraperService screenScraperService,
+            JellyEmuFileService fileService)
+            : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory)
+        {
+            _screenScraperService = screenScraperService;
+            _fileService = fileService;
+        }
 
         /// <summary>
         /// Returns lightweight card metadata for a batch of item IDs (tags, rating, providerIds).
@@ -67,6 +78,12 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetSystems()
         {
+            var cacheKey = JellyEmuCacheKeys.Systems();
+            if (CacheService.TryGetValue<object>(cacheKey, out var cachedSystems) && cachedSystems != null)
+            {
+                return Ok(cachedSystems);
+            }
+
             var systems = PlatformCoreRegistry.Select(kvp => new
             {
                 name = kvp.Key,
@@ -78,11 +95,13 @@ namespace JellyEmu.Controllers
                 })
             });
 
-            return Ok(new
+            var result = new
             {
                 systems,
                 platformCoreMap = PlatformCoreRegistry
-            });
+            };
+            CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(24));
+            return Ok(result);
         }
 
         public record ShaderOption(string Id, string Label);
@@ -166,8 +185,9 @@ namespace JellyEmu.Controllers
 
         public static readonly List<SelectOption> AvailableFps = new()
         {
-            new("0", "Disabled (Default)"),
-            new("1", "Enabled (Display Framerate Badge)")
+            new("0", "None"),
+            new("1", "FPS"),
+            new("2", "Detailed")
         };
 
         public static readonly List<SelectOption> AvailableAutosave = new()
@@ -204,29 +224,41 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetSettingOptions([FromQuery] string? scope = null, [FromQuery] string? category = null)
         {
+            var cacheKey = JellyEmuCacheKeys.SettingOptions(scope, category);
+            if (CacheService.TryGetValue<object>(cacheKey, out var cachedOptions) && cachedOptions != null)
+            {
+                return Ok(cachedOptions);
+            }
+
             var filter = (scope ?? category)?.Trim().ToLowerInvariant();
+            object result;
 
             if (!string.IsNullOrEmpty(filter))
             {
-                return filter switch
+                result = filter switch
                 {
-                    "shaders" or "shader" => Ok(AvailableShaders.Select(s => new { id = s.Id, label = s.Label })),
-                    "scaling" or "scale" => Ok(AvailableScaling.Select(s => new { id = s.Id, label = s.Label })),
-                    "rotation" => Ok(AvailableRotations.Select(s => new { id = s.Id, label = s.Label })),
-                    "ffrate" or "fastforwardrates" => Ok(AvailableFastForwardRates.Select(s => new { id = s.Id, label = s.Label })),
-                    "smrate" or "slowmotionrates" => Ok(AvailableSlowMotionRates.Select(s => new { id = s.Id, label = s.Label })),
-                    "volume" => Ok(AvailableVolume.Select(s => new { id = s.Id, label = s.Label })),
-                    "mute" => Ok(AvailableMute.Select(s => new { id = s.Id, label = s.Label })),
-                    "fps" or "showfps" => Ok(AvailableFps.Select(s => new { id = s.Id, label = s.Label })),
-                    "autosave" => Ok(AvailableAutosave.Select(s => new { id = s.Id, label = s.Label })),
-                    "haptics" => Ok(AvailableHaptics.Select(s => new { id = s.Id, label = s.Label })),
-                    "virtualgamepad" => Ok(AvailableVirtualGamepad.Select(s => new { id = s.Id, label = s.Label })),
-                    "virtualgamepadlefty" => Ok(AvailableVirtualGamepadLefty.Select(s => new { id = s.Id, label = s.Label })),
-                    _ => Ok(GetAllSettingOptions())
+                    "shaders" or "shader" => AvailableShaders.Select(s => new { id = s.Id, label = s.Label }),
+                    "scaling" or "scale" => AvailableScaling.Select(s => new { id = s.Id, label = s.Label }),
+                    "rotation" => AvailableRotations.Select(s => new { id = s.Id, label = s.Label }),
+                    "ffrate" or "fastforwardrates" => AvailableFastForwardRates.Select(s => new { id = s.Id, label = s.Label }),
+                    "smrate" or "slowmotionrates" => AvailableSlowMotionRates.Select(s => new { id = s.Id, label = s.Label }),
+                    "volume" => AvailableVolume.Select(s => new { id = s.Id, label = s.Label }),
+                    "mute" => AvailableMute.Select(s => new { id = s.Id, label = s.Label }),
+                    "fps" or "showfps" => AvailableFps.Select(s => new { id = s.Id, label = s.Label }),
+                    "autosave" => AvailableAutosave.Select(s => new { id = s.Id, label = s.Label }),
+                    "haptics" => AvailableHaptics.Select(s => new { id = s.Id, label = s.Label }),
+                    "virtualgamepad" => AvailableVirtualGamepad.Select(s => new { id = s.Id, label = s.Label }),
+                    "virtualgamepadlefty" => AvailableVirtualGamepadLefty.Select(s => new { id = s.Id, label = s.Label }),
+                    _ => GetAllSettingOptions()
                 };
             }
+            else
+            {
+                result = GetAllSettingOptions();
+            }
 
-            return Ok(GetAllSettingOptions());
+            CacheService.Set(cacheKey, result, slidingExpiration: TimeSpan.FromHours(24));
+            return Ok(result);
         }
 
         private object GetAllSettingOptions() => new
@@ -244,5 +276,55 @@ namespace JellyEmu.Controllers
             virtualGamepad = AvailableVirtualGamepad.Select(s => new { id = s.Id, label = s.Label }),
             virtualGamepadLefty = AvailableVirtualGamepadLefty.Select(s => new { id = s.Id, label = s.Label })
         };
+
+        /// <summary>
+        /// Checks if a local manual file exists alongside the ROM file.
+        /// Delegated to JellyEmuFileService.
+        /// </summary>
+        public static string? TryGetLocalManualPath(string? itemPath) => JellyEmuFileService.TryGetLocalManualPath(itemPath);
+
+        /// <summary>
+        /// Serves the local PDF game manual if one exists alongside the ROM file.
+        /// Path: GET /jellyemu/meta/manual/{itemId}
+        /// Path: GET /jellyemu/meta/manual/{itemId}.pdf
+        /// </summary>
+        [HttpGet("/jellyemu/meta/manual/{itemId}")]
+        [HttpGet("/jellyemu/meta/manual/{itemId}.pdf")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetLocalManual(string itemId)
+        {
+            var manualPath = _fileService.GetLocalManualPath(itemId);
+            if (string.IsNullOrEmpty(manualPath) || !System.IO.File.Exists(manualPath))
+            {
+                return NotFound();
+            }
+
+            return PhysicalFile(manualPath, "application/pdf", enableRangeProcessing: true);
+        }
+
+        /// <summary>
+        /// Extensible guide endpoint returning manual, map, video, walkthrough, and guide details for a game item.
+        /// Path: GET /jellyemu/meta/guide?itemId=...&provider=...&gameId=...
+        /// </summary>
+        [HttpGet("/jellyemu/meta/guide")]
+        [HttpGet("/jellyemu/screenscraper/guide")]
+        [Produces(MediaTypeNames.Application.Json)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetGameGuide(
+            [FromQuery] string? itemId,
+            [FromQuery] string? provider,
+            [FromQuery] string? gameId,
+            CancellationToken cancellationToken)
+        {
+            var guide = await _screenScraperService.GetUnifiedGuideAsync(itemId, provider, gameId, cancellationToken).ConfigureAwait(false);
+            if (guide == null)
+            {
+                return NotFound(new { message = "No guides found for this game" });
+            }
+
+            return Ok(guide);
+        }
     }
 }

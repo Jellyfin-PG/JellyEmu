@@ -10,7 +10,6 @@
     let _batchScheduled = false;
 
     JE.queueGetItem = function(cardId, resolve) {
-        JE.perf.mark('getItem-queued:' + cardId);
         _metaQueue.push({ cardId, resolve });
         if (!_batchScheduled) {
             _batchScheduled = true;
@@ -28,21 +27,14 @@
             const resolves = {};
             batch.forEach(b => {
                 resolves[b.cardId] = b.resolve;
-                JE.perf.mark('getItem-start:' + b.cardId);
             });
 
-            JE.perf.mark('batch-fetch-start:' + ids[0]);
             fetch('/jellyemu/cardmeta?ids=' + ids.join(','))
                 .then(r => r.ok ? r.json() : {})
                 .catch(() => ({}))
                 .then(function(data) {
-                    JE.perf.mark('batch-fetch-end:' + ids[0]);
-                    try { performance.measure('jellyemu:batch-fetch[' + ids.length + ']:' + ids[0], 'jellyemu:batch-fetch-start:' + ids[0], 'jellyemu:batch-fetch-end:' + ids[0]); } catch(_) {}
-
                     batch.forEach(function(b) {
                         const meta = data[b.cardId];
-                        JE.perf.mark('getItem-end:' + b.cardId);
-                        try { performance.measure('jellyemu:getItem-api:' + b.cardId, 'jellyemu:getItem-start:' + b.cardId, 'jellyemu:getItem-end:' + b.cardId); } catch(_) {}
                         b.resolve(meta ? {
                             Tags:            meta.tags            || [],
                             CommunityRating: meta.communityRating ?? null,
@@ -90,15 +82,11 @@
         _pendingCards.add(card);
         if (!_cardFlushScheduled) {
             _cardFlushScheduled = true;
-            JE.perf.mark('card-flush-scheduled');
             setTimeout(function() {
                 _cardFlushScheduled = false;
                 const batch = Array.from(_pendingCards);
                 _pendingCards.clear();
-                JE.perf.mark('card-flush-start');
                 batch.forEach(JE.processCard);
-                JE.perf.mark('card-flush-end');
-                try { performance.measure('jellyemu:card-flush[' + batch.length + ']', 'jellyemu:card-flush-start', 'jellyemu:card-flush-end'); } catch(_) {}
             }, 0);
         }
     }
@@ -106,10 +94,7 @@
     JE.applyGameCardTreatment = function(card) {
         card.setAttribute('data-jellyemu-game', '1');
 
-        const cardId0 = card.getAttribute('data-id') || 'unknown';
-        JE.perf.mark('card-rAF-scheduled:' + cardId0);
         requestAnimationFrame(function() {
-            JE.perf.mark('card-rAF-start:' + cardId0);
 
             card.querySelectorAll('button[data-action="resume"], button[data-action="play"]').forEach(function(b) {
                 b.style.display = 'none';
@@ -131,8 +116,6 @@
 
                         const imgCtr = card.querySelector('.cardImageContainer');
                         if (!imgCtr) return;
-
-                        JE.perf.mark('badge-render-start:' + cardId);
 
                         card.setAttribute('data-jellyemu-tags', item.Tags.join(','));
 
@@ -166,10 +149,11 @@
 
                         const rating = item.CommunityRating;
                         const pids = item.ProviderIds || {};
-                        if (typeof rating === 'number' && (pids['IGDB'] || pids['Romm'])) {
+                        if (typeof rating === 'number' && (pids['IGDB'] || pids['Romm'] || pids['RAWG'] || pids['ScreenScraper'])) {
                             const ratingBadge = document.createElement('div');
                             ratingBadge.className = 'jellyemu-card-rating-badge';
-                            ratingBadge.title = (pids['IGDB'] ? 'IGDB' : 'RoMM') + ' rating: ' + rating.toFixed(1) + ' / 10';
+                            const src = pids['IGDB'] ? 'IGDB' : pids['Romm'] ? 'RoMM' : pids['RAWG'] ? 'RAWG' : pids['ScreenScraper'] ? 'ScreenScraper' : 'Community';
+                            ratingBadge.title = src + ' rating: ' + rating.toFixed(1) + ' / 10';
                             ratingBadge.style.cssText = 'position:absolute;top:4px;right:4px;z-index:2;pointer-events:none;' +
                                 'display:inline-flex;align-items:center;gap:2px;' +
                                 'background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.18);' +
@@ -201,14 +185,9 @@
                             });
                         }
 
-                        JE.perf.mark('badge-render-end:' + cardId);
-                        try { performance.measure('jellyemu:badge-render:' + cardId, 'jellyemu:badge-render-start:' + cardId, 'jellyemu:badge-render-end:' + cardId); } catch(_) {}
                     });
                 }
             }
-
-            JE.perf.mark('card-rAF-end:' + cardId0);
-            try { performance.measure('jellyemu:card-rAF:' + cardId0, 'jellyemu:card-rAF-start:' + cardId0, 'jellyemu:card-rAF-end:' + cardId0); } catch(_) {}
         });
     };
 
@@ -257,8 +236,6 @@
     };
 
     const cardObserver = new MutationObserver((mutations) => {
-        JE.perf.mark('observer-batch-start');
-
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType !== 1) return;
@@ -287,9 +264,6 @@
                 }
             });
         });
-
-        JE.perf.mark('observer-batch-end');
-        JE.perf.measure('observer-batch', 'observer-batch-start', 'observer-batch-end');
     });
 
     const _viewContainer = document.querySelector('.view-manager') || document.body;

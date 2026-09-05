@@ -50,17 +50,9 @@
     ]);
 
     JE.perf = {
-        mark: (n) => performance.mark('jellyemu:' + n),
-        measure: (n, a, b) => { try { performance.measure('jellyemu:' + n, 'jellyemu:' + a, 'jellyemu:' + b); } catch(_) {} },
-        time: (n, fn) => {
-            const s = 'jellyemu:' + n + ':start';
-            const e = 'jellyemu:' + n + ':end';
-            performance.mark(s);
-            return Promise.resolve(fn()).finally(() => {
-                performance.mark(e);
-                try { performance.measure('jellyemu:' + n, s, e); } catch(_) {}
-            });
-        },
+        mark: function() {},
+        measure: function() {},
+        time: function(n, fn) { return Promise.resolve(fn()); },
     };
 
     JE.delay = ms => new Promise(resolve => setTimeout(resolve, ms));

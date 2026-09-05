@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Jellyfin.Data.Enums;
+using JellyEmu.Utilities;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -76,22 +77,7 @@ namespace JellyEmu.Providers
 
         protected static PersonKind MapPersonKind(string role)
         {
-            if (string.IsNullOrEmpty(role)) return PersonKind.Author;
-            var r = role.ToLowerInvariant();
-            if (r.Contains("design"))     return PersonKind.Creator;
-            if (r.Contains("program"))    return PersonKind.Creator;
-            if (r.Contains("art"))        return PersonKind.Artist;
-            if (r.Contains("writing"))    return PersonKind.Writer;
-            if (r.Contains("writer"))     return PersonKind.Writer;
-            if (r.Contains("music"))      return PersonKind.Composer;
-            if (r.Contains("composer"))   return PersonKind.Composer;
-            if (r.Contains("director"))   return PersonKind.Director;
-            if (r.Contains("producer"))   return PersonKind.Producer;
-            if (r.Contains("sound"))      return PersonKind.Engineer;
-            if (r.Contains("audio"))      return PersonKind.Engineer;
-            if (r.Contains("editor"))     return PersonKind.Editor;
-            if (r.Contains("illustrat"))  return PersonKind.Illustrator;
-            return PersonKind.Author;
+            return GamingPersonHelper.MapPersonKind(role);
         }
     }
 
@@ -293,8 +279,14 @@ namespace JellyEmu.Providers
                                     if (member.TryGetProperty("positions", out var positions) && positions.ValueKind == JsonValueKind.Array && positions.GetArrayLength() > 0)
                                         role = positions[0].TryGetProperty("name", out var posName) ? (posName.GetString() ?? "Developer") : "Developer";
 
-                                     var pKind = MapPersonKind(role);
-                                     var pInfo = new PersonInfo { Name = $"{rawName} (RAWG)", Type = pKind, Role = role };
+                                    var formattedRole = GamingPersonHelper.FormatRole(role);
+                                    var pKind = GamingPersonHelper.MapPersonKind(formattedRole);
+                                    var pInfo = new PersonInfo
+                                    {
+                                        Name = GamingPersonHelper.ToGamingPersonName(rawName),
+                                        Type = pKind,
+                                        Role = formattedRole
+                                    };
 
                                      if (member.TryGetProperty("id", out var idEl))
                                      {
@@ -384,6 +376,12 @@ namespace JellyEmu.Providers
             var results = new List<RemoteSearchResult>();
             if (string.IsNullOrEmpty(ApiKey)) return results;
 
+            // Only search RAWG if the person has an existing RAWG provider ID or is explicitly a gaming creator
+            if (!searchInfo.ProviderIds.ContainsKey("RAWG") && !GamingPersonHelper.IsGamingPerson(searchInfo.Name))
+            {
+                return results;
+            }
+
             searchInfo.ProviderIds.TryGetValue("RAWG", out var directId);
 
             if (!string.IsNullOrEmpty(directId))
@@ -399,9 +397,10 @@ namespace JellyEmu.Providers
                         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                         var root = doc.RootElement;
 
+                        var rawName = root.TryGetProperty("name", out var n) ? n.GetString() ?? searchInfo.Name : searchInfo.Name;
                         var sr = new RemoteSearchResult
                         {
-                            Name = (root.TryGetProperty("name", out var n) ? n.GetString() ?? searchInfo.Name : searchInfo.Name) + " (RAWG)",
+                            Name = GamingPersonHelper.ToGamingPersonName(rawName),
                             ProviderIds = new Dictionary<string, string> { { "RAWG", directId } },
                             SearchProviderName = Name
                         };
@@ -421,7 +420,10 @@ namespace JellyEmu.Providers
 
             try
             {
-                var url = $"https://api.rawg.io/api/creators?search={Uri.EscapeDataString(searchInfo.Name)}&key={ApiKey}";
+                var cleanSearchName = GamingPersonHelper.CleanPersonName(searchInfo.Name);
+                if (string.IsNullOrWhiteSpace(cleanSearchName)) return results;
+
+                var url = $"https://api.rawg.io/api/creators?search={Uri.EscapeDataString(cleanSearchName)}&key={ApiKey}";
                 var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -434,7 +436,7 @@ namespace JellyEmu.Providers
 
                             var sr = new RemoteSearchResult
                             {
-                                Name = (nameEl.GetString() ?? string.Empty) + " (RAWG)",
+                                Name = GamingPersonHelper.ToGamingPersonName(nameEl.GetString() ?? string.Empty),
                                 ProviderIds = new Dictionary<string, string> { { "RAWG", idEl.GetInt32().ToString() } },
                                 SearchProviderName = Name
                             };
@@ -459,6 +461,12 @@ namespace JellyEmu.Providers
             var result = new MetadataResult<Person> { HasMetadata = false };
             if (string.IsNullOrEmpty(ApiKey)) return result;
 
+            // Only fetch RAWG metadata if the person has an existing RAWG provider ID or is explicitly a gaming creator
+            if (!info.ProviderIds.ContainsKey("RAWG") && !GamingPersonHelper.IsGamingPerson(info.Name))
+            {
+                return result;
+            }
+
             info.ProviderIds.TryGetValue("RAWG", out var rawgId);
             if (string.IsNullOrEmpty(rawgId))
             {
@@ -477,13 +485,9 @@ namespace JellyEmu.Providers
                     var root = doc.RootElement;
 
                     var rawName = root.TryGetProperty("name", out var n) ? n.GetString() ?? info.Name : info.Name;
-                    var position = "Developer";
-                    if (root.TryGetProperty("positions", out var pArr) && pArr.ValueKind == JsonValueKind.Array && pArr.GetArrayLength() > 0)
-                        position = pArr[0].TryGetProperty("name", out var pName) ? (pName.GetString() ?? "Developer") : "Developer";
-
                     var person = new Person
                     {
-                        Name = $"{rawName} (RAWG)",
+                        Name = GamingPersonHelper.ToGamingPersonName(rawName),
                         Overview = root.TryGetProperty("description", out var d)
                             ? (d.GetString() ?? string.Empty)
                                 .Replace("<p>", "").Replace("</p>", "")
@@ -509,7 +513,8 @@ namespace JellyEmu.Providers
         public RawgPersonImageProvider(IHttpClientFactory httpClientFactory, ILogger<RawgPersonImageProvider> logger)
             : base(httpClientFactory, logger) { }
 
-        public bool Supports(BaseItem item) => item is Person;
+        public bool Supports(BaseItem item) =>
+            item is Person person && (person.HasProviderId("RAWG") || GamingPersonHelper.IsGamingPerson(person.Name));
 
         public IEnumerable<ImageType> GetSupportedImages(BaseItem item) => new[] { ImageType.Primary };
 
@@ -517,8 +522,33 @@ namespace JellyEmu.Providers
         {
             var list = new List<RemoteImageInfo>();
             if (string.IsNullOrEmpty(ApiKey)) return list;
+            if (item is not Person person || (!person.HasProviderId("RAWG") && !GamingPersonHelper.IsGamingPerson(person.Name)))
+                return list;
 
             var rawgId = item.GetProviderId("RAWG");
+            if (string.IsNullOrEmpty(rawgId))
+            {
+                var cleanName = GamingPersonHelper.CleanPersonName(item.Name);
+                if (!string.IsNullOrEmpty(cleanName))
+                {
+                    try
+                    {
+                        var searchUrl = $"https://api.rawg.io/api/creators?search={Uri.EscapeDataString(cleanName)}&key={ApiKey}";
+                        var searchResp = await GetHttpClient().GetAsync(searchUrl, cancellationToken).ConfigureAwait(false);
+                        if (searchResp.IsSuccessStatusCode)
+                        {
+                            using var searchDoc = JsonDocument.Parse(await searchResp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                            if (searchDoc.RootElement.TryGetProperty("results", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                            {
+                                var first = arr.EnumerateArray().FirstOrDefault();
+                                if (first.TryGetProperty("id", out var idEl)) rawgId = idEl.GetInt32().ToString();
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
             if (string.IsNullOrEmpty(rawgId)) return list;
 
             try
@@ -547,7 +577,8 @@ namespace JellyEmu.Providers
         public string Key => "RAWG";
         public ExternalIdMediaType? Type => ExternalIdMediaType.Person;
         public string UrlFormatString => "https://rawg.io/creators/{0}";
-        public bool Supports(IHasProviderIds item) => item is Person;
+        public bool Supports(IHasProviderIds item) =>
+            item is Person person && (person.HasProviderId("RAWG") || GamingPersonHelper.IsGamingPerson(person.Name));
     }
 
     public class RawgGameExternalId : IExternalId
@@ -566,7 +597,7 @@ namespace JellyEmu.Providers
 
         public IEnumerable<string> GetExternalUrls(BaseItem item)
         {
-            if (item is Person && item.TryGetProviderId("RAWG", out var personId))
+            if (item is Person person && (person.HasProviderId("RAWG") || GamingPersonHelper.IsGamingPerson(person.Name)) && person.TryGetProviderId("RAWG", out var personId))
                 yield return $"https://rawg.io/creators/{personId}";
             else if (item is Book && item.TryGetProviderId("RAWG", out var gameId))
                 yield return $"https://rawg.io/games/{gameId}";

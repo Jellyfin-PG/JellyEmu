@@ -5,6 +5,7 @@
 .jellyemu-misc-item {
     display: inline-flex;
     align-items: center;
+    margin-right: 0.6em;
 }
 .jellyemu-ttb-pill,
 .jellyemu-playtime-pill,
@@ -14,17 +15,27 @@
     align-items: center;
     gap: 4px;
     cursor: default;
+    margin-right: 0.6em;
 }
 .jellyemu-slot-pill,
-.jellyemu-ra-pill {
+.jellyemu-ra-pill,
+.jellyemu-manual-pill,
+.jellyemu-map-pill,
+.jellyemu-guide-pill {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
+    text-decoration: none;
+    color: inherit;
     transition: opacity 0.15s ease;
+    margin-right: 0.6em;
 }
 .jellyemu-slot-pill:hover,
-.jellyemu-ra-pill:hover {
+.jellyemu-ra-pill:hover,
+.jellyemu-manual-pill:hover,
+.jellyemu-map-pill:hover,
+.jellyemu-guide-pill:hover {
     opacity: 0.85;
 }
 

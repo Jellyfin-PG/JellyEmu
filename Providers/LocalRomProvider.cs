@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Jellyfin.Data.Enums;
+using JellyEmu.Utilities;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
@@ -92,7 +93,13 @@ namespace JellyEmu.Providers
                                 var name = node.Element("name")?.Value ?? node.Value;
                                 if (string.IsNullOrWhiteSpace(name)) return;
                                 var role = node.Element("role")?.Value ?? defaultRole;
-                                var p = new PersonInfo { Name = name.Trim(), Type = PersonKind.Author, Role = role };
+                                var formattedRole = GamingPersonHelper.FormatRole(role);
+                                var p = new PersonInfo
+                                {
+                                    Name = GamingPersonHelper.ToGamingPersonName(name),
+                                    Type = GamingPersonHelper.MapPersonKind(formattedRole),
+                                    Role = formattedRole
+                                };
                                 var thumb = node.Element("thumb")?.Value;
                                 if (!string.IsNullOrWhiteSpace(thumb)) p.ImageUrl = thumb;
                                 result.AddPerson(p);

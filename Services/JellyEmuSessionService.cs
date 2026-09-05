@@ -104,7 +104,7 @@ namespace JellyEmu.Services
         /// Reports progress to keep the session alive and update the elapsed-time ticker
         /// in the Dashboard. Call every ~30 seconds from the player page.
         /// </summary>
-        public async Task PingSessionAsync(string userId, string itemId)
+        public async Task PingSessionAsync(string userId, string itemId, long? elapsedSeconds = null, bool isPaused = false)
         {
             var key = Key(userId, itemId);
             if (!_activeSessions.TryGetValue(key, out var active))
@@ -118,7 +118,8 @@ namespace JellyEmu.Services
 
             try
             {
-                var elapsedTicks = (long)(DateTime.UtcNow - active.StartedAt).TotalSeconds * TimeSpan.TicksPerSecond;
+                var seconds = elapsedSeconds ?? (long)(DateTime.UtcNow - active.StartedAt).TotalSeconds;
+                var elapsedTicks = seconds * TimeSpan.TicksPerSecond;
 
                 var info = new PlaybackProgressInfo
                 {
@@ -127,14 +128,14 @@ namespace JellyEmu.Services
                     PlayMethod    = PlayMethod.DirectPlay,
                     MediaSourceId = item.Id.ToString("N"),
                     PositionTicks = elapsedTicks,
-                    IsPaused      = false,
+                    IsPaused      = isPaused,
                     IsMuted       = false,
                 };
 
                 await _sessionManager.OnPlaybackProgress(info).ConfigureAwait(false);
 
-                _logger.LogDebug("[JellyEmu] Session ping — user:{UserId} item:{ItemId} elapsed:{Elapsed}s",
-                    userId, itemId, elapsedTicks / TimeSpan.TicksPerSecond);
+                _logger.LogDebug("[JellyEmu] Session ping — user:{UserId} item:{ItemId} elapsed:{Elapsed}s paused:{IsPaused}",
+                    userId, itemId, seconds, isPaused);
             }
             catch (Exception ex)
             {
@@ -145,7 +146,7 @@ namespace JellyEmu.Services
         /// <summary>
         /// Closes the Jellyfin playback session for the game.
         /// </summary>
-        public async Task StopSessionAsync(string userId, string itemId)
+        public async Task StopSessionAsync(string userId, string itemId, long? elapsedSeconds = null)
         {
             var key = Key(userId, itemId);
             if (!_activeSessions.TryRemove(key, out var active))
@@ -159,7 +160,8 @@ namespace JellyEmu.Services
 
             try
             {
-                var elapsedTicks = (long)(DateTime.UtcNow - active.StartedAt).TotalSeconds * TimeSpan.TicksPerSecond;
+                var seconds = elapsedSeconds ?? (long)(DateTime.UtcNow - active.StartedAt).TotalSeconds;
+                var elapsedTicks = seconds * TimeSpan.TicksPerSecond;
 
                 var info = new PlaybackStopInfo
                 {
@@ -173,7 +175,7 @@ namespace JellyEmu.Services
                 await _sessionManager.OnPlaybackStopped(info).ConfigureAwait(false);
 
                 _logger.LogInformation("[JellyEmu] Session stopped — user:{UserId} item:{ItemId} elapsed:{Elapsed}s",
-                    userId, itemId, elapsedTicks / TimeSpan.TicksPerSecond);
+                    userId, itemId, seconds);
             }
             catch (Exception ex)
             {
