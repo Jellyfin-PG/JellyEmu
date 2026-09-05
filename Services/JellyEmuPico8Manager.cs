@@ -90,7 +90,7 @@ namespace JellyEmu.Services
 
                 var client = _httpClientFactory.CreateClient("JellyEmuPico8");
                 client.DefaultRequestHeaders.Add("User-Agent",
-                    "Mozilla/5.0 (compatible; JellyEmu/1.0)");
+                    JellyEmuVersion.BrowserUserAgent);
 
                 _logger.LogInformation("[JellyEmu] Fetching PICO-8 runtime from {Url}", RuntimeUrl);
 

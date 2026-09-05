@@ -159,7 +159,7 @@ namespace JellyEmu.Controllers
             {
                 var url = $"https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php?z={prefs.RaUsername}&y={prefs.RaApiKey}&g={raGameId}&u={prefs.RaUsername}&a=1";
                 var client = HttpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
 
                 var response = await client.GetAsync(url).ConfigureAwait(false);
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -220,7 +220,7 @@ namespace JellyEmu.Controllers
             {
                 var url = $"https://retroachievements.org/dorequest.php?r=gameid&m={md5}";
                 var client = HttpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
 
                 var response = await client.GetAsync(url).ConfigureAwait(false);
 

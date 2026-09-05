@@ -66,7 +66,7 @@ namespace JellyEmu.Controllers
             try
             {
                 var client = HttpClientFactory.CreateClient("JellyEmuPico8");
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (compatible; JellyEmu/1.0)");
+                client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.BrowserUserAgent);
 
                 using var upstream = await client.GetAsync(
                     JellyEmuPico8Manager.RuntimeUrl,
@@ -117,7 +117,7 @@ namespace JellyEmu.Controllers
             try
             {
                 var client = HttpClientFactory.CreateClient("JellyEmuThreeJs");
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (compatible; JellyEmu/1.0)");
+                client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.BrowserUserAgent);
 
                 using var upstream = await client.GetAsync(
                     JellyEmuThreeJsManager.RuntimeUrl,

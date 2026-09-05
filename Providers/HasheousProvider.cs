@@ -57,7 +57,7 @@ namespace JellyEmu.Providers
                         : $"https://hasheous.org/api/v1/Lookup/ByHash/md5/{md5}";
 
                     var client = _httpClientFactory.CreateClient();
-                    client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+                    client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
 
                     var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode)
@@ -126,7 +126,7 @@ namespace JellyEmu.Providers
                     ? $"https://hasheous.org/api/v1/Lookup/ById/{hasheousId}"
                     : $"https://hasheous.org/api/v1/Lookup/ByHash/md5/{md5}";
                 var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
                 
                 var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
@@ -323,7 +323,7 @@ namespace JellyEmu.Providers
                     : $"https://hasheous.org/api/v1/Lookup/ByHash/md5/{md5}";
 
                 var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
                 
                 var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
