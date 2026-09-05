@@ -39,9 +39,15 @@ namespace JellyEmu.Controllers
         /// </summary>
         [HttpGet("/jellyemu/playlist/{itemId}/discs/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetDiscs(string itemId, string userId)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+            {
+                return BadRequest("Invalid item ID or user ID format.");
+            }
+
             var item = LibraryManager.GetItemById(itemId);
             if (item == null || string.IsNullOrEmpty(item.Path) || !item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase))
             {
@@ -77,6 +83,11 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult SwapDisc(string itemId, string userId, [FromQuery] string disc)
         {
+            if (!IsValidId(itemId) || !IsValidId(userId))
+            {
+                return BadRequest("Invalid item ID or user ID format.");
+            }
+
             if (!VerifyUser(userId)) return Forbid();
 
             var item = LibraryManager.GetItemById(itemId);

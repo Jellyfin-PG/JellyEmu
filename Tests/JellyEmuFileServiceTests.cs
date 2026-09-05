@@ -153,5 +153,65 @@ namespace JellyEmu.Tests
                 Directory.Delete(tempDir, true);
             }
         }
+
+        [Theory]
+        [InlineData("../evil")]
+        [InlineData("../../windows")]
+        [InlineData("user/with/slashes")]
+        [InlineData("user\\with\\backslashes")]
+        [InlineData("user*evil")]
+        public void GetItemMetaPath_ThrowsArgumentException_OnInvalidUserId(string invalidUserId)
+        {
+            var appPaths = new MockAppPaths(Path.GetTempPath());
+            var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+            Assert.Throws<ArgumentException>(() => service.GetItemMetaPath(invalidUserId, "item1"));
+        }
+
+        [Theory]
+        [InlineData("../evil")]
+        [InlineData("../../windows")]
+        [InlineData("item/with/slashes")]
+        [InlineData("item\\with\\backslashes")]
+        [InlineData("item?evil")]
+        public void GetItemMetaPath_ThrowsArgumentException_OnInvalidItemId(string invalidItemId)
+        {
+            var appPaths = new MockAppPaths(Path.GetTempPath());
+            var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+            Assert.Throws<ArgumentException>(() => service.GetItemMetaPath("user1", invalidItemId));
+        }
+
+        [Fact]
+        public void GetActiveDiscIndex_ReturnsDefault_WhenUserIdContainsTraversal()
+        {
+            var appPaths = new MockAppPaths(Path.GetTempPath());
+            var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+            var index = service.GetActiveDiscIndex("../../etc/passwd", "item1", maxDiscs: 5);
+            Assert.Equal(1, index);
+        }
+
+        [Fact]
+        public void SetActiveDiscIndex_IgnoresCall_WhenUserIdContainsTraversal()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var appPaths = new MockAppPaths(tempDir);
+                var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+                // Should safely reject without throwing or creating files outside
+                service.SetActiveDiscIndex("../../evil", "item1", 2);
+
+                var evilPath = Path.Combine(tempDir, "evil");
+                Assert.False(Directory.Exists(evilPath));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

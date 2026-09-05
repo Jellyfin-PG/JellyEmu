@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -105,12 +107,56 @@ namespace JellyEmu.Services
 
         #region Playlists and Multi-disc ROMs
 
+        private static readonly Regex SafeIdRegex = new Regex("^[a-zA-Z0-9_-]{1,64}$", RegexOptions.Compiled);
+
         /// <summary>
-        /// Returns the path to the user's active disc metadata file for an item.
+        /// Validates that an identifier contains only safe alphanumeric/hyphen/underscore characters.
+        /// </summary>
+        public static bool IsValidId(string? id)
+        {
+            return !string.IsNullOrWhiteSpace(id) && SafeIdRegex.IsMatch(id);
+        }
+
+        /// <summary>
+        /// Gets the sanitized and validated user directory inside the jellyemu-saves storage.
+        /// </summary>
+        public string GetSafeUserSavesDir(string userId)
+        {
+            if (!IsValidId(userId))
+            {
+                throw new ArgumentException("Invalid user ID format.", nameof(userId));
+            }
+
+            var safeUserId = Path.GetFileName(userId.TrimStart('/', '\\'));
+            var baseDir = Path.GetFullPath(Path.Combine(_appPaths.DataPath, "jellyemu-saves"));
+            var userDir = Path.GetFullPath(Path.Combine(baseDir, safeUserId));
+            if (!userDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new SecurityException("Path traversal detected in user ID.");
+            }
+
+            return userDir;
+        }
+
+        /// <summary>
+        /// Returns the validated path to the user's active disc metadata file for an item.
         /// </summary>
         public string GetItemMetaPath(string userId, string itemId)
         {
-            return Path.Combine(_appPaths.DataPath, "jellyemu-saves", userId, $"{itemId}-meta.json");
+            if (!IsValidId(itemId))
+            {
+                throw new ArgumentException("Invalid item ID format.", nameof(itemId));
+            }
+
+            var userDir = GetSafeUserSavesDir(userId);
+            var safeItemId = Path.GetFileName(itemId.TrimStart('/', '\\'));
+            var metaPath = Path.GetFullPath(Path.Combine(userDir, $"{safeItemId}-meta.json"));
+            if (!metaPath.StartsWith(userDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new SecurityException("Path traversal detected in item ID.");
+            }
+
+            return metaPath;
         }
 
         /// <summary>
@@ -118,19 +164,19 @@ namespace JellyEmu.Services
         /// </summary>
         public int GetActiveDiscIndex(string? userId, string itemId, int maxDiscs = int.MaxValue)
         {
-            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(itemId))
-            {
-                return 1;
-            }
-
-            var metaPath = GetItemMetaPath(userId, itemId);
-            if (!File.Exists(metaPath))
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(itemId) || !IsValidId(userId) || !IsValidId(itemId))
             {
                 return 1;
             }
 
             try
             {
+                var metaPath = GetItemMetaPath(userId, itemId);
+                if (!File.Exists(metaPath))
+                {
+                    return 1;
+                }
+
                 var json = File.ReadAllText(metaPath);
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("activeDiscIndex", out var prop))
@@ -144,7 +190,7 @@ namespace JellyEmu.Services
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "[JellyEmu] Could not read active disc index from {Path}", metaPath);
+                _logger.LogDebug(ex, "[JellyEmu] Could not read active disc index from user {UserId} item {ItemId}", userId, itemId);
             }
 
             return 1;
@@ -155,13 +201,16 @@ namespace JellyEmu.Services
         /// </summary>
         public void SetActiveDiscIndex(string userId, string itemId, int activeDiscIndex)
         {
-            var metaPath = GetItemMetaPath(userId, itemId);
-            var dir = Path.GetDirectoryName(metaPath);
-            if (!string.IsNullOrEmpty(dir))
+            if (!IsValidId(userId) || !IsValidId(itemId))
             {
-                Directory.CreateDirectory(dir);
+                _logger.LogWarning("[JellyEmu] Cannot set active disc index: invalid userId '{UserId}' or itemId '{ItemId}'", userId, itemId);
+                return;
             }
 
+            var userDir = GetSafeUserSavesDir(userId);
+            Directory.CreateDirectory(userDir);
+
+            var metaPath = GetItemMetaPath(userId, itemId);
             var payload = new { activeDiscIndex };
             File.WriteAllText(metaPath, JsonSerializer.Serialize(payload));
         }
