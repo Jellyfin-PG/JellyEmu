@@ -165,6 +165,41 @@ namespace JellyEmu
         public string CommunityWorkerUrl { get; set; } = "https://jellyemu-community.grimmdev.workers.dev";
 
         /// <summary>
+        /// ScreenScraper developer ID (devid).
+        /// </summary>
+        public string ScreenScraperDevId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// ScreenScraper developer password (devpassword).
+        /// </summary>
+        public string ScreenScraperDevPassword { get; set; } = string.Empty;
+
+        /// <summary>
+        /// ScreenScraper software identifier (softname).
+        /// </summary>
+        public string ScreenScraperSoftName { get; set; } = "JellyEmu";
+
+        /// <summary>
+        /// ScreenScraper user login username (ssid).
+        /// </summary>
+        public string ScreenScraperUser { get; set; } = string.Empty;
+
+        /// <summary>
+        /// ScreenScraper user password (sspassword).
+        /// </summary>
+        public string ScreenScraperPassword { get; set; } = string.Empty;
+
+        /// <summary>
+        /// ScreenScraper preferred region for titles and media: "auto", "us", "eu", "jp", or "wor".
+        /// </summary>
+        public string ScreenScraperRegionPreference { get; set; } = "auto";
+
+        /// <summary>
+        /// ScreenScraper preferred language code for synopses: "en", "fr", "de", "es", "it", "ja", "pt".
+        /// </summary>
+        public string ScreenScraperLanguagePreference { get; set; } = "en";
+
+        /// <summary>
         /// Manual BIOS file assignments per system tag or core name (ignored by XmlSerializer).
         /// </summary>
         [XmlIgnore]

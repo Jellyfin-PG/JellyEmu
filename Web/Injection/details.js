@@ -16,31 +16,36 @@
         if (!JE.cachedTags.length) return;
         const miscBar = page.querySelector('.itemMiscInfo-primary');
         if (!miscBar) return;
-        if (miscBar.querySelector('.jellyemu-info-wrap')) return;
 
-        const wrap = document.createElement('div');
-        wrap.className = 'jellyemu-info-wrap';
-        wrap.style.cssText = 'display:contents';
-        miscBar.appendChild(wrap);
+        let wrap = miscBar.querySelector('.jellyemu-info-wrap');
+        const isNewWrap = !wrap;
+        if (isNewWrap) {
+            wrap = document.createElement('div');
+            wrap.className = 'jellyemu-info-wrap';
+            wrap.style.cssText = 'display:contents';
+            miscBar.appendChild(wrap);
+        }
 
         JE.perf.mark('inject-misc-start');
 
-        const systemTags = JE.cachedTags.filter(t => t !== 'Game' && t !== 'JellyEmu' && t !== 'Unsupported' && !JE.knownRegions.has(t) && !JE.isDiscTag(t));
-        const regionTags = JE.cachedTags.filter(t => JE.knownRegions.has(t));
-        const discTags   = JE.cachedTags.filter(t => JE.isDiscTag(t));
-        const allTags    = [...systemTags, ...regionTags, ...discTags];
+        if (isNewWrap) {
+            const systemTags = JE.cachedTags.filter(t => t !== 'Game' && t !== 'JellyEmu' && t !== 'Unsupported' && !JE.knownRegions.has(t) && !JE.isDiscTag(t));
+            const regionTags = JE.cachedTags.filter(t => JE.knownRegions.has(t));
+            const discTags   = JE.cachedTags.filter(t => JE.isDiscTag(t));
+            const allTags    = [...systemTags, ...regionTags, ...discTags];
 
-        const tagFrag = document.createDocumentFragment();
-        allTags.forEach(tag => {
-            const div = document.createElement('div');
-            div.className = 'mediaInfoItem jellyemu-misc-item';
-            div.textContent = tag;
-            tagFrag.appendChild(div);
-        });
-        wrap.appendChild(tagFrag);
+            const tagFrag = document.createDocumentFragment();
+            allTags.forEach(tag => {
+                const div = document.createElement('div');
+                div.className = 'mediaInfoItem jellyemu-misc-item';
+                div.textContent = tag;
+                tagFrag.appendChild(div);
+            });
+            wrap.appendChild(tagFrag);
+        }
 
         // Time to Beat
-        const ttbRaw = JE.cachedProviderIds.IgdbTTB;
+        const ttbRaw = JE.cachedProviderIds && JE.cachedProviderIds.IgdbTTB;
         if (ttbRaw && !wrap.querySelector('.jellyemu-ttb-pill')) {
             const data = ttbRaw.split(',');
             const map = {};
@@ -212,6 +217,77 @@
                     (unknownTag ? 'Unknown Platform' : 'External Only');
                 wrap.appendChild(pill);
             }
+        }
+
+        // Guides, Manuals & Maps from ScreenScraper
+        if (itemId && !wrap.querySelector('.jellyemu-guide-group')) {
+            const ssId = (JE.cachedProviderIds && (JE.cachedProviderIds.ScreenScraper || JE.cachedProviderIds.screenscraper)) || '';
+            let guideUrl = '/jellyemu/meta/guide?itemId=' + encodeURIComponent(itemId);
+            if (ssId) {
+                guideUrl += '&gameId=' + encodeURIComponent(ssId);
+            }
+
+            fetch(guideUrl)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (JE.currentItemId !== itemId) return;
+                    if (wrap.querySelector('.jellyemu-guide-group')) return;
+
+                    const group = document.createElement('div');
+                    group.className = 'jellyemu-guide-group';
+                    group.style.cssText = 'display:contents;';
+
+                    // Manual Link
+                    if (data.manualUrl && typeof data.manualUrl === 'string' && data.manualUrl.trim().length > 0) {
+                        const pill = document.createElement('a');
+                        pill.className = 'mediaInfoItem jellyemu-manual-pill';
+                        pill.href = data.manualUrl;
+                        pill.target = '_blank';
+                        pill.rel = 'noopener noreferrer';
+                        pill.title = 'View Official Game Manual (PDF)';
+                        pill.style.marginRight = '0.6em';
+                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#00a4dc;">menu_book</span>Manual';
+                        pill.addEventListener('click', (e) => e.stopPropagation());
+                        group.appendChild(pill);
+                        group.appendChild(document.createTextNode(' '));
+                    }
+
+                    // Map Link
+                    if (data.mapUrl && typeof data.mapUrl === 'string' && data.mapUrl.trim().length > 0) {
+                        const pill = document.createElement('a');
+                        pill.className = 'mediaInfoItem jellyemu-map-pill';
+                        pill.href = data.mapUrl;
+                        pill.target = '_blank';
+                        pill.rel = 'noopener noreferrer';
+                        pill.title = 'View Game Map';
+                        pill.style.marginRight = '0.6em';
+                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#52B54B;">map</span>Map';
+                        pill.addEventListener('click', (e) => e.stopPropagation());
+                        group.appendChild(pill);
+                        group.appendChild(document.createTextNode(' '));
+                    }
+
+                    // Guide Link
+                    if (data.guideUrl && typeof data.guideUrl === 'string' && data.guideUrl.trim().length > 0) {
+                        const pill = document.createElement('a');
+                        pill.className = 'mediaInfoItem jellyemu-guide-pill';
+                        pill.href = data.guideUrl;
+                        pill.target = '_blank';
+                        pill.rel = 'noopener noreferrer';
+                        pill.title = 'View Game Guide & Info';
+                        pill.style.marginRight = '0.6em';
+                        pill.innerHTML = '<span class="material-icons" style="font-size:13px;vertical-align:middle;color:#f0c040;">explore</span>Guide';
+                        pill.addEventListener('click', (e) => e.stopPropagation());
+                        group.appendChild(pill);
+                        group.appendChild(document.createTextNode(' '));
+                    }
+
+                    if (group.hasChildNodes()) {
+                        wrap.appendChild(group);
+                    }
+                })
+                .catch(() => {});
         }
 
         JE.perf.mark('inject-misc-end');

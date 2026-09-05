@@ -39,6 +39,8 @@ namespace JellyEmu
             serviceCollection.AddSingleton<JellyEmuInputService>();
             serviceCollection.AddMemoryCache();
             serviceCollection.AddSingleton<JellyEmuCacheService>();
+            serviceCollection.AddSingleton<JellyEmuFileService>();
+            serviceCollection.AddSingleton<ScreenScraperService>();
 
             serviceCollection.AddHostedService<JellyEmuInjectorService>();
         }
