@@ -38,7 +38,7 @@ namespace JellyEmu.Controllers
                 return Ok(new { reachable = false, reason = "No Romm URL configured" });
 
             var client = HttpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+            client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
             client.Timeout = TimeSpan.FromSeconds(8);
 
             foreach (var probe in new[] { "/api/heartbeat", "/api/", "/" })

@@ -29,7 +29,7 @@ namespace JellyEmu.Services
 
                 bool vantageEnabled = Plugin.Instance?.Configuration?.VantageEnabled ?? true;
                 string vantageStr = vantageEnabled ? "true" : "false";
-                string versionStr = typeof(JellyEmuUIInjector).Assembly.GetName().Version?.ToString() ?? "0.8.8";
+                string versionStr = JellyEmuVersion.Value;
 
                 string injection = $$"""
                 <link rel="stylesheet" href="/jellyemu/assets/injection/bundle.css?v={{versionStr}}" data-jellyemu-mods="1">

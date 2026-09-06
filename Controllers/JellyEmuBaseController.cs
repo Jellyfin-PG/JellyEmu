@@ -874,7 +874,7 @@ namespace JellyEmu.Controllers
         protected HttpClient GetRommClient()
         {
             var client = HttpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+            client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
             var cfg = Plugin.Instance?.Configuration;
             if (cfg == null) return client;
 

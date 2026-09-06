@@ -269,7 +269,7 @@ namespace JellyEmu.Controllers
                 scale = effectivePrefs.Scale,
                 volume = effectivePrefs.Volume ?? "1",
                 mute = effectivePrefs.Mute ?? "0",
-                version = GetType().Assembly.GetName().Version?.ToString() ?? "0.8.8"
+                version = JellyEmuVersion.Value
             });
 
             // When opened as a new tab (threaded cores), these headers make the page
