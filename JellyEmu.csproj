@@ -47,6 +47,7 @@
     <EmbeddedResource Include="Web/ejs.xr.js" />
     <EmbeddedResource Include="Web/ejs.save.js" />
     <EmbeddedResource Include="Web/ejs.setting.js" />
+    <EmbeddedResource Include="Web/ejs.netplay.js" />
     <EmbeddedResource Include="Web/ejs.style.css" />
     <!-- Frontend Injection Modules -->
     <EmbeddedResource Include="Web/Injection/*" />

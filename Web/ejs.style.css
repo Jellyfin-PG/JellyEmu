@@ -14,9 +14,17 @@ body {
     color: #fff;
 }
 
-#game {
-    width: 100%;
-    height: 100%;
+#game,
+.ejs_parent,
+.ejs_canvas_parent {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    overflow: hidden !important;
+    background-color: #000 !important;
 }
 
 .ejs_canvas_parent,
@@ -25,6 +33,18 @@ canvas.ejs_canvas,
     transform: translateZ(0);
     will-change: transform;
     background-color: #000;
+    margin: auto !important;
+    display: block !important;
+    flex-shrink: 0 !important;
+}
+
+#je-netplay-video {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: auto !important;
 }
 
 /* EJS Elements */
@@ -492,6 +512,12 @@ canvas.ejs_canvas,
 
 .je-btn:hover {
     background: rgba(255, 255, 255, .14);
+}
+
+.je-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .je-btn-primary {
@@ -1072,3 +1098,257 @@ canvas.ejs_canvas,
     color: #fff;
     font-size: 14px;
 }
+
+/* Netplay Topbar & Live Session Indicators */
+.je-topbtn-live {
+    background: rgba(52, 199, 89, 0.15) !important;
+    border: 1px solid rgba(52, 199, 89, 0.35) !important;
+    color: #a3f7bf !important;
+}
+
+.je-topbtn-live:hover {
+    background: rgba(52, 199, 89, 0.25) !important;
+}
+
+.je-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #34c759;
+    box-shadow: 0 0 8px #34c759;
+    display: inline-block;
+    animation: je-live-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes je-live-pulse {
+    0%, 100% {
+        transform: scale(0.9);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.25);
+        opacity: 1;
+    }
+}
+
+.je-badge-status {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(52, 199, 89, 0.18);
+    color: #34c759;
+    border: 1px solid rgba(52, 199, 89, 0.3);
+}
+
+.je-badge-host {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: rgba(255, 204, 0, 0.2);
+    color: #ffd60a;
+    border: 1px solid rgba(255, 204, 0, 0.35);
+}
+
+.je-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.je-btn-danger {
+    background: rgba(255, 69, 58, 0.15);
+    border-color: rgba(255, 69, 58, 0.35);
+    color: #ff6961;
+}
+
+.je-btn-danger:hover {
+    background: rgba(255, 69, 58, 0.3);
+}
+
+/* Netplay Rooms List & Room Cards */
+.je-netplay-room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+}
+
+.je-netplay-room-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.je-netplay-room-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.je-np-room-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.je-np-room-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.je-np-room-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.je-np-room-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.je-np-room-count.je-np-full {
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.je-np-room-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 16px;
+    flex-shrink: 0;
+}
+
+.je-netplay-empty,
+.je-netplay-unconfigured {
+    text-align: center;
+    padding: 32px 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* Netplay Players in Session */
+.je-netplay-player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.je-netplay-player-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.je-np-player-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.je-np-player-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.je-np-ping-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: monospace, system-ui, -apple-system, sans-serif;
+    letter-spacing: 0.2px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    user-select: none;
+    text-align: center;
+}
+
+.je-np-ping-good {
+    color: #34c759;
+    background: rgba(52, 199, 89, 0.12);
+    border-color: rgba(52, 199, 89, 0.3);
+}
+
+.je-np-ping-medium {
+    color: #ff9f0a;
+    background: rgba(255, 159, 10, 0.12);
+    border-color: rgba(255, 159, 10, 0.3);
+}
+
+.je-np-ping-poor {
+    color: #ff453a;
+    background: rgba(255, 69, 58, 0.12);
+    border-color: rgba(255, 69, 58, 0.3);
+}
+
+.je-np-ping-measuring {
+    color: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+#je-np-chat-messages {
+    height: 140px;
+    overflow-y: scroll;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) rgba(0, 0, 0, 0.2);
+}
+
+#je-np-chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+#je-np-chat-messages::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+#je-np-chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+}
+
+#je-np-chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+

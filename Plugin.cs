@@ -72,7 +72,10 @@ namespace JellyEmu
         /// </summary>
         public string TheGamesDbApiKey { get; set; } = string.Empty;
 
-        public string NetplayServer { get; set; } = string.Empty;
+        /// <summary>
+        /// Comma or newline-separated STUN/TURN server URLs for WebRTC Netplay.
+        /// </summary>
+        public string NetplayIceServers { get; set; } = "stun:stun.l.google.com:19302\nstun:stun1.l.google.com:19302\nstun:stun2.l.google.com:19302";
 
         /// <summary>
         /// Whether the Romm metadata provider is enabled. Disabled by default.

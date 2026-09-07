@@ -136,56 +136,66 @@
         var gameEl = document.getElementById('game');
         var ejsParent = document.querySelector('.ejs_parent');
         var canvasParent = document.querySelector('.ejs_canvas_parent');
-        var canvas = document.querySelector('canvas.ejs_canvas') || document.querySelector('#game canvas') || document.querySelector('canvas');
 
-        if (gameEl) gameEl.setAttribute('data-scale', size);
-        if (ejsParent) ejsParent.setAttribute('data-scale', size);
+        [gameEl, ejsParent, canvasParent].forEach(function (parent) {
+            if (parent) {
+                parent.style.setProperty('display', 'flex', 'important');
+                parent.style.setProperty('align-items', 'center', 'important');
+                parent.style.setProperty('justify-content', 'center', 'important');
+                parent.style.setProperty('width', '100%', 'important');
+                parent.style.setProperty('height', '100%', 'important');
+                parent.style.setProperty('overflow', 'hidden', 'important');
+                parent.style.setProperty('position', 'relative', 'important');
+            }
+        });
 
-        if (canvasParent) {
-            canvasParent.style.setProperty('display', 'flex', 'important');
-            canvasParent.style.setProperty('align-items', 'center', 'important');
-            canvasParent.style.setProperty('justify-content', 'center', 'important');
-            canvasParent.style.setProperty('width', '100%', 'important');
-            canvasParent.style.setProperty('height', '100%', 'important');
-            canvasParent.style.setProperty('overflow', 'hidden', 'important');
-        }
+        var targets = [
+            document.querySelector('canvas.ejs_canvas'),
+            document.querySelector('#game canvas'),
+            document.getElementById('je-netplay-video')
+        ].filter(Boolean);
 
-        if (!canvas) return;
+        if (!targets.length) return;
 
-        if (size === 'fit') {
-            canvas.style.setProperty('width', '100%', 'important');
-            canvas.style.setProperty('height', '100%', 'important');
-            canvas.style.setProperty('max-width', '100vw', 'important');
-            canvas.style.setProperty('max-height', '100vh', 'important');
-            canvas.style.setProperty('object-fit', 'contain', 'important');
-            canvas.style.setProperty('image-rendering', 'auto', 'important');
-        } else if (size === 'stretch') {
-            canvas.style.setProperty('width', '100vw', 'important');
-            canvas.style.setProperty('height', '100vh', 'important');
-            canvas.style.setProperty('max-width', '100vw', 'important');
-            canvas.style.setProperty('max-height', '100vh', 'important');
-            canvas.style.setProperty('object-fit', 'fill', 'important');
-            canvas.style.setProperty('image-rendering', 'auto', 'important');
-        } else {
-            var mult = parseInt(size) || 1;
-            var e = emu();
-            var nativeW = (e && e.gameManager && typeof e.gameManager.getVideoDimensions === 'function')
-                ? e.gameManager.getVideoDimensions('width')
-                : (canvas.width || 256);
-            var nativeH = (e && e.gameManager && typeof e.gameManager.getVideoDimensions === 'function')
-                ? e.gameManager.getVideoDimensions('height')
-                : (canvas.height || 224);
+        targets.forEach(function (el) {
+            el.style.setProperty('margin', 'auto', 'important');
+            el.style.setProperty('display', 'block', 'important');
+            el.style.setProperty('flex-shrink', '0', 'important');
+            if (size === 'fit') {
+                el.style.setProperty('width', '100%', 'important');
+                el.style.setProperty('height', '100%', 'important');
+                el.style.setProperty('max-width', '100vw', 'important');
+                el.style.setProperty('max-height', '100vh', 'important');
+                el.style.setProperty('object-fit', 'contain', 'important');
+                el.style.setProperty('image-rendering', 'auto', 'important');
+            } else if (size === 'stretch') {
+                el.style.setProperty('width', '100vw', 'important');
+                el.style.setProperty('height', '100vh', 'important');
+                el.style.setProperty('max-width', '100vw', 'important');
+                el.style.setProperty('max-height', '100vh', 'important');
+                el.style.setProperty('object-fit', 'fill', 'important');
+                el.style.setProperty('image-rendering', 'auto', 'important');
+            } else {
+                var mult = parseInt(size) || 1;
+                var e = emu();
+                var nativeW = (e && e.gameManager && typeof e.gameManager.getVideoDimensions === 'function')
+                    ? e.gameManager.getVideoDimensions('width')
+                    : (el.videoWidth || el.width || 256);
+                var nativeH = (e && e.gameManager && typeof e.gameManager.getVideoDimensions === 'function')
+                    ? e.gameManager.getVideoDimensions('height')
+                    : (el.videoHeight || el.height || 224);
 
-            if (!nativeW || nativeW <= 0) nativeW = 256;
-            if (!nativeH || nativeH <= 0) nativeH = 224;
+                if (!nativeW || nativeW <= 0) nativeW = 256;
+                if (!nativeH || nativeH <= 0) nativeH = 224;
 
-            canvas.style.setProperty('width', (nativeW * mult) + 'px', 'important');
-            canvas.style.setProperty('height', (nativeH * mult) + 'px', 'important');
-            canvas.style.setProperty('max-width', 'none', 'important');
-            canvas.style.setProperty('max-height', 'none', 'important');
-            canvas.style.setProperty('object-fit', 'contain', 'important');
-            canvas.style.setProperty('image-rendering', 'pixelated', 'important');
-        }
+                el.style.setProperty('width', (nativeW * mult) + 'px', 'important');
+                el.style.setProperty('height', (nativeH * mult) + 'px', 'important');
+                el.style.setProperty('max-width', 'none', 'important');
+                el.style.setProperty('max-height', 'none', 'important');
+                el.style.setProperty('object-fit', 'contain', 'important');
+                el.style.setProperty('image-rendering', 'pixelated', 'important');
+            }
+        });
     }
 
     var fpsEl = document.getElementById('je-fps');
@@ -324,11 +334,16 @@
         applyLiveFps();
     }
 
-    // Apply when emulator boots
+    // Apply when emulator boots or netplay video mounts
     window.addEventListener('jellyemu:gamestart', function () {
         setTimeout(applyAllLiveSettings, 100);
         setTimeout(applyAllLiveSettings, 500);
     });
+    window.addEventListener('jellyemu:netplay-video-mounted', function () {
+        applyLiveScreenSize();
+    });
+    window.addEventListener('resize', applyLiveScreenSize);
+    window.addEventListener('orientationchange', applyLiveScreenSize);
 
     // Tab Management
     var tabSysBtn  = document.getElementById('je-set-tab-sys');

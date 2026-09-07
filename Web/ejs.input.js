@@ -13,6 +13,10 @@
     function openPopup(id)  { window._jeOpenPopup  && window._jeOpenPopup(id);  }
     function closePopup(id) { window._jeClosePopup && window._jeClosePopup(id); }
     function syncVGToggles(){ window._jeSyncVGToggles && window._jeSyncVGToggles(); }
+    function _isInputWindowOpen() {
+        var pop = document.getElementById('je-pop-inputmap');
+        return !!(pop && (pop.classList.contains('je-open') || pop.classList.contains('je-popup-active')));
+    }
 
     // ==========================================
     // - EMULATORJS SYSTEM INPUT SCHEMES -
@@ -421,11 +425,19 @@
         }
         _jeSimulatedState[idx] = boolPressed;
 
-        var mapName = getActiveInputMap()[idx] || ('ID ' + idx);
-        console.log('[JellyEmu Input] _jeSimulate | Index:', idx, '(' + mapName + ') | Pressed:', boolPressed);
+        if (_isInputWindowOpen()) {
+            var mapName = getActiveInputMap()[idx] || ('ID ' + idx);
+            console.log('[JellyEmu Input] _jeSimulate | Index:', idx, '(' + mapName + ') | Pressed:', boolPressed);
+        }
 
         var isAnalog = (idx >= 16 && idx <= 23);
         var simVal = boolPressed ? (isAnalog ? 32767 : 1) : 0;
+
+        // If in netplay as guest, route input directly over low-latency WebRTC DataChannel
+        if (typeof window._jeSendNetplayInput === 'function' && window._jeSendNetplayInput(idx, simVal)) {
+            return;
+        }
+
         try {
             g.simulateInput(0, idx, simVal);
         } catch (e) {
@@ -539,7 +551,9 @@
                 if (pressed !== wasPressed) {
                     _jeRawGpPrevButtons[gp.index][bi] = pressed;
                     var label = _jeButtonLabel(bi);
-                    console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' (' + gp.id + ') Button ' + bi + ' [' + label + '] ' + (pressed ? 'PRESSED' : 'RELEASED') + ' (val: ' + val.toFixed(2) + ')');
+                    if (_isInputWindowOpen()) {
+                        console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' (' + gp.id + ') Button ' + bi + ' [' + label + '] ' + (pressed ? 'PRESSED' : 'RELEASED') + ' (val: ' + val.toFixed(2) + ')');
+                    }
 
                     // If currently listening for mapping in Input Settings modal:
                     if (_jeActiveGpListen && pressed) {
@@ -596,7 +610,9 @@
 
                 // Positive axis direction
                 if (isMovedPos !== wasMovedPos) {
-                    console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' Axis ' + ai + ' [' + posLabel + '] ' + (isMovedPos ? 'MOVED' : 'RELEASED') + ' (val: ' + aVal.toFixed(2) + ')');
+                    if (_isInputWindowOpen()) {
+                        console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' Axis ' + ai + ' [' + posLabel + '] ' + (isMovedPos ? 'MOVED' : 'RELEASED') + ' (val: ' + aVal.toFixed(2) + ')');
+                    }
                     if (_jeActiveGpListen && isMovedPos) {
                         var initA = (_jeActiveGpListen.initialAxes && _jeActiveGpListen.initialAxes[gp.index] && _jeActiveGpListen.initialAxes[gp.index][ai]) || 0;
                         if (Math.abs(aVal - initA) > 0.4) {
@@ -617,7 +633,9 @@
 
                 // Negative axis direction
                 if (isMovedNeg !== wasMovedNeg) {
-                    console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' Axis ' + ai + ' [' + negLabel + '] ' + (isMovedNeg ? 'MOVED' : 'RELEASED') + ' (val: ' + aVal.toFixed(2) + ')');
+                    if (_isInputWindowOpen()) {
+                        console.log('[JellyEmu Gamepad RAW] Pad #' + gp.index + ' Axis ' + ai + ' [' + negLabel + '] ' + (isMovedNeg ? 'MOVED' : 'RELEASED') + ' (val: ' + aVal.toFixed(2) + ')');
+                    }
                     if (_jeActiveGpListen && isMovedNeg) {
                         var initA = (_jeActiveGpListen.initialAxes && _jeActiveGpListen.initialAxes[gp.index] && _jeActiveGpListen.initialAxes[gp.index][ai]) || 0;
                         if (Math.abs(aVal - initA) > 0.4) {
@@ -1130,8 +1148,7 @@
     }
 
     function _popupOpen() {
-        var pop = document.getElementById('je-pop-inputmap');
-        return pop && (pop.classList.contains('je-popup-active') || pop.style.display !== 'none');
+        return _isInputWindowOpen();
     }
 
     var _gpPollInterval = null;
