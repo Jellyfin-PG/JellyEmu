@@ -30,7 +30,7 @@ namespace JellyEmu.Providers
             var client = HttpClientFactory.CreateClient();
             if (!client.DefaultRequestHeaders.Contains("User-Agent"))
             {
-                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "JellyEmu/1.0");
+                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", JellyEmuVersion.UserAgent);
             }
             return client;
         }

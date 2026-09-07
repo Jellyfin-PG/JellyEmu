@@ -29,7 +29,7 @@ namespace JellyEmu.Providers
         protected HttpClient GetHttpClient()
         {
             var client = HttpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("User-Agent", "JellyEmu/1.0");
+            client.DefaultRequestHeaders.Add("User-Agent", JellyEmuVersion.UserAgent);
             if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
             {
                 var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Username}:{Password}"));

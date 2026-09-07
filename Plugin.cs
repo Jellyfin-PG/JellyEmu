@@ -68,7 +68,7 @@ namespace JellyEmu
         public string SteamGridDbApiKey { get; set; } = string.Empty;
 
         /// <summary>
-        /// TheGamesDB API Key. Get yours at https://thegamesdb.net/user/api/
+        /// TheGamesDB API Key. Get yours at https://thegamesdb.net/profile.php
         /// </summary>
         public string TheGamesDbApiKey { get; set; } = string.Empty;
 

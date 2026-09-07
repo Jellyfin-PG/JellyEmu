@@ -85,7 +85,7 @@ namespace JellyEmu.Services
 
                 var client = _httpClientFactory.CreateClient("JellyEmuThreeJs");
                 client.DefaultRequestHeaders.Add("User-Agent",
-                    "Mozilla/5.0 (compatible; JellyEmu/1.0)");
+                    JellyEmuVersion.BrowserUserAgent);
 
                 _logger.LogInformation("[JellyEmu] Fetching Three.js runtime from {Url}", RuntimeUrl);
 

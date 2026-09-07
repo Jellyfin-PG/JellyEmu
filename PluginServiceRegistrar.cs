@@ -12,14 +12,14 @@ namespace JellyEmu
             serviceCollection.AddHttpClient("JellyEmuEjs", client =>
             {
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    "JellyEmu/1.0 (Jellyfin plugin; +https://github.com/Jellyfin-PG/JellyEmu)");
+                    $"{JellyEmuVersion.UserAgent} (Jellyfin plugin; +https://github.com/Jellyfin-PG/JellyEmu)");
                 client.Timeout = TimeSpan.FromMinutes(10);
             });
 
             serviceCollection.AddHttpClient("JellyEmuPico8", client =>
             {
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    "Mozilla/5.0 (compatible; JellyEmu/1.0)");
+                    JellyEmuVersion.BrowserUserAgent);
                 client.Timeout = TimeSpan.FromMinutes(5);
             });
 
