@@ -271,13 +271,16 @@
             <div class="verticalSection" style="margin-bottom: 1.8em;">
                 <h4 style="margin: 0 0 6px 0; font-size: 1.05em; font-weight: 600; color: #fff;">Netplay Multiplayer</h4>
                 <p style="color: #aaa; margin-bottom: 1em; font-size: 0.9em; line-height: 1.4;">
-                    Provide your netplay server address to enable multiplayer via EmulatorJS.
-                    Leave blank to disable netplay. Requires a running EmulatorJS netplay relay server.
+                    Multiplayer via EmulatorJS. JellyEmu includes a built-in Netplay relay server running directly on your Jellyfin server with automatic room matchmaking, and in-game chat.
                 </p>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="netplayServer">Netplay Server Address</label>
-                    <input id="netplayServer" type="text" class="emby-input"
-                        placeholder="e.g. https://192.168.1.100:3000" autocomplete="off" />
+                    <label class="inputLabel inputLabelUnfocused" for="netplayIceServers">WebRTC STUN / ICE Servers</label>
+                    <textarea id="netplayIceServers" class="emby-input" rows="3"
+                        placeholder="stun:stun.l.google.com:19302&#10;stun:stun1.l.google.com:19302&#10;stun:stun2.l.google.com:19302"
+                        style="height: auto; resize: vertical; font-family: monospace; font-size: 0.85em;"></textarea>
+                    <div class="fieldDescription" style="color: #888; font-size: 0.8em; margin-top: 4px;">
+                        Comma or line-separated list of STUN/TURN server URLs for WebRTC peer-to-peer streaming. Leave as default Google STUN servers or provide your own ICE/STUN/TURN servers.
+                    </div>
                 </div>
             </div>
 

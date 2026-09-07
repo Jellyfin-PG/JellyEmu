@@ -190,8 +190,17 @@ namespace JellyEmu.Controllers
             var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId, activeSlot));
 
             var igdbId = item.GetProviderId("IGDB");
-            var netplayServer = Plugin.Instance?.Configuration.NetplayServer ?? string.Empty;
-            var hasNetplay = !string.IsNullOrWhiteSpace(netplayServer);
+            int numericGameId;
+            if (!int.TryParse(igdbId, out numericGameId) || numericGameId <= 0)
+            {
+                numericGameId = (item.Id.GetHashCode() & 0x7FFFFFFF);
+                if (numericGameId == 0) numericGameId = 1;
+            }
+
+            const string netplayServer = "/jellyemu/netplay";
+            var netplayIceServers = Plugin.Instance?.Configuration.NetplayIceServers ?? string.Empty;
+            var netplayIceServersJson = System.Text.Json.JsonSerializer.Serialize(netplayIceServers);
+            const bool hasNetplay = true;
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
             var ejsBase = EjsManager.IsReady
@@ -253,8 +262,11 @@ namespace JellyEmu.Controllers
                 active_shader = activeShader ?? string.Empty,
                 video_rotation = videoRotation,
                 igdb_id = igdbId ?? string.Empty,
+                game_id = numericGameId,
                 has_netplay = hasNetplay,
                 netplay_server = netplayServer,
+                netplay_ice_servers = netplayIceServers,
+                netplay_ice_servers_json = netplayIceServersJson,
                 save_exists = saveExists,
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,

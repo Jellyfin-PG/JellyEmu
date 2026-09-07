@@ -250,8 +250,8 @@
             var collRow = page.querySelector('#rommCollectionSyncRow');
             if (collRow) collRow.style.display = config.RommCollectionSyncEnabled !== false ? '' : 'none';
             
-            var np = page.querySelector('#netplayServer');
-            if (np) np.value = config.NetplayServer || '';
+            var npIce = page.querySelector('#netplayIceServers');
+            if (npIce) npIce.value = config.NetplayIceServers !== undefined && config.NetplayIceServers !== null ? config.NetplayIceServers : 'stun:stun.l.google.com:19302\nstun:stun1.l.google.com:19302\nstun:stun2.l.google.com:19302';
             var ejsSel = page.querySelector('#ejsChannel');
             if (ejsSel) ejsSel.value = (config.EjsChannel || 'stable').toLowerCase();
             var feedUrl = page.querySelector('#marketplaceFeedUrl');
@@ -322,8 +322,8 @@
             if (vantage) config.VantageEnabled = vantage.value === 'true';
             var ejsSel = page.querySelector('#ejsChannel');
             if (ejsSel) config.EjsChannel = ejsSel.value;
-            var np = page.querySelector('#netplayServer');
-            if (np) config.NetplayServer = np.value.trim();
+            var npIce = page.querySelector('#netplayIceServers');
+            if (npIce) config.NetplayIceServers = npIce.value.trim();
             var gLib = page.querySelector('#gamesLibraryPath');
             if (gLib) config.GamesLibraryPath = gLib.value;
             var feedUrl = page.querySelector('#marketplaceFeedUrl');

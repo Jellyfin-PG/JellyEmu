@@ -34,6 +34,9 @@
         <span id="je-topbar-title">{{ game_name }}</span>
 
         <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="je-topbtn je-topbtn-live" id="je-topbtn-netplay" style="display:none;" title="Active Netplay Match">
+                <span id="je-topbtn-netplay-text">Netplay</span>
+            </button>
             <button class="je-topbtn" id="je-vr-btn" title="Enter VR">
                 <svg viewBox="0 0 24 24">
                     <path
@@ -96,7 +99,7 @@
                 <path
                     d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" />
             </svg></button>
-        <button class="je-dockbtn" id="je-btn-netplay" title="Netplay" disabled><svg viewBox="0 0 24 24">
+        <button class="je-dockbtn" id="je-btn-netplay" title="Netplay"><svg viewBox="0 0 24 24">
                 <path
                     d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z" />
             </svg></button>
@@ -430,6 +433,138 @@
             </div>
         </div>
     </div>
+
+    <!-- Popup: Netplay -->
+    <div class="je-overlay" id="je-pop-netplay">
+        <div class="je-popup je-popup-lg" style="max-width:620px; max-height:85vh; display:flex; flex-direction:column;">
+            <div class="je-popup-hdr">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <h3>Multiplayer Netplay</h3>
+                    <span id="je-netplay-hdr-status" class="je-badge-status" style="display:none;"></span>
+                </div>
+                <button class="je-closebtn" data-close="je-pop-netplay">&times;</button>
+            </div>
+            <div class="je-tabs" style="margin-bottom:0; padding:0 20px;">
+                <button class="je-tab je-tab-active" id="je-np-tab-rooms">Rooms</button>
+                <button class="je-tab" id="je-np-tab-host">Host Game</button>
+                <button class="je-tab" id="je-np-tab-session" style="display:none;">Active Match</button>
+                <button class="je-tab" id="je-np-tab-settings">Settings</button>
+            </div>
+            <div class="je-popup-body" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px;">
+                <!-- Tab Rooms Panel -->
+                <div class="je-tab-panel je-tab-active" id="je-tab-np-rooms" style="display:flex; flex-direction:column; gap:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="je-section-title" style="margin:0;">Public &amp; Private Rooms</span>
+                        <button class="je-btn" id="je-np-refresh-btn" style="padding:4px 10px; font-size:12px;">Refresh</button>
+                    </div>
+                    <div id="je-np-rooms-list" class="je-netplay-room-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Tab Host Panel -->
+                <div class="je-tab-panel" id="je-tab-np-host" style="display:none; flex-direction:column; gap:12px;">
+                    <div class="je-section-title" style="margin-top:0;">Host a Netplay Room</div>
+                    <div class="je-setting">
+                        <span class="je-setting-label">Room Name</span>
+                        <input type="text" id="je-np-host-roomname" placeholder="My Game Room" maxlength="32"
+                            style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 10px;color:#fff;font-size:13px;width:200px;">
+                    </div>
+                    <div class="je-setting">
+                        <span class="je-setting-label">Max Players</span>
+                        <select id="je-np-host-max">
+                            <option value="2">2 Players</option>
+                            <option value="3">3 Players</option>
+                            <option value="4">4 Players</option>
+                        </select>
+                    </div>
+                    <div class="je-setting">
+                        <span class="je-setting-label">Room Password (Optional)</span>
+                        <input type="password" id="je-np-host-password" placeholder="Leave blank for public room"
+                            style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 10px;color:#fff;font-size:13px;width:200px;">
+                    </div>
+                    <div style="margin-top:8px;">
+                        <button class="je-btn je-btn-primary" id="je-np-create-btn" style="width:100%;">Create &amp; Host Room</button>
+                    </div>
+                </div>
+
+                <!-- Tab Session Panel -->
+                <div class="je-tab-panel" id="je-tab-np-session" style="display:none; flex-direction:column; gap:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div class="je-section-title" id="je-np-sess-name" style="margin:0;">Multiplayer Match</div>
+                            <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
+                                <small id="je-np-sess-id" style="color:#aaa; font-family:monospace;"></small>
+                                <span id="je-np-sess-password" class="je-badge" style="display:none; font-size:11px; background:rgba(245,166,35,0.15); color:#f5a623;"></span>
+                            </div>
+                        </div>
+                        <button class="je-btn je-btn-danger" id="je-np-leave-btn" style="padding:4px 12px; font-size:12px;">Leave Room</button>
+                    </div>
+
+                    <div class="je-section-title" style="margin-top:6px;">Connected Players</div>
+                    <div id="je-np-players-list" class="je-netplay-player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <div id="je-np-host-controls" style="display:none; flex-direction:column; gap:8px; margin-top:8px;">
+                        <div class="je-section-title" style="margin:0;">Host Controls</div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="je-btn" id="je-np-sync-btn" style="flex:1;" title="Refresh WebRTC video stream if stalled">Refresh Stream</button>
+                            <button class="je-btn" id="je-np-restart-btn" style="flex:1;">Restart Game</button>
+                        </div>
+                    </div>
+
+                    <div class="je-section-title" style="margin-top:6px;">In-Game Chat</div>
+                    <div id="je-np-chat-messages">
+                        <div style="color:#888; font-style:italic; font-size:11px;">Say hello to the room!</div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <input type="text" id="je-np-chat-input" placeholder="Type a message..." maxlength="300" autocomplete="off"
+                            style="flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:7px 12px; color:#fff; font-size:13px; outline:none;">
+                        <button id="je-np-chat-send" class="je-btn je-btn-primary" style="padding:7px 16px; font-size:13px; white-space:nowrap;">Send</button>
+                    </div>
+                </div>
+
+                <!-- Tab Settings Panel -->
+                <div class="je-tab-panel" id="je-tab-np-settings" style="display:none; flex-direction:column; gap:12px;">
+                    <div class="je-section-title" style="margin-top:0;">Player Profile</div>
+                    <div class="je-setting">
+                        <span class="je-setting-label">Display Nickname</span>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="je-np-player-name" placeholder="Player" maxlength="20"
+                                style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 10px;color:#fff;font-size:13px;width:180px;">
+                            <button class="je-btn je-btn-primary" id="je-np-save-name-btn" style="padding:6px 12px; font-size:12px;">Save Nickname</button>
+                        </div>
+                    </div>
+                    <div class="je-section-title" style="margin-top:8px;">Stream Quality &amp; Bandwidth</div>
+                    <div class="je-setting" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="je-setting-label">Video Streaming Quality</span>
+                            <div style="font-size:11px; opacity:0.6; margin-top:2px;">WebRTC bitrate &amp; rate control profile</div>
+                        </div>
+                        <select id="je-np-quality-preset" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 10px;color:#fff;font-size:12px;outline:none;cursor:pointer;">
+                            <option value="low">Low (Canvas 480p - Low Bandwidth)</option>
+                            <option value="balanced">Balanced (Canvas 720p - Standard)</option>
+                            <option value="high" selected>High (Canvas 1:1 - Best Quality)</option>
+                        </select>
+                    </div>
+                    <div class="je-section-title" style="margin-top:8px;">Netplay Server &amp; Session Info</div>
+                    <div class="je-setting" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="je-setting-label">Relay Server Latency</span>
+                        <code id="je-np-server-display" style="color:#81c784; font-size:12px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px;"></code>
+                    </div>
+                    <div class="je-setting" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="je-setting-label">Room Filter Game ID</span>
+                        <code id="je-np-gameid-display" style="color:#aaa; font-size:12px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px;"></code>
+                    </div>
+                    <div class="je-setting" style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:6px;">
+                        <span class="je-setting-label" style="margin-top:2px;">STUN / ICE Servers</span>
+                        <pre id="je-np-ice-display" style="color:#64b5f6; font-size:11px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px; margin:0; max-height:60px; overflow-y:auto; text-align:right; white-space:pre-wrap; word-break:break-all; max-width:60%; font-family:monospace;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div id="je-fps"></div>
     <div id="game"></div>
     <script id="je-available-cores-json" type="application/json">{{ available_cores_json }}</script>
@@ -451,6 +586,10 @@
                 activeSlot: {{ active_slot }},
                 isM3u: {{ is_m3u }},
                 token: token,
+                hasNetplay: {{ has_netplay }},
+                netplayServer: '{{ netplay_server }}',
+                netplayIceServers: {{ netplay_ice_servers_json }},
+                gameId: {{ game_id }},
                 virtualGamepad: '{{ virtual_gamepad }}',
                 virtualGamepadLefty: '{{ virtual_gamepad_lefty }}',
                 platformTag: '{{ platform_tag }}',
@@ -763,6 +902,7 @@
 
             // Refocus game on any click on the game area or after dock button press
             document.getElementById('game').addEventListener('mousedown', function () {
+                if (window._jePopupOpen) return;
                 setTimeout(refocusGame, 50);
             });
             // Dock buttons: refocus game after each click (unless a popup opened)
@@ -885,9 +1025,23 @@
                     if (gp) gp.focus();
                 }
             }
-            window.addEventListener('click', function () {
+            window.addEventListener('click', function (e) {
+                if (window._jePopupOpen) return;
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
                 try { window.focus(); } catch (e) {}
             });
+
+            // Prevent keystrokes in any input fields from bubbling to Emscripten/game engine
+            document.addEventListener('keydown', function (e) {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+                    e.stopPropagation();
+                }
+            }, false);
+            document.addEventListener('keyup', function (e) {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+                    e.stopPropagation();
+                }
+            }, false);
 
             // Server sync for controls & settings
             var _syncTimer = null;
@@ -931,6 +1085,9 @@
 
             // Exit button
             document.getElementById('je-exit-btn').addEventListener('click', function () {
+                if (window.JellyEmuNetplay && typeof window.JellyEmuNetplay.dispose === 'function') {
+                    window.JellyEmuNetplay.dispose();
+                }
                 if (window.EJS_onExit) { EJS_onExit(); }
                 else if (window.opener) { window.close(); }
                 else { window.parent.postMessage('close-jellyemu', '*'); }
@@ -1055,11 +1212,16 @@
                 if (typeof window._jeResumeSessionTracking === 'function') window._jeResumeSessionTracking();
             });
 
-            // Auto-Pause (Reduces battery & CPU usage when tab is hidden)
+            // Auto-Pause (Reduces battery & CPU usage when tab is hidden, unless hosting Netplay)
             var _autoPausedByBackground = false;
             document.addEventListener('visibilitychange', function () {
                 var e = emu();
                 if (!e || !e.started) return;
+
+                // Never auto-pause in background if active in Netplay (especially when hosting)
+                var isNetplayActive = (e.isNetplay && e.netplay) || (window.JellyEmuNetplay && window.JellyEmuNetplay.inRoom);
+                var isHosting = isNetplayActive && ((e.netplay && e.netplay.owner) || (window.JellyEmuNetplay && window.JellyEmuNetplay.isHost));
+                if (isHosting || isNetplayActive) return;
 
                 if (document.hidden) {
                     if (!e.paused) {
@@ -1402,6 +1564,7 @@
         window.EJS_gameName = '{{ game_name }}';
         window.EJS_pathtodata = '{{ ejs_base }}/';
         window.EJS_startOnLoaded = true;
+        window.EJS_startOnLoad = true;
         window.EJS_askBeforeExit = true;
         window.EJS_color = '#00a4dc';
 
@@ -1446,20 +1609,12 @@
 
         {{ if igdb_id && igdb_id != "" }}
         window.EJS_gameID = {{ igdb_id }};
+        {{ else }}
+        window.EJS_gameID = {{ game_id }};
         {{ end }}
 
-        // EJS_cheats not injected at startup — loaded lazily client-side on cheat popup open
-        {{ if has_netplay }}
         window.EJS_netplayServer = '{{ netplay_server }}';
-        window.EJS_netplayICEServers = [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun.nextcloud.com:3478' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
-        ];
-        {{ end }}
+        window.EJS_netplayICEServers = {{ netplay_ice_servers_json }};
 
         {{ if save_exists }}
         window.EJS_loadStateURL = '{{ save_get_url }}';
@@ -1686,6 +1841,9 @@
                 : Promise.resolve();
 
             function closeIframe() {
+                if (window.JellyEmuNetplay && typeof window.JellyEmuNetplay.dispose === 'function') {
+                    window.JellyEmuNetplay.dispose();
+                }
                 if (window.parent === window) {
                     try { var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); } catch (e) { }
                     window.close();
@@ -1727,6 +1885,7 @@
     <script src="/jellyemu/assets/ejs.save.js?v={{ version }}"></script>
     <script src="/jellyemu/assets/ejs.setting.js?v={{ version }}"></script>
     <script src="/jellyemu/assets/ejs.xr.js?v={{ version }}"></script>
+    <script src="/jellyemu/assets/ejs.netplay.js?v={{ version }}"></script>
     <script src="{{ ejs_base }}/loader.js"></script>
     <script>
         window.addEventListener('load', function () {

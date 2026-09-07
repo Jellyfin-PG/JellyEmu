@@ -104,6 +104,19 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the netplay embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.netplay.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.netplay.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult NetplayJs()
+        {
+            return ServeEmbeddedJs("ejs.netplay.js");
+        }
+
+        /// <summary>
         /// Serves the stylesheet embedded CSS resource.
         /// Path: GET /jellyemu/assets/ejs.style.css
         /// </summary>
