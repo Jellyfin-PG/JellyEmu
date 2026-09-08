@@ -137,7 +137,7 @@
                     var sep = locPath.indexOf('\\') >= 0 ? '\\' : '/';
                     var opt = document.createElement('option');
                     opt.value = locPath + sep + 'JellyEmu';
-                    opt.textContent = folder.Name + ' (' + locPath + ')';
+                    opt.textContent = folder.Name + ' (' + opt.value + ')';
                     if (selectedPath && opt.value === selectedPath) {
                         opt.selected = true;
                         matched = true;

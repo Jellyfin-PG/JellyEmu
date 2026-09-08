@@ -547,7 +547,15 @@ namespace JellyEmu.Controllers
                     return BadRequest("Invalid game name for screenshot folder.");
 
                 Directory.CreateDirectory(gameDir);
-                var fullPath = Path.Join(gameDir, $"{safeName} {DateTime.Now:yyyy-MM-dd HH-mm-ss-fff}{ext}");
+                var stamp = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture);
+                var seq = 1;
+                string fullPath;
+                do
+                {
+                    fullPath = Path.Join(gameDir, $"{stamp} {safeName} {seq:D3}{ext}");
+                    seq++;
+                }
+                while (System.IO.File.Exists(fullPath));
                 await System.IO.File.WriteAllBytesAsync(fullPath, bytes).ConfigureAwait(false);
 
                 Logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} to {Path}",
