@@ -272,7 +272,8 @@ namespace JellyEmu.Tests
                 scale = "fit",
                 volume = "1",
                 mute = "0",
-                version = "0.8.8"
+                version = "0.8.8",
+                screenshots_to_library = false
             });
 
             Assert.NotNull(rendered);

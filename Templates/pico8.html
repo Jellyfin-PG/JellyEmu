@@ -308,10 +308,27 @@
                 ctx.imageSmoothingEnabled = false;
                 ctx.drawImage(canvas, 0, 0, offscreen.width, offscreen.height);
                 var s = offscreen.toDataURL('image/jpeg', 0.88);
-                var a = document.createElement('a');
-                a.href = s;
-                a.download = '{{ game_name }}'.replace(/[^a-z0-9]/gi, '_') + '.png';
-                a.click();
+                if ({{ screenshots_to_library }}) {
+                    var token = '';
+                    try {
+                        var creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
+                        var server = (creds.Servers || []).find(function (sv) { return sv.AccessToken; });
+                        token = (server && server.AccessToken) || '';
+                    } catch (e) { }
+                    fetch('/jellyemu/screenshot/{{ item_id }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'MediaBrowser Token="' + token + '"'
+                        },
+                        body: JSON.stringify({ dataUrl: s })
+                    }).catch(function (err) { console.warn('[JellyEmu] Screenshot upload failed:', err); });
+                } else {
+                    var a = document.createElement('a');
+                    a.href = s;
+                    a.download = '{{ game_name }}'.replace(/[^a-z0-9]/gi, '_') + '.png';
+                    a.click();
+                }
             }
         } catch(e) { console.warn('[JellyEmu] Screenshot capture failed:', e); }
     }

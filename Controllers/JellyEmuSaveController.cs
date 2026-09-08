@@ -499,6 +499,80 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Saves a captured screenshot into the configured screenshots folder, under a
+        /// per-game subfolder so picture libraries group them as albums.
+        /// Body: { "dataUrl": "data:image/png;base64,..." }
+        /// Path: POST /jellyemu/screenshot/{itemId}
+        /// </summary>
+        [HttpPost("/jellyemu/screenshot/{itemId}")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> PostLibraryScreenshot(string itemId)
+        {
+            if (!IsValidId(itemId))
+                return BadRequest("Invalid item ID.");
+
+            var folder = Plugin.Instance?.Configuration?.ScreenshotsFolder;
+            if (string.IsNullOrWhiteSpace(folder))
+                return NotFound("No screenshots folder is configured.");
+
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null)
+                return NotFound();
+
+            try
+            {
+                using var reader = new StreamReader(Request.Body);
+                var body = await reader.ReadToEndAsync().ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(body);
+                var dataUrl = doc.RootElement.TryGetProperty("dataUrl", out var d)
+                    ? d.GetString() ?? string.Empty : string.Empty;
+
+                string ext;
+                if (dataUrl.StartsWith("data:image/png;base64,", StringComparison.Ordinal)) ext = ".png";
+                else if (dataUrl.StartsWith("data:image/jpeg;base64,", StringComparison.Ordinal)) ext = ".jpg";
+                else if (dataUrl.StartsWith("data:image/webp;base64,", StringComparison.Ordinal)) ext = ".webp";
+                else return BadRequest("Body must contain a valid image dataUrl.");
+
+                var bytes = Convert.FromBase64String(dataUrl[(dataUrl.IndexOf(',') + 1)..]);
+                if (bytes.Length == 0 || bytes.Length > 20 * 1024 * 1024)
+                    return BadRequest("Screenshot image is empty or too large.");
+
+                var safeName = GetSafeScreenshotName(item.Name, itemId);
+                var root = Path.GetFullPath(folder);
+                var gameDir = Path.GetFullPath(Path.Join(root, safeName));
+                if (!gameDir.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                    return BadRequest("Invalid game name for screenshot folder.");
+
+                Directory.CreateDirectory(gameDir);
+                var fullPath = Path.Join(gameDir, $"{safeName} {DateTime.Now:yyyy-MM-dd HH-mm-ss-fff}{ext}");
+                await System.IO.File.WriteAllBytesAsync(fullPath, bytes).ConfigureAwait(false);
+
+                Logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} to {Path}",
+                    SanitizeForLog(itemId), fullPath);
+                return Ok(new { saved = true });
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or FormatException)
+            {
+                Logger.LogWarning(ex, "Failed to save library screenshot for item {ItemId}", SanitizeForLog(itemId));
+                return BadRequest("Could not save image data.");
+            }
+        }
+
+        /// <summary>
+        /// Turns a game name into a filesystem-safe folder/file name, falling back to the
+        /// item id when nothing safe remains.
+        /// </summary>
+        internal static string GetSafeScreenshotName(string? gameName, string itemId)
+        {
+            var safeName = string.Concat((gameName ?? string.Empty)
+                .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries)).Trim();
+            return safeName.Length == 0 || safeName.All(c => c == '.') ? itemId : safeName;
+        }
+
+        /// <summary>
         /// Returns 200 if SRAM data exists for the given user/item/slot, 404 otherwise.
         /// Path: HEAD /jellyemu/sram/{itemId}/{userId}
         /// Path: HEAD /jellyemu/sram/{itemId}/{userId}/{slot}

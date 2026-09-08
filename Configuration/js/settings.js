@@ -258,7 +258,9 @@
             if (feedUrl) feedUrl.value = config.MarketplaceFeedUrl || '';
             var bPath = page.querySelector('#biosPath');
             if (bPath) bPath.value = config.BiosPath || '';
-            
+            var shotsFolder = page.querySelector('#screenshotsFolder');
+            if (shotsFolder) shotsFolder.value = config.ScreenshotsFolder || '';
+
             loadLibraryFolders(config.GamesLibraryPath || '');
             loadBiosList(page);
         }).catch(function (err) {
@@ -330,7 +332,9 @@
             if (feedUrl) config.MarketplaceFeedUrl = feedUrl.value.trim();
             var bPath = page.querySelector('#biosPath');
             if (bPath) config.BiosPath = bPath.value.trim();
-            
+            var shotsFolder = page.querySelector('#screenshotsFolder');
+            if (shotsFolder) config.ScreenshotsFolder = shotsFolder.value.trim();
+
             return ApiClient.updatePluginConfiguration(pluginId, config);
         }).then(function (result) {
             if (window.Dashboard && typeof window.Dashboard.processPluginConfigurationUpdateResult === 'function') {
