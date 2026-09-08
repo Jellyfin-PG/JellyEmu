@@ -548,14 +548,9 @@ namespace JellyEmu.Controllers
 
                 Directory.CreateDirectory(gameDir);
                 var stamp = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture);
-                var seq = 1;
-                string fullPath;
-                do
-                {
-                    fullPath = Path.Join(gameDir, $"{stamp} {safeName} {seq:D3}{ext}");
-                    seq++;
-                }
-                while (System.IO.File.Exists(fullPath));
+                var fullPath = Path.Join(gameDir, stamp + ext);
+                for (var seq = 2; System.IO.File.Exists(fullPath); seq++)
+                    fullPath = Path.Join(gameDir, $"{stamp} {seq:D3}{ext}");
                 await System.IO.File.WriteAllBytesAsync(fullPath, bytes).ConfigureAwait(false);
 
                 Logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} to {Path}",
