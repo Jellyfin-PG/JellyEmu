@@ -553,8 +553,6 @@ namespace JellyEmu.Controllers
                     fullPath = Path.Join(gameDir, $"{stamp} {seq:D3}{ext}");
                 await System.IO.File.WriteAllBytesAsync(fullPath, bytes).ConfigureAwait(false);
 
-                Logger.LogInformation("[JellyEmu] Saved screenshot for item {ItemId} to {Path}",
-                    SanitizeForLog(itemId), fullPath);
                 return Ok(new { saved = true });
             }
             catch (Exception ex) when (ex is IOException or JsonException or FormatException)
