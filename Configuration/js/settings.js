@@ -71,31 +71,35 @@
         btn.classList.toggle('je-on', !!val);
     }
 
-    function loadLibraryFolders(selectedPath) {
+    function populateFolderSelect(selectId, selectedPath, opts) {
         var page = document.querySelector('#JellyEmuConfigPage');
         if (!page) return;
-        var selectEl = page.querySelector('#gamesLibraryPath');
+        var selectEl = page.querySelector(selectId);
         if (!selectEl) return;
-        
+
         selectEl.innerHTML = '<option value="">Loading libraries...</option>';
 
         ApiClient.getVirtualFolders().then(function (folders) {
             selectEl.innerHTML = '';
-            
+
             var defaultOpt = document.createElement('option');
             defaultOpt.value = '';
-            defaultOpt.textContent = '-- Select a Library Folder --';
+            defaultOpt.textContent = opts.defaultLabel;
             selectEl.appendChild(defaultOpt);
 
             var count = 0;
-            (folders || []).forEach(function (folder) {
+            var matched = !selectedPath;
+            (folders || []).filter(function (folder) {
+                return !opts.collectionType || folder.CollectionType === opts.collectionType;
+            }).forEach(function (folder) {
                 (folder.Locations || []).forEach(function (locPath) {
                     count++;
                     var opt = document.createElement('option');
-                    opt.value = locPath;
-                    opt.textContent = folder.Name + ' (' + locPath + ')';
-                    if (selectedPath && locPath === selectedPath) {
+                    opt.value = opts.mapValue ? opts.mapValue(locPath) : locPath;
+                    opt.textContent = folder.Name + ' (' + opt.value + ')';
+                    if (selectedPath && opt.value === selectedPath) {
                         opt.selected = true;
+                        matched = true;
                     }
                     selectEl.appendChild(opt);
                 });
@@ -107,44 +111,6 @@
                 noOpt.textContent = 'No media folders found';
                 selectEl.appendChild(noOpt);
             }
-        }).catch(function (err) {
-            console.error('[JellyEmu] Failed to load library folders:', err);
-            selectEl.innerHTML = '<option value="">Failed to load library folders</option>';
-        });
-    }
-
-    function loadScreenshotFolders(selectedPath) {
-        var page = document.querySelector('#JellyEmuConfigPage');
-        if (!page) return;
-        var selectEl = page.querySelector('#screenshotsFolder');
-        if (!selectEl) return;
-
-        selectEl.innerHTML = '<option value="">Loading libraries...</option>';
-
-        ApiClient.getVirtualFolders().then(function (folders) {
-            selectEl.innerHTML = '';
-
-            var defaultOpt = document.createElement('option');
-            defaultOpt.value = '';
-            defaultOpt.textContent = '-- Download in browser --';
-            selectEl.appendChild(defaultOpt);
-
-            var matched = !selectedPath;
-            (folders || []).filter(function (folder) {
-                return folder.CollectionType === 'homevideos';
-            }).forEach(function (folder) {
-                (folder.Locations || []).forEach(function (locPath) {
-                    var sep = locPath.indexOf('\\') >= 0 ? '\\' : '/';
-                    var opt = document.createElement('option');
-                    opt.value = locPath + sep + 'JellyEmu';
-                    opt.textContent = folder.Name + ' (' + opt.value + ')';
-                    if (selectedPath && opt.value === selectedPath) {
-                        opt.selected = true;
-                        matched = true;
-                    }
-                    selectEl.appendChild(opt);
-                });
-            });
 
             // Keep a previously configured path (e.g. set before a library was
             // removed or renamed) selectable so saving doesn't silently clear it.
@@ -156,8 +122,25 @@
                 selectEl.appendChild(customOpt);
             }
         }).catch(function (err) {
-            console.error('[JellyEmu] Failed to load Photos libraries:', err);
-            selectEl.innerHTML = '<option value="">Failed to load Photos libraries</option>';
+            console.error('[JellyEmu] Failed to load library folders:', err);
+            selectEl.innerHTML = '<option value="">Failed to load library folders</option>';
+        });
+    }
+
+    function loadLibraryFolders(selectedPath) {
+        populateFolderSelect('#gamesLibraryPath', selectedPath, {
+            defaultLabel: '-- Select a Library Folder --'
+        });
+    }
+
+    function loadScreenshotFolders(selectedPath) {
+        populateFolderSelect('#screenshotsFolder', selectedPath, {
+            collectionType: 'homevideos',
+            defaultLabel: '-- Download in browser --',
+            mapValue: function (locPath) {
+                var sep = locPath.indexOf('\\') >= 0 ? '\\' : '/';
+                return locPath + sep + 'JellyEmu';
+            }
         });
     }
 
