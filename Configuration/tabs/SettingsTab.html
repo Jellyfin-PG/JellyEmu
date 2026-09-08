@@ -287,11 +287,11 @@
             <div class="verticalSection">
                 <h4 style="margin: 0 0 6px 0; font-size: 1.05em; font-weight: 600; color: #fff;">Screenshots Folder</h4>
                 <p style="color: #aaa; margin-bottom: 1em; font-size: 0.9em; line-height: 1.4;">
-                    Folder where in-game screenshots are saved, grouped in a subfolder per game. Point it at a Jellyfin picture library to browse screenshots directly in Jellyfin. Leave empty to download screenshots in the browser instead.
+                    Save in-game screenshots to a Jellyfin Photos library, in a <code>JellyEmu</code> subfolder grouped per game, so they can be browsed directly in Jellyfin. Select "Download in browser" to keep the default download behaviour.
                 </p>
                 <div class="inputContainer" style="margin-bottom: 1.2em;">
-                    <label class="inputLabel inputLabelUnfocused" for="screenshotsFolder">Screenshots Folder Path</label>
-                    <input id="screenshotsFolder" type="text" class="emby-input" placeholder="Leave empty to download screenshots in the browser" autocomplete="off" />
+                    <label class="selectLabel" for="screenshotsFolder">Select Jellyfin Photos Library</label>
+                    <select id="screenshotsFolder" class="emby-select" style="width:100%; box-sizing:border-box; background: #000000 !important; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 10px; color: #fff;"></select>
                 </div>
             </div>
 

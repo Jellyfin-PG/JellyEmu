@@ -113,6 +113,54 @@
         });
     }
 
+    function loadScreenshotFolders(selectedPath) {
+        var page = document.querySelector('#JellyEmuConfigPage');
+        if (!page) return;
+        var selectEl = page.querySelector('#screenshotsFolder');
+        if (!selectEl) return;
+
+        selectEl.innerHTML = '<option value="">Loading libraries...</option>';
+
+        ApiClient.getVirtualFolders().then(function (folders) {
+            selectEl.innerHTML = '';
+
+            var defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- Download in browser --';
+            selectEl.appendChild(defaultOpt);
+
+            var matched = !selectedPath;
+            (folders || []).filter(function (folder) {
+                return folder.CollectionType === 'homevideos';
+            }).forEach(function (folder) {
+                (folder.Locations || []).forEach(function (locPath) {
+                    var sep = locPath.indexOf('\\') >= 0 ? '\\' : '/';
+                    var opt = document.createElement('option');
+                    opt.value = locPath + sep + 'JellyEmu';
+                    opt.textContent = folder.Name + ' (' + locPath + ')';
+                    if (selectedPath && opt.value === selectedPath) {
+                        opt.selected = true;
+                        matched = true;
+                    }
+                    selectEl.appendChild(opt);
+                });
+            });
+
+            // Keep a previously configured path (e.g. set before a library was
+            // removed or renamed) selectable so saving doesn't silently clear it.
+            if (!matched) {
+                var customOpt = document.createElement('option');
+                customOpt.value = selectedPath;
+                customOpt.textContent = 'Current: ' + selectedPath;
+                customOpt.selected = true;
+                selectEl.appendChild(customOpt);
+            }
+        }).catch(function (err) {
+            console.error('[JellyEmu] Failed to load Photos libraries:', err);
+            selectEl.innerHTML = '<option value="">Failed to load Photos libraries</option>';
+        });
+    }
+
     function loadBiosList(page) {
         var folderEl = page.querySelector('#biosFolderDisplay');
         var containerEl = page.querySelector('#biosListContainer');
@@ -258,9 +306,7 @@
             if (feedUrl) feedUrl.value = config.MarketplaceFeedUrl || '';
             var bPath = page.querySelector('#biosPath');
             if (bPath) bPath.value = config.BiosPath || '';
-            var shotsFolder = page.querySelector('#screenshotsFolder');
-            if (shotsFolder) shotsFolder.value = config.ScreenshotsFolder || '';
-
+            loadScreenshotFolders(config.ScreenshotsFolder || '');
             loadLibraryFolders(config.GamesLibraryPath || '');
             loadBiosList(page);
         }).catch(function (err) {
