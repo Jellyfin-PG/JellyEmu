@@ -135,6 +135,12 @@ namespace JellyEmu
         public string GamesLibraryPath { get; set; } = string.Empty;
 
         /// <summary>
+        /// Folder path where in-game screenshots are saved, e.g. a Jellyfin picture library.
+        /// When empty, screenshots download in the browser instead.
+        /// </summary>
+        public string ScreenshotsFolder { get; set; } = string.Empty;
+
+        /// <summary>
         /// Whether to use the Loom plugin for UI injection instead of standard file transformation.
         /// </summary>
         public bool UseLoomInjector { get; set; } = false;
