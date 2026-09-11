@@ -361,6 +361,7 @@ namespace JellyEmu.Tests
                     {
                         var normalized = attr.Template.TrimStart('/');
                         methodTemplates.Add(normalized);
+                        Assert.True(allTemplates.Add(normalized), $"Duplicate route template across controller methods: {normalized}");
                     }
                 }
 
@@ -371,6 +372,7 @@ namespace JellyEmu.Tests
                     {
                         var normalized = attr.Template.TrimStart('/');
                         methodTemplates.Add(normalized);
+                        Assert.True(allTemplates.Add(normalized), $"Duplicate route template across controller methods: {normalized}");
                     }
                 }
 

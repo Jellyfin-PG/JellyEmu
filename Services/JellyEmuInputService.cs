@@ -37,7 +37,8 @@ namespace JellyEmu.Services
             new() { Id = 26, Label = "CHANGE SLOT", Description = "Cycle active save state slot" },
             new() { Id = 27, Label = "FAST FORWARD", Description = "Toggle fast forward emulation" },
             new() { Id = 28, Label = "REWIND", Description = "Rewind gameplay in real time" },
-            new() { Id = 29, Label = "SLOW MOTION", Description = "Toggle slow motion gameplay" }
+            new() { Id = 29, Label = "SLOW MOTION", Description = "Toggle slow motion gameplay" },
+            new() { Id = 30, Label = "EXIT GAME", Description = "Exit emulation and return to Jellyfin" }
         };
 
         private static readonly Dictionary<int, InputBindingDefault> BaseDefaultBindings = new()
@@ -71,7 +72,8 @@ namespace JellyEmu.Services
             { 26, new() { Kb1 = 51,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
             { 27, new() { Kb1 = 107, Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
             { 28, new() { Kb1 = 32,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
-            { 29, new() { Kb1 = 109, Kb2 = 0, Gp1 = "",                      Gp2 = "" } }
+            { 29, new() { Kb1 = 109, Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
+            { 30, new() { Kb1 = 27,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } }
         };
 
         private static readonly Dictionary<string, Dictionary<int, InputBindingDefault>> SchemeDefaultOverrides =
