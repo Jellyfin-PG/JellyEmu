@@ -53,7 +53,17 @@
 
         const toast = document.createElement('div');
         toast.className = 'je-toast';
-        toast.innerHTML = `<span class="material-icons" style="font-size:18px">check_circle</span> ${msg}`;
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'material-icons';
+        iconSpan.style.cssText = 'font-size:18px';
+        iconSpan.textContent = 'check_circle';
+
+        const msgSpan = document.createElement('span');
+        msgSpan.textContent = msg || '';
+
+        toast.appendChild(iconSpan);
+        toast.appendChild(document.createTextNode(' '));
+        toast.appendChild(msgSpan);
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }

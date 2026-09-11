@@ -33,7 +33,7 @@
         }
         toast.style.background = isError ? 'rgba(211, 47, 47, 0.95)' : 'rgba(46, 125, 50, 0.95)';
         toast.style.border = isError ? '1px solid #ef5350' : '1px solid #66bb6a';
-        toast.innerHTML = (isError ? '&#10006; ' : '&#10004; ') + msg;
+        toast.textContent = (isError ? '\u2716 ' : '\u2714 ') + (msg || '');
         toast.style.opacity = '1';
         toast.style.transform = 'translateY(0)';
 

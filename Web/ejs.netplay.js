@@ -177,7 +177,16 @@
             var toast = document.createElement('div');
             toast.id = 'je-netplay-toast';
             toast.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:rgba(20,22,30,0.92);color:#fff;padding:8px 16px;border-radius:20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;display:flex;align-items:center;gap:8px;z-index:999999;box-shadow:0 4px 16px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(8px);pointer-events:none;transition:opacity 0.3s ease;';
-            toast.innerHTML = '<span class="material-icons" style="font-size:16px;color:#00a4dc;">' + (icon || 'sync') + '</span> <span>' + msg + '</span>';
+            var iconSpan = document.createElement('span');
+            iconSpan.className = 'material-icons';
+            iconSpan.style.cssText = 'font-size:16px;color:#00a4dc;';
+            iconSpan.textContent = icon || 'sync';
+
+            var msgSpan = document.createElement('span');
+            msgSpan.textContent = msg || '';
+
+            toast.appendChild(iconSpan);
+            toast.appendChild(msgSpan);
             document.body.appendChild(toast);
             setTimeout(function () {
                 if (toast && toast.parentNode) {
