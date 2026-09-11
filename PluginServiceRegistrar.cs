@@ -41,6 +41,9 @@ namespace JellyEmu
             serviceCollection.AddSingleton<JellyEmuCacheService>();
             serviceCollection.AddSingleton<JellyEmuFileService>();
             serviceCollection.AddSingleton<ScreenScraperService>();
+            serviceCollection.AddSingleton<JellyEmuNetplayService>();
+            serviceCollection.AddHostedService(sp => sp.GetRequiredService<JellyEmuNetplayService>());
+            serviceCollection.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter, NetplayStartupFilter>();
 
             serviceCollection.AddHostedService<JellyEmuInjectorService>();
         }

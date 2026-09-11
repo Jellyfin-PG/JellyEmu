@@ -90,41 +90,14 @@
             playUrl += (playUrl.indexOf('?') !== -1 ? '&' : '?') + 'slot=' + slot;
         }
 
-        // Romm sync-on-launch: pull if Romm has a newer save
-        if (userId) {
-            fetch('/jellyemu/romm/sync-on-launch/' + itemId + '/' + userId, { method: 'POST' })
-                .then(function(r) { return r.ok ? r.json() : null; })
-                .then(function(d) { if (d && d.pulled) JE.jeToast('\u2601 Loaded save from Romm (newer than local)'); })
-                .catch(function() {});
-        }
+        // Romm sync-on-launch: pull if Romm has a newer save before launching
+        var syncPromise = userId
+            ? fetch('/jellyemu/romm/sync-on-launch/' + itemId + '/' + userId, { method: 'POST' }).catch(function() {})
+            : Promise.resolve();
 
-        fetch('/jellyemu/core/' + itemId + (userId ? '?userId=' + userId : ''))
-            .then(function(r) { return r.ok ? r.json() : { needsThreads: false }; })
-            .catch(function() { return { needsThreads: false }; })
-            .then(function(info) {
-                if (info.needsThreads) {
-                    var gameTab = window.open(playUrl, '_blank');
-                    var jellyEmuChannel = new BroadcastChannel('jellyemu-exit');
-                    jellyEmuChannel.addEventListener('message', function(msg) {
-                        if (msg.data === 'close-jellyemu') {
-                            jellyEmuChannel.close();
-                            if (gameTab && !gameTab.closed) gameTab.close();
-                        }
-                    });
-                } else {
-                    var iframe = document.createElement('iframe');
-                    iframe.id = 'jellyemu-iframe';
-                    iframe.allow = 'autoplay; fullscreen; gamepad *; xr-spatial-tracking; microphone';
-                    iframe.tabIndex = 0;
-                    iframe.style = 'width:100vw; height:100vh; border:none; position:fixed; top:0; left:0; z-index:99999; background:#000;';
-                    iframe.src = playUrl;
-                    document.body.appendChild(iframe);
-                    document.body.style.overflow = 'hidden';
-                    setTimeout(function() {
-                        try { iframe.focus(); } catch (e) {}
-                    }, 100);
-                }
-            });
+        syncPromise.finally(function() {
+            window.location.href = playUrl;
+        });
     };
 
     JE.deleteSave = async function(itemId, slot) {

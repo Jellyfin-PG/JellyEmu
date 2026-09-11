@@ -48,17 +48,28 @@
     var panelStates  = document.getElementById('je-panel-states');
     var panelSram    = document.getElementById('je-panel-sram');
 
+    var statesBuilt = false;
+    var sramBuilt   = false;
+
     function setActiveTab(tab) {
         if (tab === 'states') {
             tabBtnStates.classList.add('je-tab-active');
             tabBtnSram.classList.remove('je-tab-active');
             panelStates.style.display = 'flex';
             panelSram.style.display = 'none';
+            if (!statesBuilt) {
+                statesBuilt = true;
+                buildSaveSlots();
+            }
         } else {
             tabBtnSram.classList.add('je-tab-active');
             tabBtnStates.classList.remove('je-tab-active');
             panelSram.style.display = 'flex';
             panelStates.style.display = 'none';
+            if (!sramBuilt) {
+                sramBuilt = true;
+                buildSramSlots();
+            }
         }
     }
 
@@ -293,9 +304,9 @@
 
     // Dock Save States button triggers our unified modal
     document.getElementById('je-btn-saves').addEventListener('click', function () {
+        statesBuilt = false;
+        sramBuilt = false;
         setActiveTab('states');
-        buildSaveSlots();
-        buildSramSlots();
         window._jeOpenPopup('je-pop-saves');
     });
 

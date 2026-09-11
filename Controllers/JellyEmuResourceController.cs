@@ -104,6 +104,33 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the netplay embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.netplay.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.netplay.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult NetplayJs()
+        {
+            return ServeEmbeddedJs("ejs.netplay.js");
+        }
+
+        /// <summary>
+        /// Serves the COI Service Worker resource with Service-Worker-Allowed header.
+        /// Path: GET /jellyemu/assets/coi-serviceworker.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/coi-serviceworker.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult CoiServiceWorkerJs()
+        {
+            Response.Headers["Service-Worker-Allowed"] = "/";
+            return ServeEmbeddedFile("Web.Injection.coi-serviceworker.js", "application/javascript; charset=utf-8");
+        }
+
+        /// <summary>
         /// Serves the stylesheet embedded CSS resource.
         /// Path: GET /jellyemu/assets/ejs.style.css
         /// </summary>
