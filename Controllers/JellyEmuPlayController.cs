@@ -106,7 +106,9 @@ namespace JellyEmu.Controllers
             var html = template.Render(new
             {
                 game_name = gameName,
-                cart_url = cartUrl
+                cart_url = cartUrl,
+                item_id = itemId,
+                screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder)
             });
 
             ApplyCrossOriginIsolationHeaders();
@@ -281,7 +283,8 @@ namespace JellyEmu.Controllers
                 scale = effectivePrefs.Scale,
                 volume = effectivePrefs.Volume ?? "1",
                 mute = effectivePrefs.Mute ?? "0",
-                version = JellyEmuVersion.Value
+                version = JellyEmuVersion.Value,
+                screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder)
             });
 
             // When opened as a new tab (threaded cores), these headers make the page

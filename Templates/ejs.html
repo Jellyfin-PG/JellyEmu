@@ -1497,33 +1497,49 @@
                 buildCheats();
             });
 
-            // Screenshot
-            document.getElementById('je-btn-screenshot').addEventListener('click', function () {
-                var dataUrl = _jeCaptureCanvas('image/png');
-                if (dataUrl && dataUrl.startsWith('data:image')) {
+            // Screenshot — uploads to the configured screenshots folder when set,
+            // otherwise downloads in the browser.
+            var _jeShotsToLibrary = {{ screenshots_to_library }};
+            function _jeSaveShotToLibrary(dataUrl) {
+                fetch('/jellyemu/screenshot/{{ item_id }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'MediaBrowser Token="' + (_jellyToken || '') + '"'
+                    },
+                    body: JSON.stringify({ dataUrl: dataUrl })
+                }).then(function (r) {
+                    if (!r.ok) throw new Error('Server rejected screenshot');
+                    var btn = document.getElementById('je-btn-screenshot');
+                    if (btn) {
+                        btn.style.filter = 'drop-shadow(0 0 6px #7f7)';
+                        setTimeout(function () { btn.style.filter = ''; }, 800);
+                    }
+                }).catch(function (err) { console.warn('[JellyEmu] Screenshot upload failed:', err); });
+            }
+            function _jeHandleShot(dataUrl) {
+                if (!dataUrl || !dataUrl.startsWith('data:image')) return;
+                if (_jeShotsToLibrary) {
+                    _jeSaveShotToLibrary(dataUrl);
+                } else {
                     var a = document.createElement('a');
                     a.href = dataUrl;
                     a.download = (window.EJS_gameName || 'screenshot') + '.png';
                     a.click();
-                    try {
-                        window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: dataUrl }, '*');
-                    } catch (ex) { }
-                    return;
                 }
+                try {
+                    window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: dataUrl }, '*');
+                } catch (ex) { }
+            }
+            document.getElementById('je-btn-screenshot').addEventListener('click', function () {
+                var dataUrl = _jeCaptureCanvas('image/png');
+                if (dataUrl && dataUrl.startsWith('data:image')) return _jeHandleShot(dataUrl);
 
                 var g = gm(); if (!g) return;
                 g.screenshot().then(function (pngBytes) {
-                    var blob = new Blob([pngBytes], { type: 'image/png' });
-                    var url = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
-                    a.href = url;
-                    a.download = (window.EJS_gameName || 'screenshot') + '.png';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    try {
-                        var s = window._jeCaptureCanvas();
-                        if (s) window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: s }, '*');
-                    } catch (ex) { }
+                    var fr = new FileReader();
+                    fr.onload = function () { _jeHandleShot(fr.result); };
+                    fr.readAsDataURL(new Blob([pngBytes], { type: 'image/png' }));
                 }).catch(function (err) { console.warn('[JellyEmu] Screenshot failed:', err); });
             });
 
