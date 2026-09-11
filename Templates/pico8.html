@@ -4,11 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ game_name }}</title>
+    <script src="/jellyemu/assets/coi-serviceworker.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; }
 
-        /* ── Loading Screen ── */
+        /* Loading Screen */
         #je-loader { position: fixed; inset: 0; z-index: 99999; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; transition: opacity .4s ease; }
         #je-loader.je-dismiss { opacity: 0; pointer-events: none; }
         #je-loader-title { font-size: 28px; font-weight: 700; text-align: center; padding: 0 20px; }
@@ -17,7 +18,7 @@
         @keyframes je-spin { to { transform: rotate(360deg); } }
         .je-loader-anim { position: relative; display: flex; align-items: center; justify-content: center; width: 90px; height: 90px; }
 
-        /* ── PICO-8 layout ── */
+        /* PICO-8 layout */
         #p8_frame_0 { display: table; width: 100%; height: 100%; background-color: #111; }
         #p8_frame { display: flex; width: 100%; height: 100%; margin: auto; }
         #p8_container { margin: auto; display: flex; }
@@ -33,13 +34,16 @@
             -ms-interpolation-mode: nearest-neighbor;
             border: 0px;
             cursor: none;
+            transform: translateZ(0);
+            will-change: transform;
+            backface-visibility: hidden;
         }
 
-        /* ── Shared Dock Styles ── */
+        /* Shared Dock Styles */
         .je-bar { position: fixed; z-index: 90000; transition: opacity .3s ease, transform .3s ease; }
         .je-bar.je-hidden { opacity: 0; pointer-events: none; }
 
-        /* ── Bottom Dock ── */
+        /* Bottom Dock */
         #je-dock { width: max-content; bottom: 16px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 28px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.1); }
         #je-dock.je-active { display: flex; }
         #je-dock.je-hidden { transform: translateX(-50%) translateY(20px); }
@@ -50,7 +54,7 @@
         .je-dockbtn.je-active { background: rgba(255,255,255,.2); }
         .je-dock-sep { width: 1px; height: 24px; background: rgba(255,255,255,.15); margin: 0 2px; flex-shrink: 0; }
 
-        /* ── Top Bar ── */
+        /* Top Bar*/
         .je-bar { position: fixed; left: 0; right: 0; z-index: 90000; display: flex; align-items: center; transition: opacity .3s; }
         #je-topbar { top: 0; height: 48px; justify-content: space-between; padding: 0 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); opacity: 0; pointer-events: none; }
         body:hover #je-topbar { opacity: 1; pointer-events: auto; }
@@ -60,12 +64,12 @@
         .je-topbtn:active { transform: scale(.93); }
         .je-topbtn svg { width: 20px; height: 20px; fill: currentColor; }
 
-        /* ── Hide Legacy Touch UI ── */
+        /* Hide Legacy Touch UI */
         #touch_controls_gfx, #touch_keyboard_gfx, #touch_controls_background {
             display: none !important;
         }
 
-        /* ── Custom Touch UI ── */
+        /* Custom Touch UI */
         #custom-touch-ui {
             position: fixed;
             bottom: 80px; /* Moved up slightly to clear the dock */
@@ -220,7 +224,11 @@
     function jeExit() {
         if (window.parent === window) {
             try { var ch = new BroadcastChannel('jellyemu-exit'); ch.postMessage('close-jellyemu'); ch.close(); } catch(e) {}
-            window.close();
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/web/#/details?id={{ item_id }}';
+            }
         } else {
             window.parent.postMessage('close-jellyemu', '*');
         }
