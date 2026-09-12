@@ -2,9 +2,7 @@
   <img src="assets/jellyemu.svg" alt="JellyEmu Logo" width="120" />
   <h1>JellyEmu</h1>
   <p>A plugin for jellyfin (10.11.x - 12) to import, manage, play and share your roms and pico-8 games with users.</p>
-  <p><sub>Now with Romm integration, pico-8, VR/AR, HomeAssistant, RetroArch, NetPlay, and Playnite support.</sub></p>
-  <p><sub>The <a href="https://github.com/Jellyfin-PG/JellyEmu-Playnite">Playnite Addon</a> to play platforms not supported in web.</sub></p>
-  <p><sub>The <a href="https://github.com/Jellyfin-PG/JellyEmu-HomeAssistant-Plugin">HomeAssistant Plugin</a> to manage and integrate with your library.</sub></p>
+  <p><sub>Now with Romm integration, pico-8, VR/AR, [HomeAssistant](https://github.com/Jellyfin-PG/JellyEmu-HomeAssistant-Plugin), RetroArch, NetPlay, and [Playnite](https://github.com/Jellyfin-PG/JellyEmu-Playnite) support.</sub></p>
 </div>
 
 <p align="center">
