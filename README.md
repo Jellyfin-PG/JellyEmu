@@ -66,6 +66,58 @@
 
 ---
 
+<div align="center">
+
+<h2>Documentation</h2>
+
+<table>
+<tr>
+<td align="center" width="25%">
+
+<a href="https://github.com/Jellyfin-PG/JellyEmu/wiki/Installation">
+<b>Installation</b>
+</a>
+
+<br>
+Install JellyEmu and its dependencies
+
+</td>
+
+<td align="center" width="25%">
+
+<a href="https://github.com/Jellyfin-PG/JellyEmu/wiki/Plugin-Library">
+<b>Plugin Library</b>
+</a>
+
+<br>
+Available plugins and configuration
+
+</td>
+
+<td align="center" width="25%">
+
+<a href="https://github.com/Jellyfin-PG/JellyEmu/wiki/RetroArch">
+<b>RetroArch</b>
+</a>
+
+<br>
+Configure RetroArch emulation
+</td>
+
+<td align="center" width="25%">
+
+<a href="https://github.com/Jellyfin-PG/JellyEmu/wiki">
+<b>Wiki</b>
+</a>
+
+<br>
+View all documentation
+
+</td>
+</tr>
+</table>
+</div>
+
 # JellyEmu Plugin Setup Guide
 
 This guide details the process for integrating an emulation collection into Jellyfin for metadata management and direct playback.
