@@ -85,12 +85,12 @@ Install JellyEmu and its dependencies
 
 <td align="center" width="25%">
 
-<a href="https://github.com/Jellyfin-PG/JellyEmu/wiki/Plugin-Library">
-<b>Plugin Library</b>
+<a href="https://github.com/Jellyfin-PG/JellyEmu/wiki/Plugin-Setup">
+<b>Plugin Setup</b>
 </a>
 
 <br>
-Available plugins and configuration
+Setup JellyEmu and Library
 
 </td>
 
