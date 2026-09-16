@@ -154,6 +154,36 @@ namespace JellyEmu.Tests
             }
         }
 
+        [Fact]
+        public void ResolveAllRomFiles_ReturnsAllFiles_ForDirectoryGamePackage()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            var subDir = Path.Combine(tempDir, "Data");
+            Directory.CreateDirectory(subDir);
+            try
+            {
+                var exe = Path.Combine(tempDir, "Skyrim.exe");
+                var ini = Path.Combine(tempDir, "INPUT.INI");
+                var dat = Path.Combine(subDir, "DATA01.DAT");
+                File.WriteAllText(exe, "exe content");
+                File.WriteAllText(ini, "ini content");
+                File.WriteAllText(dat, "dat content");
+
+                var appPaths = new MockAppPaths(tempDir);
+                var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+                var allFiles = service.ResolveAllRomFiles(tempDir);
+                Assert.Equal(3, allFiles.Count);
+                Assert.Contains(exe, allFiles);
+                Assert.Contains(ini, allFiles);
+                Assert.Contains(dat, allFiles);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
         [Theory]
         [InlineData("../evil")]
         [InlineData("../../windows")]

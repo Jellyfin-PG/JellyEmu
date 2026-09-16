@@ -40,13 +40,19 @@ namespace JellyEmu.Controllers
         [HttpHead("/jellyemu/rom/{itemId}/{filename?}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Rom(string itemId, string? filename = null, [FromQuery] string? userId = null)
+        public async Task<IActionResult> Rom(string itemId, string? filename = null, [FromQuery] string? userId = null)
         {
             var item = LibraryManager.GetItemById(itemId);
             if (item == null || string.IsNullOrEmpty(item.Path))
             {
                 Logger.LogWarning("[JellyEmu] Rom: item {ItemId} not found or path missing", itemId);
                 return NotFound();
+            }
+
+            if (Directory.Exists(item.Path))
+            {
+                await DownloadZip(itemId).ConfigureAwait(false);
+                return new EmptyResult();
             }
 
             var romPath = _fileService.ResolveActiveRomPath(item.Path, userId, itemId);
@@ -88,7 +94,12 @@ namespace JellyEmu.Controllers
                 return;
             }
 
-            var zipName = $"{Path.GetFileNameWithoutExtension(item.Path)}.zip";
+            var isDir = Directory.Exists(item.Path);
+            var baseDir = item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var zipName = isDir
+                ? $"{Path.GetFileName(baseDir)}.zip"
+                : $"{Path.GetFileNameWithoutExtension(item.Path)}.zip";
+
             Response.ContentType = "application/zip";
             Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Uri.EscapeDataString(zipName)}\"";
 
@@ -96,7 +107,10 @@ namespace JellyEmu.Controllers
             {
                 foreach (var filePath in filesToZip)
                 {
-                    var entryName = Path.GetFileName(filePath);
+                    var entryName = isDir
+                        ? Path.GetRelativePath(baseDir, filePath).Replace('\\', '/')
+                        : Path.GetFileName(filePath);
+
                     var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
                     using (var entryStream = entry.Open())
                     using (var fileStream = System.IO.File.OpenRead(filePath))

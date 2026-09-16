@@ -106,5 +106,56 @@ namespace JellyEmu.Tests
                 Directory.Delete(tempDir, true);
             }
         }
+
+        [Theory]
+        [InlineData("windows", "Skyrim")]
+        [InlineData("linux", "Celeste")]
+        [InlineData("macos", "StardewValley")]
+        [InlineData("android", "Minecraft")]
+        public void IsRomPath_ModernPlatformGameFolder_ShouldReturnTrue(string platformFolder, string gameFolder)
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), platformFolder, gameFolder);
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "Game.exe"), "dummy exe");
+                File.WriteAllText(Path.Combine(tempDir, "DATA01.DAT"), "dummy data");
+                File.WriteAllText(Path.Combine(tempDir, "INPUT.INI"), "dummy ini");
+
+                Assert.True(RomExtensions.IsRomPath(tempDir));
+            }
+            finally
+            {
+                var root = Path.GetDirectoryName(Path.GetDirectoryName(tempDir));
+                if (root != null && Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("windows")]
+        [InlineData("linux")]
+        [InlineData("macos")]
+        [InlineData("android")]
+        public void IsRomPath_PlatformCategoryFolderItself_ShouldReturnFalse(string platformFolder)
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), platformFolder);
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "somefile.txt"), "dummy");
+                Assert.False(RomExtensions.IsRomPath(tempDir));
+            }
+            finally
+            {
+                var root = Path.GetDirectoryName(tempDir);
+                if (root != null && Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
     }
 }
