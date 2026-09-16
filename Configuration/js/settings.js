@@ -150,90 +150,115 @@
         if (!containerEl) return;
         var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
 
-        ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-            fetch('/jellyemu/bios/list', {
-                headers: { 'Authorization': authHeader }
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (folderEl) folderEl.textContent = 'Folder: ' + (d.directory || d.Directory || 'Not found');
-                var items = d.items || d.Items || [];
-                if (items.length === 0) {
-                    containerEl.innerHTML = '<div style="color: #aaa; font-style: italic; padding: 6px 0;">No BIOS files detected. Place BIOS files (e.g. scph5501.bin, gba_bios.bin) in the folder above.</div>';
-                    return;
-                }
+        fetch('/jellyemu/bios/list', {
+            headers: { 'Authorization': authHeader }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (folderEl) folderEl.textContent = 'Folder: ' + (d.directory || d.Directory || 'Not found');
+            var items = d.items || d.Items || [];
+            if (items.length === 0) {
+                containerEl.innerHTML = '<div style="color: #aaa; font-style: italic; padding: 10px 0;">No BIOS files detected. Place BIOS files (e.g. scph5501.bin, gba_bios.bin) in the folder above.</div>';
+                return;
+            }
 
-                var systems = [
-                    { id: 'General', label: 'Auto-Detect / General' },
-                    { id: 'PlayStation', label: 'PlayStation (PS1)' },
-                    { id: 'Game Boy Advance', label: 'Game Boy Advance (GBA)' },
-                    { id: 'Nintendo DS', label: 'Nintendo DS (NDS)' },
-                    { id: 'NES', label: 'Famicom Disk System (NES)' },
-                    { id: 'Sega CD', label: 'Sega CD' },
-                    { id: 'Sega Saturn', label: 'Sega Saturn' },
-                    { id: 'Dreamcast', label: 'Dreamcast' },
-                    { id: 'Neo Geo', label: 'Neo Geo' },
-                    { id: 'Nintendo 3DS', label: 'Nintendo 3DS' }
-                ];
+            // Group by System
+            var groups = {};
+            items.forEach(function(it) {
+                var sys = it.systemOrCore || it.SystemOrCore || 'Unknown';
+                if (!groups[sys]) groups[sys] = [];
+                groups[sys].push(it);
+            });
 
-                var html = '<table style="width:100%; border-collapse:collapse; text-align:left; color:#eee;">';
-                html += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.1); font-weight:600;"><th style="padding:6px;">File Name</th><th style="padding:6px;">Target System</th><th style="padding:6px; text-align:right;">Size</th></tr>';
-                
-                items.forEach(function(it) {
+            var sortedSysKeys = Object.keys(groups).sort(function(a, b) {
+                if (a === 'Unknown') return 1;
+                if (b === 'Unknown') return -1;
+                return a.localeCompare(b);
+            });
+
+            var html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+
+            sortedSysKeys.forEach(function(sysKey) {
+                var groupItems = groups[sysKey];
+                var sysLabel = sysKey === 'Unknown' ? 'Other / Unrecognized' : sysKey;
+                var safeSysId = sysKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+                html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px 12px;">';
+                html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">';
+                html += '<span style="font-weight: 600; color: #52B54B; font-size: 0.95em;">' + sysLabel + '</span>';
+                html += '<span style="color: #888; font-size: 0.8em;">' + groupItems.length + (groupItems.length === 1 ? ' file' : ' files') + '</span>';
+                html += '</div>';
+
+                html += '<table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88em;">';
+
+                groupItems.forEach(function(it) {
                     var rel = it.relativePath || it.RelativePath || it.fileName || it.FileName || '';
                     var fn = it.fileName || it.FileName || rel;
                     var rawSize = (typeof it.sizeBytes === 'number') ? it.sizeBytes : ((typeof it.SizeBytes === 'number') ? it.SizeBytes : 0);
                     var sz = (rawSize / 1024).toFixed(1) + ' KB';
-                    var sys = it.systemOrCore || it.SystemOrCore || 'General';
+                    var status = it.status || it.Status || 'Unrecognized';
+                    var isActive = !!(it.isActive !== undefined ? it.isActive : it.IsActive);
+                    var md5 = it.md5 || it.Md5 || '';
+                    var expMd5 = it.expectedMd5 || it.ExpectedMd5 || '';
 
-                    var optionsHtml = '';
-                    systems.forEach(function(s) {
-                        var isSel = (s.id.toLowerCase() === sys.toLowerCase());
-                        optionsHtml += '<option value="' + s.id + '"' + (isSel ? ' selected' : '') + ' style="background:#000000; color:#fff;">' + s.label + '</option>';
-                    });
+                    var statusBadge = '';
+                    if (status === 'Verified') {
+                        statusBadge = '<span style="display: inline-block; background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.78em; font-weight: 600;" title="Verified Libretro Dump&#10;MD5: ' + md5 + '">✓ Verified</span>';
+                    } else if (status === 'Mismatch') {
+                        statusBadge = '<span style="display: inline-block; background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.78em; font-weight: 600;" title="Checksum Mismatch (Bad Dump)&#10;MD5: ' + md5 + (expMd5 ? '&#10;Expected: ' + expMd5 : '') + '">⚠ Checksum Mismatch</span>';
+                    } else {
+                        statusBadge = '<span style="display: inline-block; background: rgba(255, 255, 255, 0.08); color: #aaa; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 2px 6px; font-size: 0.78em;" title="MD5: ' + md5 + '">Unrecognized</span>';
+                    }
 
-                    html += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
-                        '<td style="padding:6px; font-family:monospace; font-size:0.95em;">' + fn + (rel !== fn ? ' <small style="color:#777;">(' + rel + ')</small>' : '') + '</td>' +
-                        '<td style="padding:6px;">' +
-                        '<select class="je-bios-sys-select emby-select" data-rel="' + rel.replace(/"/g, '&quot;') + '" style="background: #000000 !important; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #52B54B; padding: 4px 8px; font-size: 0.88em;">' +
-                        optionsHtml +
-                        '</select>' +
+                    var isRadioDisabled = (sysKey === 'Unknown');
+
+                    html += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">' +
+                        '<td style="padding: 6px 4px; width: 28px; text-align: center;">' +
+                        (isRadioDisabled ? '' : '<input type="radio" class="je-bios-active-radio" name="bios_active_' + safeSysId + '" data-sys="' + sysKey.replace(/"/g, '&quot;') + '" data-rel="' + rel.replace(/"/g, '&quot;') + '" ' + (isActive ? 'checked' : '') + ' title="Set as Active BIOS for ' + sysKey + '" style="cursor: pointer; accent-color: #52B54B;" />') +
                         '</td>' +
-                        '<td style="padding:6px; text-align:right; color:#888;">' + sz + '</td>' +
+                        '<td style="padding: 6px 8px; font-family: monospace; color: #fff;">' +
+                        fn + (rel !== fn ? ' <small style="color: #777;">(' + rel + ')</small>' : '') +
+                        '</td>' +
+                        '<td style="padding: 6px 8px; text-align: right; white-space: nowrap;">' + statusBadge + '</td>' +
+                        '<td style="padding: 6px 8px; text-align: right; color: #888; width: 70px;">' + sz + '</td>' +
                         '</tr>';
                 });
-                html += '</table>';
-                containerEl.innerHTML = html;
 
-                var selects = containerEl.querySelectorAll('.je-bios-sys-select');
-                selects.forEach(function(sel) {
-                    sel.addEventListener('change', function() {
-                        var relPath = this.getAttribute('data-rel');
-                        var targetSys = this.value;
-                        ApiClient.getPluginConfiguration(pluginId).then(function (cfg) {
-                            cfg.BiosAssignments = cfg.BiosAssignments || {};
-                            for (var k in cfg.BiosAssignments) {
-                                if (cfg.BiosAssignments[k] === relPath) {
-                                    delete cfg.BiosAssignments[k];
-                                }
-                            }
-                            if (targetSys !== 'General') {
-                                cfg.BiosAssignments[targetSys] = relPath;
-                            }
-                            return ApiClient.updatePluginConfiguration(pluginId, cfg);
-                        }).then(function() {
-                            showStatus('BIOS system assignment updated!', false);
-                            loadBiosList(page);
-                        }).catch(function(err) {
-                            console.error('[JellyEmu] Failed updating BIOS assignment:', err);
-                            showStatus('Failed updating BIOS assignment.', true);
-                        });
+                html += '</table>';
+                html += '</div>';
+            });
+
+            html += '</div>';
+            containerEl.innerHTML = html;
+
+            var radios = containerEl.querySelectorAll('.je-bios-active-radio');
+            radios.forEach(function(r) {
+                r.addEventListener('change', function() {
+                    if (!this.checked) return;
+                    var sys = this.getAttribute('data-sys');
+                    var rel = this.getAttribute('data-rel');
+
+                    fetch('/jellyemu/bios/active', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': authHeader,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ system: sys, relativePath: rel })
+                    })
+                    .then(function(res) { return res.json(); })
+                    .then(function() {
+                        showStatus('Active BIOS for ' + sys + ' set to ' + rel, false);
+                    })
+                    .catch(function(err) {
+                        console.error('[JellyEmu] Failed setting active BIOS:', err);
+                        showStatus('Failed to set active BIOS.', true);
                     });
                 });
-            })
-            .catch(function(err) {
-                containerEl.innerHTML = '<div style="color:#FF4444;">Failed to fetch BIOS list: ' + err + '</div>';
             });
+        })
+        .catch(function(err) {
+            containerEl.innerHTML = '<div style="color:#FF4444; padding: 6px 0;">Failed to fetch BIOS list: ' + err + '</div>';
         });
     }
 

@@ -51,6 +51,8 @@
     <EmbeddedResource Include="Web/ejs.style.css" />
     <!-- Frontend Injection Modules -->
     <EmbeddedResource Include="Web/Injection/*" />
+    <!-- Resources -->
+    <EmbeddedResource Include="Resources\system_bios.json" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">

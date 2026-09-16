@@ -302,9 +302,9 @@
 
             <!-- System BIOS -->
             <div class="verticalSection">
-                <h4 style="margin: 0 0 6px 0; font-size: 1.05em; font-weight: 600; color: #fff;">System BIOS Folder &amp; Assignment</h4>
+                <h4 style="margin: 0 0 6px 0; font-size: 1.05em; font-weight: 600; color: #fff;">System BIOS &amp; Hash Validation</h4>
                 <p style="color: #aaa; margin-bottom: 1em; font-size: 0.9em; line-height: 1.4;">
-                    Folder location for system BIOS files (e.g. <code>scph5501.bin</code> for PS1, <code>gba_bios.bin</code> for GBA, <code>disksys.rom</code> for FDS). Leave empty to use default folder.
+                    Place system BIOS files in your BIOS folder. JellyEmu automatically detects their target platform and validates their MD5/SHA1 checksums against the official Libretro database. If multiple BIOS files exist for a system, pick the active one below.
                 </p>
                 <div class="inputContainer" style="margin-bottom: 1.2em;">
                     <label class="inputLabel inputLabelUnfocused" for="biosPath">Custom BIOS Directory Path</label>
@@ -312,12 +312,12 @@
                 </div>
                 <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-weight: 600; font-size: 0.9em; color: #fff;">Detected System BIOS Files</span>
-                        <button type="button" id="btnRefreshBios" class="emby-button" style="padding: 4px 12px; font-size: 0.8em; background: rgba(255,255,255,0.08);">Refresh</button>
+                        <span style="font-weight: 600; font-size: 0.9em; color: #fff;">Detected &amp; Validated BIOS Files</span>
+                        <button type="button" id="btnRefreshBios" class="emby-button" style="padding: 4px 12px; font-size: 0.8em; background: rgba(255,255,255,0.08);">Scan &amp; Refresh</button>
                     </div>
                     <div id="biosFolderDisplay" style="font-size: 0.8em; color: #888; margin-bottom: 10px; word-break: break-all;"></div>
-                    <div id="biosListContainer" style="font-size: 0.85em; max-height: 180px; overflow-y: auto;">
-                        <div style="color: #aaa;">Loading BIOS list…</div>
+                    <div id="biosListContainer" style="font-size: 0.85em; max-height: 380px; overflow-y: auto;">
+                        <div style="color: #aaa;">Scanning BIOS directory…</div>
                     </div>
                 </div>
             </div>

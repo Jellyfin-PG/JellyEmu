@@ -1,6 +1,7 @@
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -288,6 +289,25 @@ namespace JellyEmu.Controllers
             var biosFolder = _biosService.GetBiosDirectory();
             var list = _biosService.ListInstalledBios();
             return Ok(new { directory = biosFolder, items = list, total = list.Count });
+        }
+
+        /// <summary>
+        /// Sets the active BIOS file for a given system platform tag.
+        /// Path: POST /jellyemu/bios/active
+        /// </summary>
+        [HttpPost("/jellyemu/bios/active")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult SetActiveBios([FromBody] SetActiveBiosRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.System))
+            {
+                return BadRequest("Invalid system identifier.");
+            }
+
+            _biosService.SetActiveBios(request.System, request.RelativePath);
+            return Ok(new { success = true, system = request.System, activePath = request.RelativePath });
         }
 
         /// <summary>
@@ -585,5 +605,11 @@ namespace JellyEmu.Controllers
                 return Ok(new List<object>());
             }
         }
+    }
+
+    public class SetActiveBiosRequest
+    {
+        public string System { get; set; } = string.Empty;
+        public string RelativePath { get; set; } = string.Empty;
     }
 }
