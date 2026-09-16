@@ -201,7 +201,7 @@
                 "Dreamcast","PlayStation 2","PlayStation 3",
                 "Xbox","Xbox 360",
                 "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
-                "PlayStation Vita","Windows","Unsupported"
+                "PlayStation Vita","Windows","Linux","MacOS","Android","Unsupported"
             ]);
             
             items.forEach(function (item) {

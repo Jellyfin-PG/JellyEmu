@@ -169,7 +169,10 @@ namespace JellyEmu
                 { "wii", "Wii" }, { "nintendo wii", "Wii" }, { "wii u", "Wii U" }, { "wiiu", "Wii U" },
                 { "switch", "Nintendo Switch" }, { "nintendo switch", "Nintendo Switch" },
                 { "psvita", "PlayStation Vita" }, { "ps vita", "PlayStation Vita" }, { "playstation vita", "PlayStation Vita" }, { "play station vita", "PlayStation Vita" },
-                { "windows", "Windows" }, { "gog", "Windows" },
+                { "windows", "Windows" }, { "win", "Windows" },
+                { "linux", "Linux" },
+                { "macos", "MacOS" }, { "mac", "MacOS" }, { "osx", "MacOS" }, { "mac os", "MacOS" }, { "mac os x", "MacOS" },
+                { "android", "Android" },
             };
 
         private static readonly Dictionary<string, string> LibraryOnlyExtensions =
@@ -179,6 +182,9 @@ namespace JellyEmu
                 { ".wbfs", "Wii" }, { ".wad", "Wii" }, { ".xex", "Xbox 360" },
                 { ".xiso", "Xbox" }, { ".vpk", "PlayStation Vita" },
                 { ".exe", "Windows" }, { ".msi", "Windows" },
+                { ".appimage", "Linux" }, { ".deb", "Linux" }, { ".flatpak", "Linux" }, { ".snap", "Linux" }, { ".sh", "Linux" }, { ".x86_64", "Linux" }, { ".x86", "Linux" },
+                { ".app", "MacOS" }, { ".dmg", "MacOS" }, { ".pkg", "MacOS" },
+                { ".apk", "Android" }, { ".xapk", "Android" },
             };
 
         public static bool IsEjsSupported(string? tag)
@@ -378,6 +384,8 @@ namespace JellyEmu
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
                 ".xex", ".xiso", ".vpk", ".j3u", ".exe", ".msi",
+                ".appimage", ".deb", ".flatpak", ".snap", ".sh", ".x86_64", ".x86",
+                ".app", ".dmg", ".pkg", ".apk", ".xapk"
             };
     }
 

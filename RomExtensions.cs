@@ -51,6 +51,31 @@ namespace JellyEmu
             return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Windows";
         }
 
+        public static bool IsLinuxRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Linux";
+        }
+
+        public static bool IsMacOSRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "MacOS";
+        }
+
+        public static bool IsAndroidRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Android";
+        }
+
+        public static bool IsModernRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            var platform = new PlatformResolver(null!).Resolve(EffectiveRomPath(path));
+            return platform is "Windows" or "Linux" or "MacOS" or "Android";
+        }
+
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;

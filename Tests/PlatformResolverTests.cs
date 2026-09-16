@@ -21,6 +21,15 @@ namespace JellyEmu.Tests
         [InlineData("C:\\Games\\Game Boy Advance\\Pokemon.zip", "Game Boy Advance")] // Matches directory name
         [InlineData("C:\\Games\\genesis\\Sonic.zip", "Sega Genesis")] // Matches directory name
         [InlineData("C:\\Games\\PSX\\Spyro.cue", "PlayStation")] // Matches directory name
+        [InlineData("C:\\Games\\Windows\\Fallout.exe", "Windows")]
+        [InlineData("C:\\Games\\windows\\Half-Life.zip", "Windows")]
+        [InlineData("C:\\Games\\Linux\\Celeste.AppImage", "Linux")]
+        [InlineData("C:\\Games\\linux\\HollowKnight.sh", "Linux")]
+        [InlineData("C:\\Games\\MacOS\\StardewValley.app", "MacOS")]
+        [InlineData("C:\\Games\\mac\\Braid.dmg", "MacOS")]
+        [InlineData("C:\\Games\\Android\\Minecraft.apk", "Android")]
+        [InlineData("C:\\Games\\android\\DeadCells.xapk", "Android")]
+        [InlineData("C:\\Games\\GOG\\Game.cue", "Unknown")] // "gog" folder alias removed, cue is ambiguous without platform
         public void ResolvePlatform_ShouldResolveCorrectly(string path, string expected)
         {
             // Act
