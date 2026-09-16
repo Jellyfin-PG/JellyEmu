@@ -51,6 +51,31 @@ namespace JellyEmu
             return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Windows";
         }
 
+        public static bool IsLinuxRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Linux";
+        }
+
+        public static bool IsMacOSRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "MacOS";
+        }
+
+        public static bool IsAndroidRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return new PlatformResolver(null!).Resolve(EffectiveRomPath(path)) == "Android";
+        }
+
+        public static bool IsModernRom(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            var platform = new PlatformResolver(null!).Resolve(EffectiveRomPath(path));
+            return platform is "Windows" or "Linux" or "MacOS" or "Android";
+        }
+
         public static bool IsRomPath(string? path)
         {
             if (string.IsNullOrEmpty(path)) return false;
@@ -68,7 +93,21 @@ namespace JellyEmu
                 try
                 {
                     var cues = Directory.GetFiles(path, "*.cue");
-                    return cues.Length == 1 && CueParser.HasResolvedBin(cues[0]);
+                    if (cues.Length == 1 && CueParser.HasResolvedBin(cues[0]))
+                    {
+                        return true;
+                    }
+
+                    var trimmedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var dirName = Path.GetFileName(trimmedPath);
+                    if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName))
+                    {
+                        var platform = new PlatformResolver(null!).Resolve(trimmedPath);
+                        if (platform != "Unknown" && Directory.EnumerateFileSystemEntries(path).Any())
+                        {
+                            return true;
+                        }
+                    }
                 }
                 catch { }
             }
@@ -132,10 +171,23 @@ namespace JellyEmu
 
         public static string GetFileHash(string path)
         {
-            using var md5 = MD5.Create();
+            if (Directory.Exists(path))
+            {
+                using var md5 = MD5.Create();
+                var bytes = System.Text.Encoding.UTF8.GetBytes(path.ToLowerInvariant());
+                var hash = md5.ComputeHash(bytes);
+                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+
+            if (!File.Exists(path))
+            {
+                return string.Empty;
+            }
+
+            using var md5File = MD5.Create();
             using var stream = File.OpenRead(path);
-            var hash = md5.ComputeHash(stream);
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            var fileHash = md5File.ComputeHash(stream);
+            return BitConverter.ToString(fileHash).Replace("-", "").ToLowerInvariant();
         }
     }
 }

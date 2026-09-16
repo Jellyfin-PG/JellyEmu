@@ -241,7 +241,7 @@ namespace JellyEmu.Services
         }
 
         /// <summary>
-        /// Resolves all physical files associated with a ROM item (expanding .j3u playlists) that exist on disk.
+        /// Resolves all physical files associated with a ROM item (expanding .j3u playlists and directory trees) that exist on disk.
         /// </summary>
         public List<string> ResolveAllRomFiles(string itemPath)
         {
@@ -254,6 +254,17 @@ namespace JellyEmu.Services
             if (itemPath.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase))
             {
                 files.AddRange(J3uParser.GetReferencedFiles(itemPath));
+            }
+            else if (Directory.Exists(itemPath))
+            {
+                try
+                {
+                    files.AddRange(Directory.GetFiles(itemPath, "*", SearchOption.AllDirectories));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[JellyEmu] Could not enumerate directory files for {ItemPath}", itemPath);
+                }
             }
             else
             {

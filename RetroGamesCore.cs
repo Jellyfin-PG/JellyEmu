@@ -53,6 +53,36 @@ namespace JellyEmu
                             Tags            = tags.ToArray()
                         };
                     }
+
+                    var trimmedPath = args.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    var dirName = Path.GetFileName(trimmedPath);
+                    if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName))
+                    {
+                        var consoleTag = _platformResolver.Resolve(trimmedPath);
+                        if (consoleTag != "Unknown" && Directory.EnumerateFileSystemEntries(args.Path).Any())
+                        {
+                            var regionTag = PlatformResolver.ResolveRegions(trimmedPath).FirstOrDefault();
+                            var displayName = PlatformResolver.CleanDisplayName(dirName);
+
+                            var tags = new List<string> { "JellyEmu", consoleTag };
+                            if (!string.IsNullOrEmpty(regionTag)) tags.Add(regionTag);
+
+                            var parentFolder = Path.GetFileName(Path.GetDirectoryName(trimmedPath));
+                            var seriesName = (!string.IsNullOrEmpty(parentFolder) &&
+                                                !PlatformResolver.Aliases.ContainsKey(parentFolder))
+                                               ? parentFolder
+                                               : null;
+
+                            return new Book
+                            {
+                                Name            = RomExtensions.CleanName(displayName),
+                                Path            = args.Path,
+                                IsInMixedFolder = false,
+                                SeriesName      = seriesName,
+                                Tags            = tags.ToArray()
+                            };
+                        }
+                    }
                 }
                 catch { }
                 return null;

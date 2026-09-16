@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
 namespace JellyEmu.Services
@@ -19,8 +20,29 @@ namespace JellyEmu.Services
         [JsonPropertyName("systemOrCore")]
         public string SystemOrCore { get; set; } = string.Empty;
 
+        [JsonPropertyName("systemDescription")]
+        public string SystemDescription { get; set; } = string.Empty;
+
         [JsonPropertyName("sizeBytes")]
         public long SizeBytes { get; set; }
+
+        [JsonPropertyName("md5")]
+        public string Md5 { get; set; } = string.Empty;
+
+        [JsonPropertyName("sha1")]
+        public string Sha1 { get; set; } = string.Empty;
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "Unrecognized"; // "Verified", "Mismatch", "Unrecognized"
+
+        [JsonPropertyName("isActive")]
+        public bool IsActive { get; set; }
+
+        [JsonPropertyName("expectedMd5")]
+        public string? ExpectedMd5 { get; set; }
+
+        [JsonPropertyName("expectedSha1")]
+        public string? ExpectedSha1 { get; set; }
 
         public BiosInfo() { }
 
@@ -72,34 +94,120 @@ namespace JellyEmu.Services
             }
         }
 
-        private static readonly Dictionary<string, List<string>> KnownBiosFilenames = new(StringComparer.OrdinalIgnoreCase)
+        public static (string md5, string sha1) ComputeFileHashes(string filePath)
         {
-            { "PlayStation", new() { "scph5501.bin", "scph1001.bin", "scph7001.bin", "scph5500.bin", "scph5502.bin", "scph1000.bin", "ps1_rom.bin", "psx.bin", "psx.zip", "psx.7z" } },
-            { "Game Boy Advance", new() { "gba_bios.bin", "gba.bin", "gba_bios.zip", "gba.zip" } },
-            { "Nintendo DS", new() { "nds_bios_arm7.bin", "nds_bios_arm9.bin", "firmware.bin", "bios7.bin", "bios9.bin", "nds.zip" } },
-            { "NES", new() { "disksys.rom", "disksys.bin", "fds.rom" } },
-            { "Sega CD", new() { "bios_CD_U.bin", "bios_CD_E.bin", "bios_CD_J.bin", "segacd_bios.bin" } },
-            { "Sega Saturn", new() { "saturn_bios.bin", "sega_101.bin", "mpr-17933.bin" } },
-            { "Dreamcast", new() { "dc_boot.bin", "dc_flash.bin" } },
-            { "Neo Geo", new() { "neogeo.zip", "neogeo.bin" } },
-            { "Nintendo 3DS", new() { "boot.firm", "sysdata.zip", "3ds_bios.bin" } }
-        };
+            try
+            {
+                using var fileStream = File.OpenRead(filePath);
+                using var md5 = MD5.Create();
+                using var sha1 = SHA1.Create();
+
+                var md5Hash = BitConverter.ToString(md5.ComputeHash(fileStream)).Replace("-", "").ToLowerInvariant();
+                fileStream.Position = 0;
+                var sha1Hash = BitConverter.ToString(sha1.ComputeHash(fileStream)).Replace("-", "").ToLowerInvariant();
+                return (md5Hash, sha1Hash);
+            }
+            catch
+            {
+                return (string.Empty, string.Empty);
+            }
+        }
+
+        public List<BiosInfo> ListInstalledBios()
+        {
+            var list = new List<BiosInfo>();
+            var root = GetBiosDirectory();
+            if (!Directory.Exists(root)) return list;
+
+            var activeAssignments = Plugin.Instance?.Configuration.ActiveBios;
+            var db = LibretroSystemDatabase.Instance;
+
+            var allFiles = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories);
+            foreach (var file in allFiles)
+            {
+                var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+                var fileName = Path.GetFileName(file);
+                var fi = new FileInfo(file);
+
+                var (md5, sha1) = ComputeFileHashes(file);
+                var validation = db.ValidateBios(fileName, md5, sha1, fi.Length);
+
+                string sys = validation.SystemOrPlatform;
+                string desc = validation.SystemDescription;
+                string status = validation.Status.ToString();
+
+                if (validation.Status == BiosValidationStatus.Unrecognized)
+                {
+                    var guessed = GuessSystem(rel);
+                    if (guessed != "General" && guessed != "Unknown")
+                    {
+                        sys = guessed;
+                        desc = guessed;
+                    }
+                }
+
+                bool isActive = false;
+                if (activeAssignments != null && !string.IsNullOrEmpty(sys))
+                {
+                    if (activeAssignments.TryGetValue(sys, out var activeRel) &&
+                        string.Equals(activeRel, rel, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isActive = true;
+                    }
+                }
+
+                list.Add(new BiosInfo
+                {
+                    RelativePath = rel,
+                    FileName = fileName,
+                    SystemOrCore = sys,
+                    SystemDescription = desc,
+                    SizeBytes = fi.Length,
+                    Md5 = md5,
+                    Sha1 = sha1,
+                    Status = status,
+                    IsActive = isActive,
+                    ExpectedMd5 = validation.ExpectedMd5,
+                    ExpectedSha1 = validation.ExpectedSha1
+                });
+            }
+
+            // Ensure every system with BIOS files has an active selection
+            var grouped = list.Where(b => !string.IsNullOrEmpty(b.SystemOrCore) && b.SystemOrCore != "Unknown")
+                              .GroupBy(b => b.SystemOrCore, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var group in grouped)
+            {
+                if (!group.Any(b => b.IsActive))
+                {
+                    // Prioritize first Verified BIOS file, otherwise first in group
+                    var defaultActive = group.FirstOrDefault(b => b.Status == "Verified") ?? group.First();
+                    defaultActive.IsActive = true;
+                }
+            }
+
+            return list;
+        }
 
         public string? ResolveBiosRelativePath(string platformTag, string core)
         {
             var root = GetBiosDirectory();
             if (!Directory.Exists(root)) return null;
 
-            var assignments = Plugin.Instance?.Configuration.BiosAssignments;
-            if (assignments != null && assignments.Count > 0)
-            {
-                var keysToCheck = new[] { platformTag, core, MapTagToShortName(platformTag) }
-                    .Where(s => !string.IsNullOrWhiteSpace(s))
-                    .Distinct(StringComparer.OrdinalIgnoreCase);
+            var installed = ListInstalledBios();
 
-                foreach (var k in keysToCheck)
+            var candidateKeys = new[] { platformTag, core, MapTagToShortName(platformTag) }
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Explicit ActiveBios configuration match
+            var activeAssignments = Plugin.Instance?.Configuration.ActiveBios;
+            if (activeAssignments != null && activeAssignments.Count > 0)
+            {
+                foreach (var k in candidateKeys)
                 {
-                    if (assignments.TryGetValue(k, out var assignedRel) && !string.IsNullOrWhiteSpace(assignedRel))
+                    if (activeAssignments.TryGetValue(k, out var assignedRel) && !string.IsNullOrWhiteSpace(assignedRel))
                     {
                         var fullAssigned = Path.Combine(root, assignedRel.Replace('/', Path.DirectorySeparatorChar));
                         if (File.Exists(fullAssigned))
@@ -110,11 +218,41 @@ namespace JellyEmu.Services
                 }
             }
 
-            var candidateDirs = new[] { platformTag, core, MapTagToShortName(platformTag) }
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Distinct(StringComparer.OrdinalIgnoreCase);
+            // Active file from installed list for this system
+            foreach (var k in candidateKeys)
+            {
+                var activeForSys = installed.FirstOrDefault(b =>
+                    string.Equals(b.SystemOrCore, k, StringComparison.OrdinalIgnoreCase) && b.IsActive);
+                if (activeForSys != null)
+                {
+                    return activeForSys.RelativePath;
+                }
+            }
 
-            foreach (var sub in candidateDirs)
+            // First verified BIOS for this system
+            foreach (var k in candidateKeys)
+            {
+                var verifiedForSys = installed.FirstOrDefault(b =>
+                    string.Equals(b.SystemOrCore, k, StringComparison.OrdinalIgnoreCase) && b.Status == "Verified");
+                if (verifiedForSys != null)
+                {
+                    return verifiedForSys.RelativePath;
+                }
+            }
+
+            // Any BIOS matching the system
+            foreach (var k in candidateKeys)
+            {
+                var anyForSys = installed.FirstOrDefault(b =>
+                    string.Equals(b.SystemOrCore, k, StringComparison.OrdinalIgnoreCase));
+                if (anyForSys != null)
+                {
+                    return anyForSys.RelativePath;
+                }
+            }
+
+            // Check subdirectories directly (e.g. root/GBA/*)
+            foreach (var sub in candidateKeys)
             {
                 var subDir = Path.Combine(root, sub);
                 if (Directory.Exists(subDir))
@@ -122,21 +260,12 @@ namespace JellyEmu.Services
                     var files = Directory.GetFiles(subDir);
                     if (files.Length > 0)
                     {
-                        var first = files[0];
-                        return Path.GetRelativePath(root, first).Replace('\\', '/');
+                        return Path.GetRelativePath(root, files[0]).Replace('\\', '/');
                     }
                 }
             }
 
-            if (!string.IsNullOrEmpty(platformTag) && KnownBiosFilenames.TryGetValue(platformTag, out var knownList))
-            {
-                foreach (var fn in knownList)
-                {
-                    var p = Path.Combine(root, fn);
-                    if (File.Exists(p)) return fn;
-                }
-            }
-
+            // Name candidates in root
             var nameCandidates = new[]
             {
                 $"{platformTag}.bin", $"{platformTag}.rom", $"{platformTag}.zip",
@@ -153,42 +282,24 @@ namespace JellyEmu.Services
             return null;
         }
 
-        public List<BiosInfo> ListInstalledBios()
+        public void SetActiveBios(string systemOrPlatform, string relativePath)
         {
-            var list = new List<BiosInfo>();
-            var root = GetBiosDirectory();
-            if (!Directory.Exists(root)) return list;
+            if (string.IsNullOrWhiteSpace(systemOrPlatform) || Plugin.Instance == null) return;
 
-            var assignments = Plugin.Instance?.Configuration.BiosAssignments;
+            var cfg = Plugin.Instance.Configuration;
+            var active = cfg.ActiveBios ?? new(StringComparer.OrdinalIgnoreCase);
 
-            var allFiles = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories);
-            foreach (var file in allFiles)
+            if (string.IsNullOrWhiteSpace(relativePath))
             {
-                var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
-                var fileName = Path.GetFileName(file);
-                var fi = new FileInfo(file);
-                
-                string sys = string.Empty;
-                if (assignments != null)
-                {
-                    foreach (var kvp in assignments)
-                    {
-                        if (string.Equals(kvp.Value, rel, StringComparison.OrdinalIgnoreCase))
-                        {
-                            sys = kvp.Key;
-                            break;
-                        }
-                    }
-                }
-
-                if (string.IsNullOrEmpty(sys))
-                {
-                    sys = GuessSystem(rel);
-                }
-
-                list.Add(new BiosInfo(rel, fileName, sys, fi.Length));
+                active.Remove(systemOrPlatform);
             }
-            return list;
+            else
+            {
+                active[systemOrPlatform] = relativePath.Replace('\\', '/');
+            }
+
+            cfg.ActiveBios = active;
+            Plugin.Instance.SaveConfiguration();
         }
 
         private static string MapTagToShortName(string tag)

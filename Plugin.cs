@@ -209,7 +209,17 @@ namespace JellyEmu
         public string ScreenScraperLanguagePreference { get; set; } = "en";
 
         /// <summary>
-        /// Manual BIOS file assignments per system tag or core name (ignored by XmlSerializer).
+        /// Active BIOS file selections per system tag (ignored by XmlSerializer).
+        /// </summary>
+        [XmlIgnore]
+        public Dictionary<string, string> ActiveBios
+        {
+            get => BiosAssignments;
+            set => BiosAssignments = value;
+        }
+
+        /// <summary>
+        /// Manual or active BIOS file assignments per system tag or core name (ignored by XmlSerializer).
         /// </summary>
         [XmlIgnore]
         public Dictionary<string, string> BiosAssignments

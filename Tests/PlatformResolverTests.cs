@@ -21,6 +21,15 @@ namespace JellyEmu.Tests
         [InlineData("C:\\Games\\Game Boy Advance\\Pokemon.zip", "Game Boy Advance")] // Matches directory name
         [InlineData("C:\\Games\\genesis\\Sonic.zip", "Sega Genesis")] // Matches directory name
         [InlineData("C:\\Games\\PSX\\Spyro.cue", "PlayStation")] // Matches directory name
+        [InlineData("C:\\Games\\Windows\\Fallout.exe", "Windows")]
+        [InlineData("C:\\Games\\windows\\Half-Life.zip", "Windows")]
+        [InlineData("C:\\Games\\Linux\\Celeste.AppImage", "Linux")]
+        [InlineData("C:\\Games\\linux\\HollowKnight.sh", "Linux")]
+        [InlineData("C:\\Games\\MacOS\\StardewValley.app", "MacOS")]
+        [InlineData("C:\\Games\\mac\\Braid.dmg", "MacOS")]
+        [InlineData("C:\\Games\\Android\\Minecraft.apk", "Android")]
+        [InlineData("C:\\Games\\android\\DeadCells.xapk", "Android")]
+        [InlineData("C:\\Games\\GOG\\Game.cue", "Unknown")] // "gog" folder alias removed, cue is ambiguous without platform
         public void ResolvePlatform_ShouldResolveCorrectly(string path, string expected)
         {
             // Act
@@ -95,6 +104,57 @@ namespace JellyEmu.Tests
             finally
             {
                 Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Theory]
+        [InlineData("windows", "Skyrim")]
+        [InlineData("linux", "Celeste")]
+        [InlineData("macos", "StardewValley")]
+        [InlineData("android", "Minecraft")]
+        public void IsRomPath_ModernPlatformGameFolder_ShouldReturnTrue(string platformFolder, string gameFolder)
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), platformFolder, gameFolder);
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "Game.exe"), "dummy exe");
+                File.WriteAllText(Path.Combine(tempDir, "DATA01.DAT"), "dummy data");
+                File.WriteAllText(Path.Combine(tempDir, "INPUT.INI"), "dummy ini");
+
+                Assert.True(RomExtensions.IsRomPath(tempDir));
+            }
+            finally
+            {
+                var root = Path.GetDirectoryName(Path.GetDirectoryName(tempDir));
+                if (root != null && Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("windows")]
+        [InlineData("linux")]
+        [InlineData("macos")]
+        [InlineData("android")]
+        public void IsRomPath_PlatformCategoryFolderItself_ShouldReturnFalse(string platformFolder)
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), platformFolder);
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "somefile.txt"), "dummy");
+                Assert.False(RomExtensions.IsRomPath(tempDir));
+            }
+            finally
+            {
+                var root = Path.GetDirectoryName(tempDir);
+                if (root != null && Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
             }
         }
     }
