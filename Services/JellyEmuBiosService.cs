@@ -113,16 +113,29 @@ namespace JellyEmu.Services
             }
         }
 
+        private readonly Dictionary<string, string> _fallbackActiveBios = new(StringComparer.OrdinalIgnoreCase);
+
+        private Dictionary<string, string> GetActiveBiosMap()
+        {
+            if (Plugin.Instance?.Configuration.ActiveBios != null)
+            {
+                return Plugin.Instance.Configuration.ActiveBios;
+            }
+            return _fallbackActiveBios;
+        }
+
         public List<BiosInfo> ListInstalledBios()
         {
             var list = new List<BiosInfo>();
             var root = GetBiosDirectory();
             if (!Directory.Exists(root)) return list;
 
-            var activeAssignments = Plugin.Instance?.Configuration.ActiveBios;
+            var activeAssignments = GetActiveBiosMap();
             var db = LibretroSystemDatabase.Instance;
 
-            var allFiles = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories);
+            var allFiles = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories)
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
+
             foreach (var file in allFiles)
             {
                 var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
@@ -202,7 +215,7 @@ namespace JellyEmu.Services
                 .ToList();
 
             // Explicit ActiveBios configuration match
-            var activeAssignments = Plugin.Instance?.Configuration.ActiveBios;
+            var activeAssignments = GetActiveBiosMap();
             if (activeAssignments != null && activeAssignments.Count > 0)
             {
                 foreach (var k in candidateKeys)
@@ -284,22 +297,36 @@ namespace JellyEmu.Services
 
         public void SetActiveBios(string systemOrPlatform, string relativePath)
         {
-            if (string.IsNullOrWhiteSpace(systemOrPlatform) || Plugin.Instance == null) return;
+            if (string.IsNullOrWhiteSpace(systemOrPlatform)) return;
 
-            var cfg = Plugin.Instance.Configuration;
-            var active = cfg.ActiveBios ?? new(StringComparer.OrdinalIgnoreCase);
+            var normalizedRel = relativePath?.Replace('\\', '/') ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(relativePath))
+            if (Plugin.Instance != null)
             {
-                active.Remove(systemOrPlatform);
+                var cfg = Plugin.Instance.Configuration;
+                var active = cfg.ActiveBios ?? new(StringComparer.OrdinalIgnoreCase);
+
+                if (string.IsNullOrWhiteSpace(normalizedRel))
+                {
+                    active.Remove(systemOrPlatform);
+                }
+                else
+                {
+                    active[systemOrPlatform] = normalizedRel;
+                }
+
+                cfg.ActiveBios = active;
+                try { Plugin.Instance.SaveConfiguration(); } catch { }
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedRel))
+            {
+                _fallbackActiveBios.Remove(systemOrPlatform);
             }
             else
             {
-                active[systemOrPlatform] = relativePath.Replace('\\', '/');
+                _fallbackActiveBios[systemOrPlatform] = normalizedRel;
             }
-
-            cfg.ActiveBios = active;
-            Plugin.Instance.SaveConfiguration();
         }
 
         private static string MapTagToShortName(string tag)
