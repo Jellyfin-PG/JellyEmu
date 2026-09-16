@@ -71,12 +71,13 @@ namespace JellyEmu.Providers
                         var id = root.TryGetProperty("id", out var i) && i.ValueKind == JsonValueKind.Number ? i.GetInt32().ToString() : null;
                         var actualMd5 = md5;
 
+                        var matchRoot = root;
                         if (string.IsNullOrEmpty(name) && root.TryGetProperty("signatures", out var signatures) && signatures.GetArrayLength() > 0)
                         {
-                            var match = signatures[0];
-                            name = match.TryGetProperty("name", out var mn) ? mn.GetString() : null;
-                            id = match.TryGetProperty("id", out var mi) ? mi.GetInt64().ToString() : null;
-                            actualMd5 = match.TryGetProperty("signature", out var sig) && sig.TryGetProperty("rom", out var rom) && rom.TryGetProperty("md5", out var rmd5) ? rmd5.GetString() : md5;
+                            matchRoot = signatures[0];
+                            name = matchRoot.TryGetProperty("name", out var mn) ? mn.GetString() : null;
+                            id = matchRoot.TryGetProperty("id", out var mi) ? mi.GetInt64().ToString() : null;
+                            actualMd5 = matchRoot.TryGetProperty("signature", out var sig) && sig.TryGetProperty("rom", out var rom) && rom.TryGetProperty("md5", out var rmd5) ? rmd5.GetString() : md5;
                         }
 
                         if (!string.IsNullOrEmpty(name))
@@ -88,6 +89,24 @@ namespace JellyEmu.Providers
                             };
                             if (!string.IsNullOrEmpty(id)) sr.SetProviderId("Hasheous", id);
                             if (!string.IsNullOrEmpty(actualMd5)) sr.SetProviderId("MD5", actualMd5);
+
+                            if (matchRoot.TryGetProperty("attributes", out var attrs) && attrs.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var attr in attrs.EnumerateArray())
+                                {
+                                    if (attr.TryGetProperty("attributeType", out var typeProp) && typeProp.GetString() == "ImageId")
+                                    {
+                                        var attrName = attr.TryGetProperty("attributeName", out var nameProp) ? nameProp.GetString() : null;
+                                        var imageId = attr.TryGetProperty("value", out var valProp) ? valProp.GetString() : null;
+                                        if (!string.IsNullOrEmpty(imageId) && (attrName == "BoxArt" || attrName == "Front"))
+                                        {
+                                            sr.ImageUrl = $"https://hasheous.org/api/v1/images/{imageId}";
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
                             results.Add(sr);
                         }
                     }
