@@ -45,6 +45,7 @@
     <EmbeddedResource Include="Templates\play.html" LogicalName="JellyEmu.Templates.play.html" />
     <!-- Script & Asset Modules-->
     <EmbeddedResource Include="Web/ejs.input.js" />
+    <EmbeddedResource Include="Web/ejs.core.js" />
     <EmbeddedResource Include="Web/ejs.xr.js" />
     <EmbeddedResource Include="Web/ejs.save.js" />
     <EmbeddedResource Include="Web/ejs.setting.js" />

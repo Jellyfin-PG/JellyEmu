@@ -68,6 +68,19 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Serves the core options embedded JS resource.
+        /// Path: GET /jellyemu/assets/ejs.core.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/ejs.core.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult CoreJs()
+        {
+            return ServeEmbeddedJs("ejs.core.js");
+        }
+
+        /// <summary>
         /// Serves the XR embedded JS resource.
         /// Path: GET /jellyemu/assets/ejs.xr.js
         /// </summary>

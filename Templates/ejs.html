@@ -1094,79 +1094,6 @@
                 else { window.parent.postMessage('close-jellyemu', '*'); }
             });
 
-            // Core Options Popup
-            document.getElementById('je-btn-coreopts').addEventListener('click', function () {
-                buildCoreOptions();
-                openPopup('je-pop-coreopts');
-            });
-
-            function buildCoreOptions() {
-                var body = document.getElementById('je-coreopts-body');
-                var g = gm();
-
-                if (!g || typeof g.getCoreOptions !== 'function') {
-                    body.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:20px;">Core options not available yet.</div>';
-                    return;
-                }
-
-                var optsRaw = g.getCoreOptions();
-                if (!optsRaw || typeof optsRaw !== 'string') {
-                    body.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:20px;">No options available for this core.</div>';
-                    return;
-                }
-
-                var lines = optsRaw.split('\n');
-                body.innerHTML = '';
-                var hasOpts = false;
-
-                lines.forEach(function (line) {
-                    if (!line.trim()) return;
-                    hasOpts = true;
-
-                    // Splits "key|currentValue; val1|val2|val3"
-                    var parts = line.split(/;\s*/);
-                    if (parts.length < 2) return;
-
-                    var keyVal = parts[0].split('|');
-                    var key = keyVal[0];
-                    var currentVal = keyVal[1];
-                    var options = parts[1].split('|');
-
-                    // Make the label pretty (e.g., 'yabause_frameskip' -> 'Frameskip')
-                    var displayKey = key.replace(/^[^_]+_/, '').replace(/_/g, ' ');
-                    displayKey = displayKey.charAt(0).toUpperCase() + displayKey.slice(1);
-
-                    var row = document.createElement('div');
-                    row.className = 'je-setting';
-
-                    var label = document.createElement('span');
-                    label.className = 'je-setting-label';
-                    label.textContent = displayKey;
-
-                    var select = document.createElement('select');
-                    options.forEach(function (opt) {
-                        var option = document.createElement('option');
-                        option.value = opt;
-                        option.textContent = opt;
-                        if (opt === currentVal) option.selected = true;
-                        select.appendChild(option);
-                    });
-
-                    // Trigger the core change instantly on dropdown change
-                    select.addEventListener('change', function () {
-                        g.setVariable(key, this.value);
-                    });
-
-                    row.appendChild(label);
-                    row.appendChild(select);
-                    body.appendChild(row);
-                });
-
-                if (!hasOpts) {
-                    body.innerHTML = '<div style="opacity:.4;font-size:13px;text-align:center;padding:20px;">No options available for this core.</div>';
-                }
-            }
-
             // Fullscreen
             var btnFs = document.getElementById('je-btn-fullscreen');
             var iconEnter = document.getElementById('je-fs-enter');
@@ -1903,6 +1830,7 @@
     </script>
 
     <script src="/jellyemu/assets/ejs.input.js?v={{ version }}"></script>
+    <script src="/jellyemu/assets/ejs.core.js?v={{ version }}"></script>
     <script src="/jellyemu/assets/ejs.save.js?v={{ version }}"></script>
     <script src="/jellyemu/assets/ejs.setting.js?v={{ version }}"></script>
     <script src="/jellyemu/assets/ejs.xr.js?v={{ version }}"></script>
