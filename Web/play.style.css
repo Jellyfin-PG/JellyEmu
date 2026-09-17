@@ -1,0 +1,525 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#canvas-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background-color: #000;
+}
+
+#outputCanvas {
+    aspect-ratio: 4 / 3;
+    background-color: #000;
+    margin: auto;
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    outline: none;
+}
+
+/* Loading Screen */
+#je-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: radial-gradient(circle at center, #111422 0%, #06070a 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    transition: opacity .4s ease, transform .4s ease;
+}
+
+#je-loader.je-dismiss {
+    opacity: 0;
+    transform: scale(1.03);
+    pointer-events: none;
+}
+
+#je-loader-title {
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    padding: 0 20px;
+    letter-spacing: 0.5px;
+}
+
+#je-loader-system {
+    display: inline-block;
+    padding: 5px 16px;
+    border-radius: 20px;
+    background: rgba(0, 112, 209, 0.25);
+    border: 1px solid rgba(0, 112, 209, 0.4);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #4da6ff;
+}
+
+#je-loader-status {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.75);
+    min-height: 20px;
+}
+
+.je-loader-anim {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 90px;
+    height: 90px;
+}
+
+.je-pulse-ring {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border: 2px solid rgba(0, 112, 209, 0.5);
+    border-radius: 50%;
+    animation: je-pulse 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.je-pulse-ring:nth-child(2) {
+    animation-delay: -0.6s;
+}
+
+.je-pulse-ring:nth-child(3) {
+    animation-delay: -1.2s;
+}
+
+@keyframes je-pulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1.6);
+        opacity: 0;
+    }
+}
+
+.je-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-top-color: #0070d1;
+    border-radius: 50%;
+    animation: je-spin 1s linear infinite;
+    z-index: 2;
+}
+
+@keyframes je-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Bars & Docks */
+.je-bar {
+    position: fixed;
+    z-index: 90000;
+    transition: opacity .3s ease, transform .3s ease;
+}
+
+.je-bar.je-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#je-topbar {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(8, 10, 15, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    opacity: 0;
+    pointer-events: none;
+}
+
+body:hover #je-topbar,
+body.je-bar-persist #je-topbar {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#je-topbar-title {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60%;
+}
+
+.je-topbtn {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    transition: background .15s, transform .1s;
+}
+
+.je-topbtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.je-topbtn:active {
+    transform: scale(.93);
+}
+
+.je-topbtn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* Bottom Dock */
+#je-dock {
+    width: max-content;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 28px;
+    background: rgba(8, 10, 15, 0.85);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+#je-dock.je-hidden {
+    transform: translateX(-50%) translateY(24px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.je-dockbtn {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s, transform .1s;
+    position: relative;
+}
+
+.je-dockbtn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.je-dockbtn:active {
+    transform: scale(.88);
+}
+
+.je-dockbtn svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+}
+
+.je-dockbtn.je-active {
+    background: rgba(0, 112, 209, 0.4);
+    color: #4da6ff;
+}
+
+.je-dock-sep {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 3px;
+    flex-shrink: 0;
+}
+
+/* Stats HUD */
+#je-stats-hud {
+    position: fixed;
+    top: 56px;
+    left: 16px;
+    z-index: 89000;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #00ff88;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    display: none;
+}
+
+#je-stats-hud.je-visible {
+    display: block;
+}
+
+/* Modals & Popups */
+.je-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 95000;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.je-popup.je-active {
+    display: flex;
+}
+
+.je-popup-panel {
+    background: #151821;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
+    display: flex;
+    flex-direction: column;
+}
+
+.je-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.je-popup-title {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.je-popup-close {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s, color .15s;
+}
+
+.je-popup-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.je-popup-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.je-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.je-setting-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.je-setting-control select,
+.je-setting-control input[type="range"] {
+    background: #202433;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+}
+
+.je-setting-control select:focus {
+    border-color: #0070d1;
+}
+
+/* Toast */
+.je-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 18, 26, 0.92);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    z-index: 99000;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+/* Virtual Touch Gamepad for PS2 */
+#je-virtual-gamepad {
+    position: fixed;
+    inset: 0;
+    z-index: 88000;
+    pointer-events: none;
+    display: none;
+}
+
+#je-virtual-gamepad.je-active {
+    display: block;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    #je-virtual-gamepad {
+        display: none !important;
+    }
+}
+
+.je-touch-pad {
+    position: absolute;
+    pointer-events: auto;
+}
+
+/* D-Pad */
+#je-touch-dpad {
+    bottom: 70px;
+    left: 20px;
+    width: 140px;
+    height: 140px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 4px;
+}
+
+.je-touch-btn {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: #fff;
+    user-select: none;
+}
+
+.je-touch-btn:active,
+.je-touch-btn.je-pressed {
+    background: rgba(0, 112, 209, 0.5);
+    border-color: #0070d1;
+}
+
+/* Face buttons */
+#je-touch-action {
+    bottom: 70px;
+    right: 20px;
+    width: 140px;
+    height: 140px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 4px;
+}
+
+.je-touch-btn.ps-cross { color: #5c8ae6; }
+.je-touch-btn.ps-circle { color: #e65c5c; }
+.je-touch-btn.ps-square { color: #e65cd5; }
+.je-touch-btn.ps-triangle { color: #5ce68a; }
+
+/* Shoulder buttons */
+#je-touch-shoulders {
+    top: 60px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+}
+
+.je-touch-shoulder-group {
+    display: flex;
+    gap: 8px;
+}
+
+.je-touch-shoulder {
+    width: 60px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* Menu (Select / Start) */
+#je-touch-menu {
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+}
+
+.je-touch-pill {
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 12px;
+}

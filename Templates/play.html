@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ game_name }} - PlayStation 2</title>
+    <script src="/jellyemu/assets/coi-serviceworker.js?v={{ version }}"></script>
+    <link rel="stylesheet" href="/jellyemu/assets/play.style.css?v={{ version }}">
+    <script src="/jellyemu/assets/play.disc.js?v={{ version }}"></script>
+    <script src="/jellyemu/assets/play.input.js?v={{ version }}"></script>
+    <script src="/jellyemu/assets/play.save.js?v={{ version }}"></script>
+    <script src="/jellyemu/assets/play.setting.js?v={{ version }}"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="je-loader">
+        <div class="je-loader-anim">
+            <div class="je-pulse-ring"></div>
+            <div class="je-pulse-ring"></div>
+            <div class="je-pulse-ring"></div>
+            <div class="je-spinner"></div>
+        </div>
+        <div id="je-loader-title">{{ game_name }}</div>
+        <div id="je-loader-system">PlayStation 2</div>
+        <div id="je-loader-status">Preparing Play! WebAssembly core…</div>
+    </div>
+
+    <!-- Live Stats HUD -->
+    <div id="je-stats-hud">FPS: -- | Speed: --%</div>
+
+    <!-- Top Bar -->
+    <div id="je-topbar" class="je-bar">
+        <span id="je-topbar-title">{{ game_name }}</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="je-topbtn" id="je-exit-btn" title="Exit">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                Exit
+            </button>
+        </div>
+    </div>
+
+    <!-- Emulation Canvas Container -->
+    <div id="canvas-container">
+        <canvas id="outputCanvas" width="640" height="448" tabindex="1"></canvas>
+    </div>
+
+    <!-- Virtual Touch Gamepad for DualShock 2 -->
+    <div id="je-virtual-gamepad">
+        <div id="je-touch-shoulders">
+            <div class="je-touch-shoulder-group">
+                <button class="je-touch-btn je-touch-shoulder" data-ps-btn="L2">L2</button>
+                <button class="je-touch-btn je-touch-shoulder" data-ps-btn="L1">L1</button>
+            </div>
+            <div class="je-touch-shoulder-group">
+                <button class="je-touch-btn je-touch-shoulder" data-ps-btn="R1">R1</button>
+                <button class="je-touch-btn je-touch-shoulder" data-ps-btn="R2">R2</button>
+            </div>
+        </div>
+
+        <div id="je-touch-dpad" class="je-touch-pad">
+            <div></div>
+            <button class="je-touch-btn" data-ps-btn="DPAD_UP">▲</button>
+            <div></div>
+            <button class="je-touch-btn" data-ps-btn="DPAD_LEFT">◀</button>
+            <div></div>
+            <button class="je-touch-btn" data-ps-btn="DPAD_RIGHT">▶</button>
+            <div></div>
+            <button class="je-touch-btn" data-ps-btn="DPAD_DOWN">▼</button>
+            <div></div>
+        </div>
+
+        <div id="je-touch-action" class="je-touch-pad">
+            <div></div>
+            <button class="je-touch-btn ps-triangle" data-ps-btn="TRIANGLE">△</button>
+            <div></div>
+            <button class="je-touch-btn ps-square" data-ps-btn="SQUARE">□</button>
+            <div></div>
+            <button class="je-touch-btn ps-circle" data-ps-btn="CIRCLE">○</button>
+            <div></div>
+            <button class="je-touch-btn ps-cross" data-ps-btn="CROSS">✕</button>
+            <div></div>
+        </div>
+
+        <div id="je-touch-menu" class="je-touch-pad">
+            <button class="je-touch-btn je-touch-pill" data-ps-btn="SELECT">SELECT</button>
+            <button class="je-touch-btn je-touch-pill" data-ps-btn="START">START</button>
+        </div>
+    </div>
+
+    <!-- Bottom Dock Menu -->
+    <div id="je-dock" class="je-bar">
+        <button class="je-dockbtn" id="je-btn-saves" title="Memory Cards (Not yet supported)" disabled style="opacity: 0.35; cursor: not-allowed; pointer-events: none;"><svg viewBox="0 0 24 24"><path d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-vol" title="Volume" onclick="_jeOpenPopup('je-popup-vol')"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-3.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-inputmap" title="Controller Settings" onclick="_jeOpenPopup('je-popup-input')"><svg viewBox="0 0 24 24"><path d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-screenshot" title="Screenshot"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></button>
+        <button class="je-dockbtn" id="je-btn-settings" title="Settings" onclick="_jeOpenPopup('je-popup-settings')"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59-.24-1.13-.56-1.62-.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+        <div class="je-dock-sep"></div>
+        <button class="je-dockbtn" id="je-fullscreen-btn" title="Fullscreen"><svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></button>
+    </div>
+
+    <!-- Modals -->
+    <!-- Settings Modal -->
+    <div id="je-popup-settings" class="je-popup">
+        <div class="je-popup-panel">
+            <div class="je-popup-header">
+                <span class="je-popup-title">Play! PS2 Settings</span>
+                <button class="je-popup-close" onclick="_jeClosePopup('je-popup-settings')">&times;</button>
+            </div>
+            <div class="je-popup-body">
+                <div class="je-setting-row">
+                    <span class="je-setting-label">Aspect Ratio</span>
+                    <div class="je-setting-control">
+                        <select id="je-setting-aspect">
+                            <option value="4:3">4:3 (Original)</option>
+                            <option value="16:9">16:9 (Widescreen)</option>
+                            <option value="stretch">Fill Screen</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="je-setting-row">
+                    <span class="je-setting-label">Frameskip Mode</span>
+                    <div class="je-setting-control">
+                        <select id="je-setting-frameskip">
+                            <option value="0">Off (Full Rate)</option>
+                            <option value="1">Skip 1 frame</option>
+                            <option value="2">Skip 2 frames</option>
+                            <option value="3">Skip 3 frames</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="je-setting-row">
+                    <span class="je-setting-label">Audio Synchronization</span>
+                    <div class="je-setting-control">
+                        <select id="je-setting-audiosync">
+                            <option value="dynamic" selected>Dynamic Sync (Continuous)</option>
+                            <option value="realtime">Real-Time (Standard Pitch)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="je-setting-row">
+                    <span class="je-setting-label">Show Performance HUD</span>
+                    <div class="je-setting-control">
+                        <input type="checkbox" id="je-setting-hud">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volume Modal -->
+    <div id="je-popup-vol" class="je-popup">
+        <div class="je-popup-panel" style="max-width: 360px;">
+            <div class="je-popup-header">
+                <span class="je-popup-title">Audio Volume</span>
+                <button class="je-popup-close" onclick="_jeClosePopup('je-popup-vol')">&times;</button>
+            </div>
+            <div class="je-popup-body">
+                <div class="je-setting-row">
+                    <input type="range" id="je-volume-slider" min="0" max="1" step="0.05" value="1" style="width: 100%;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saves / Memory Card Modal -->
+    <div id="je-popup-saves" class="je-popup">
+        <div class="je-popup-panel">
+            <div class="je-popup-header">
+                <span class="je-popup-title">PlayStation 2 Memory Cards</span>
+                <button class="je-popup-close" onclick="_jeClosePopup('je-popup-saves')">&times;</button>
+            </div>
+            <div class="je-popup-body">
+                <p style="font-size: 13px; color: rgba(255,255,255,0.75);">
+                    Play! uses simulated 8MB PlayStation 2 Memory Cards. Game progress is synced automatically to your Jellyfin profile.
+                </p>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="je-topbtn" style="background: #0070d1; justify-content: center; flex: 1;" onclick="saveMgr.flushMemoryCard();">
+                        Save Memory Card Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Mapping Modal -->
+    <div id="je-popup-input" class="je-popup">
+        <div class="je-popup-panel">
+            <div class="je-popup-header">
+                <span class="je-popup-title">DualShock 2 Controller Mapping</span>
+                <button class="je-popup-close" onclick="_jeClosePopup('je-popup-input')">&times;</button>
+            </div>
+            <div class="je-popup-body">
+                <p style="font-size: 13px; color: rgba(255,255,255,0.75);">
+                    USB & Bluetooth gamepads (Xbox, PlayStation, etc.) are automatically mapped with full Dual Analog Stick support.
+                </p>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.9); margin-top: 10px; line-height: 1.8;">
+                    <strong>Keyboard Controls:</strong>
+                    <ul style="margin-left: 20px;">
+                        <li><strong>D-Pad:</strong> Arrow Keys</li>
+                        <li><strong>Action Buttons:</strong> Z (Cross ✕), X (Circle ○), A (Square □), S (Triangle △)</li>
+                        <li><strong>Shoulder Buttons:</strong> Q / 1 (L1), E / 2 (R1), 3 (L2), 4 / 8 (R2)</li>
+                        <li><strong>Thumbstick Clicks:</strong> 9 (L3), 0 (R3)</li>
+                        <li><strong>Left Analog Stick:</strong> T / F / G / H (or W / D)</li>
+                        <li><strong>Right Analog Stick:</strong> I / J / K / L</li>
+                        <li><strong>Select / Start:</strong> Right Shift / Enter</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crash / Recovery Modal -->
+    <div id="je-popup-crash" class="je-popup">
+        <div class="je-popup-panel" style="border-color: rgba(255, 75, 75, 0.4); box-shadow: 0 12px 40px rgba(255,0,0,0.25);">
+            <div class="je-popup-header" style="border-bottom-color: rgba(255, 75, 75, 0.3);">
+                <span class="je-popup-title" style="color: #ff6b6b; display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: #ff6b6b;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    Emulation Core Interrupted
+                </span>
+            </div>
+            <div class="je-popup-body">
+                <p style="font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.6;">
+                    The emulation worker encountered an unsupported instruction or graphics transition trap (<code id="je-crash-reason" style="color: #ffd166; font-size: 12px;">RuntimeError: unreachable</code>).
+                </p>
+                <div style="background: rgba(0, 112, 209, 0.15); border: 1px solid rgba(0, 112, 209, 0.3); border-radius: 8px; padding: 10px 12px; margin: 12px 0; font-size: 12px; color: rgba(255,255,255,0.9);">
+                    <strong>Memory Card Protected:</strong> Any in-game progress or saves created prior to this transition have been preserved.
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+                    <button class="je-topbtn" style="background: #0070d1; justify-content: center; padding: 10px;" onclick="location.reload();">
+                        Restart Game (Reload from Save)
+                    </button>
+                    <button class="je-topbtn" style="background: rgba(255,255,255,0.1); justify-content: center; padding: 8px;" onclick="if (saveMgr) saveMgr.flushMemoryCard();">
+                        Save / Sync Memory Card Now
+                    </button>
+                    <button class="je-topbtn" style="background: transparent; justify-content: center; padding: 6px; color: rgba(255,255,255,0.6);" onclick="window.history.back();">
+                        Back to Library
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Web Audio dynamic rate & volume / latency control for OpenAL backend
+        (function() {
+            const OrigAudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!OrigAudioContext) return;
+
+            window.__activeAudioSources = new Set();
+            window.__activeAudioGains = new Set();
+            window.__audioSyncMode = 'dynamic';
+            window.__currentSpeedRatio = 1.0;
+            const savedVol = localStorage.getItem('jellyemu_play_volume');
+            window.__playMasterVolume = savedVol !== null ? Math.max(0, Math.min(1, parseFloat(savedVol) || 0)) : 1.0;
+
+            window.setPlayVolume = function(vol) {
+                const v = Math.max(0, Math.min(1, parseFloat(vol) || 0));
+                window.__playMasterVolume = v;
+                try { localStorage.setItem('jellyemu_play_volume', String(v)); } catch(e) {}
+                if (window.__activeAudioGains) {
+                    window.__activeAudioGains.forEach(g => {
+                        try {
+                            g.gain.setValueAtTime(v, (window.__playAudioCtx && window.__playAudioCtx.currentTime) || 0);
+                        } catch(e) {
+                            try { g.gain.value = v; } catch(err) {}
+                        }
+                    });
+                }
+            };
+
+            window.AudioContext = class extends OrigAudioContext {
+                constructor(opts = {}) {
+                    opts.latencyHint = 'playback';
+                    super(opts);
+                    window.__playAudioCtx = this;
+                }
+
+                createGain() {
+                    const gainNode = super.createGain();
+                    window.__activeAudioGains.add(gainNode);
+                    if (typeof window.__playMasterVolume === 'number') {
+                        try { gainNode.gain.value = window.__playMasterVolume; } catch(e) {}
+                    }
+                    return gainNode;
+                }
+
+                createBufferSource() {
+                    const src = super.createBufferSource();
+                    window.__activeAudioSources.add(src);
+                    src.addEventListener('ended', () => window.__activeAudioSources.delete(src));
+
+                    const origStart = src.start;
+                    src.start = function(...args) {
+                        try {
+                            if (window.__audioSyncMode === 'dynamic') {
+                                src.playbackRate.value = Math.max(0.12, Math.min(1.0, window.__currentSpeedRatio || 1.0));
+                            } else if (window.__audioSyncMode === 'realtime') {
+                                src.playbackRate.value = 1.0;
+                            }
+                        } catch(e) {}
+                        return origStart.apply(this, args);
+                    };
+                    return src;
+                }
+            };
+            if (window.webkitAudioContext) window.webkitAudioContext = window.AudioContext;
+        })();
+        let userToken = '';
+        try {
+            const creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
+            const server = (creds.Servers || []).find(function(s) { return s.UserId === '{{ user_id }}'; }) || (creds.Servers || [])[0];
+            userToken = (server && server.AccessToken) || '';
+        } catch (e) {}
+
+        const JELLYEMU_CONFIG = {
+            itemId: '{{ item_id }}',
+            userId: '{{ user_id }}',
+            token: userToken,
+            gameName: '{{ game_name }}',
+            romUrl: '{{ rom_url }}',
+            saveGetUrl: '{{ save_get_url }}',
+            savePostUrl: '{{ save_post_url }}',
+            activeSlot: {{ active_slot }},
+            customBindings: {{ custom_bindings_json }},
+            screenshotsToLibrary: {{ screenshots_to_library }}
+        };
+
+        const statusEl = document.getElementById('je-loader-status');
+        const loaderEl = document.getElementById('je-loader');
+        let playModuleInstance = null;
+        let saveMgr = null;
+        let inputMgr = null;
+        let settingsMgr = null;
+
+        let isCrashHandled = false;
+        function showCrashRecovery(reason) {
+            if (isCrashHandled) return;
+            isCrashHandled = true;
+            console.error('[JellyEmu Play!] Crash recovery triggered:', reason);
+
+            // Do not auto-flush on crash to prevent corrupting saves with broken state
+            const reasonEl = document.getElementById('je-crash-reason');
+            if (reasonEl) {
+                let cleanReason = String(reason || 'RuntimeError: unreachable');
+                if (cleanReason.length > 80) cleanReason = cleanReason.substring(0, 80) + '…';
+                reasonEl.textContent = cleanReason;
+            }
+
+            if (typeof window._jeOpenPopup === 'function') {
+                window._jeOpenPopup('je-popup-crash');
+            } else {
+                const modal = document.getElementById('je-popup-crash');
+                if (modal) modal.classList.add('je-active');
+            }
+        }
+
+        window.addEventListener('error', function(e) {
+            const msg = (e && (e.message || (e.error && e.error.message))) || String(e);
+            if (msg.includes('unreachable') || msg.includes('GL_INVALID_OPERATION') || msg.includes('WebGL context') || msg.includes('abort(') || msg.includes('call stack') || msg.includes('RangeError')) {
+                showCrashRecovery(msg);
+            }
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            const reason = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+            if (reason.includes('unreachable') || reason.includes('GL_INVALID_OPERATION') || reason.includes('abort(') || reason.includes('call stack') || reason.includes('RangeError')) {
+                showCrashRecovery(reason);
+            }
+        });
+
+        async function initPlay() {
+            try {
+                statusEl.textContent = 'Loading Settings & Modules…';
+                saveMgr = new PlaySaveManager(JELLYEMU_CONFIG);
+                saveMgr.setupAutoSave();
+
+                settingsMgr = new PlaySettingsManager(JELLYEMU_CONFIG);
+                settingsMgr.init();
+
+                // Exit button
+                document.getElementById('je-exit-btn').onclick = () => {
+                    window.history.back();
+                };
+
+                // Fullscreen button
+                document.getElementById('je-fullscreen-btn').onclick = () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(() => {});
+                    } else {
+                        document.exitFullscreen().catch(() => {});
+                    }
+                };
+
+                // Screenshot button
+                document.getElementById('je-btn-screenshot').onclick = () => {
+                    settingsMgr.captureScreenshot();
+                };
+
+                // Touch Gamepad detection
+                if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                    document.getElementById('je-virtual-gamepad').classList.add('je-active');
+                }
+
+                statusEl.textContent = 'Fetching ROM data…';
+                console.log('[JellyEmu Play!] Fetching ROM from:', JELLYEMU_CONFIG.romUrl);
+
+                const romResponse = await fetch(JELLYEMU_CONFIG.romUrl);
+                if (!romResponse.ok) throw new Error('Failed to download ROM from server.');
+                const romBlob = await romResponse.blob();
+
+                console.log('[JellyEmu Play!] crossOriginIsolated =', window.crossOriginIsolated, '| isSecureContext =', window.isSecureContext, '| SharedArrayBuffer =', typeof SharedArrayBuffer !== 'undefined');
+
+                // Preflight check for Cross-Origin Isolation (required for SharedArrayBuffer / pthreads)
+                if (!window.crossOriginIsolated) {
+                    statusEl.textContent = 'Activating Cross-Origin Isolation…';
+                    console.warn('[JellyEmu Play!] Page is not yet crossOriginIsolated. Awaiting ServiceWorker / reload...');
+                    let waited = 0;
+                    while (!window.crossOriginIsolated && waited < 2500) {
+                        await new Promise(r => setTimeout(r, 250));
+                        waited += 250;
+                    }
+                    if (!window.crossOriginIsolated) {
+                        if (!sessionStorage.getItem('coi_reloaded')) {
+                            sessionStorage.setItem('coi_reloaded', 'true');
+                            window.location.reload();
+                            return;
+                        }
+                        console.warn('[JellyEmu Play!] Warning: crossOriginIsolated is false. Emulation requires SharedArrayBuffer (HTTPS or localhost).');
+                    }
+                }
+
+                statusEl.textContent = 'Loading Play! WASM core…';
+                
+                // Wrap Worker constructor for transparent debugging of worker creation and errors
+                if (typeof window.Worker === 'function' && !window.__playWorkerWrapped) {
+                    window.__playWorkerWrapped = true;
+                    const NativeWorker = window.Worker;
+                    window.Worker = function(scriptURL, options) {
+                        console.log('[JellyEmu Play!] Instantiating worker:', scriptURL, options);
+                        const w = new NativeWorker(scriptURL, options);
+                        w.addEventListener('error', function(e) {
+                            const msg = e.message || 'Worker thread runtime error';
+                            console.error('[JellyEmu Play! Worker error event]:', msg, e);
+                            if (msg.includes('unreachable') || msg.includes('RuntimeError') || msg.includes('abort(')) {
+                                showCrashRecovery(msg);
+                            }
+                        });
+                        return w;
+                    };
+                }
+
+                // Fetch Play.js and create a Blob URL for guaranteed same-origin module worker instantiation
+                const playJsResp = await fetch('/jellyemu/play/runtime/Play.js');
+                if (!playJsResp.ok) throw new Error('Failed to download Play.js from server (' + playJsResp.status + ')');
+                const playJsText = await playJsResp.text();
+                const playJsBlob = new Blob([playJsText], { type: 'text/javascript' });
+                const playJsBlobUrl = URL.createObjectURL(playJsBlob);
+
+                // Dynamically import Play.js runtime as ES module
+                const playExport = await import(playJsBlobUrl);
+                const PlayFactory = typeof playExport.default === 'function'
+                    ? playExport.default
+                    : (typeof playExport.Play === 'function' ? playExport.Play : (typeof window.Play === 'function' ? window.Play : playExport));
+
+                if (typeof PlayFactory !== 'function') {
+                    throw new Error('Play! core factory function not found in Play.js module export.');
+                }
+
+                const runtimeBase = window.location.origin + '/jellyemu/play/runtime/';
+                const moduleOverrides = {
+                    canvas: document.getElementById('outputCanvas'),
+                    locateFile: function(path) {
+                        return runtimeBase + path;
+                    },
+                    preRun: [
+                        function() {
+                            try {
+                                if (typeof ENV !== 'undefined') {
+                                    ENV['XDG_CONFIG_HOME'] = '/work';
+                                    ENV['HOME'] = '/work';
+                                }
+                            } catch (e) {}
+                        }
+                    ],
+                    mainScriptUrlOrBlob: playJsBlobUrl,
+                    print: function(text) {
+                        console.log('[Play!]', text);
+                    },
+                    printErr: function(text) {
+                        console.error('[Play! Err]', text);
+                        if (typeof text === 'string' && (text.includes('unreachable') || text.includes('abort('))) {
+                            showCrashRecovery(text);
+                        }
+                    },
+                    onRuntimeInitialized: function() {
+                        console.log('[JellyEmu Play!] Emscripten runtime initialized.');
+                    }
+                };
+
+                playModuleInstance = await PlayFactory(moduleOverrides);
+                playModuleInstance.setVolume = (vol) => {
+                    if (typeof window.setPlayVolume === 'function') {
+                        window.setPlayVolume(vol);
+                    }
+                };
+                window.PlayModule = playModuleInstance;
+                window.Module = playModuleInstance;
+
+                try {
+                    if (playModuleInstance.FS && typeof playModuleInstance.FS.mkdir === 'function') {
+                        try { playModuleInstance.FS.mkdir('/work'); } catch (e) {}
+                        try { playModuleInstance.FS.mkdir('/work/mc0'); } catch (e) {}
+                    }
+                } catch (fsErr) {
+                    console.log('[JellyEmu Play!] FS init note:', fsErr);
+                }
+
+                saveMgr.setPlayModule(playModuleInstance);
+                settingsMgr.setPlayModule(playModuleInstance);
+
+                // Restore memory card
+                await saveMgr.restoreMemoryCard();
+
+                // Setup disc image streaming
+                playModuleInstance.discImageDevice = new PlayDiscImageDevice(playModuleInstance);
+                playModuleInstance.discImageDevice.setFile(romBlob);
+
+                inputMgr = new PlayInputManager(playModuleInstance);
+                inputMgr.init(JELLYEMU_CONFIG.customBindings);
+
+                statusEl.textContent = 'Starting Virtual Machine…';
+                playModuleInstance.ccall('initVm', '', [], []);
+
+                // PS2WEB(14): initVm is two-phase. Phase 1 spawns the EE thread (which owns the canvas and
+                // hands it to the GS pthread) and returns immediately; when the GS is up the VM reports
+                // state 1 and we run phase 2 (pad/sound/callbacks) from HERE — the JS event loop — because
+                // phase 2 blocks on the EE mailbox and blocking inside a proxied task deadlocks the runtime.
+                if (typeof playModuleInstance.getVmInitState === 'function') {
+                    const t0 = Date.now();
+                    for (;;) {
+                        const st = playModuleInstance.getVmInitState();
+                        if (st === 2) {
+                            break;
+                        }
+                        if (st === 1) {
+                            console.log('[JellyEmu Play!] Initializing VM Phase 2 (pad, audio, and callbacks)...');
+                            playModuleInstance.ccall('initVmPhase2', '', [], []);
+                            continue;
+                        }
+                        if (Date.now() - t0 > 60000) {
+                            console.error('[JellyEmu Play!] VM init timeout');
+                            break;
+                        }
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+                }
+
+                // Final memory card sync prior to boot
+                await saveMgr.restoreMemoryCard();
+
+                // Boot disc image
+                const discFilename = '{{ game_name }}.iso';
+                statusEl.textContent = 'Booting PlayStation 2 Disc…';
+                console.log('[JellyEmu Play!] Booting disc image:', discFilename, 'Size:', romBlob.size);
+
+                try {
+                    if (typeof playModuleInstance.bootDiscImage === 'function') {
+                        playModuleInstance.bootDiscImage(discFilename);
+                        console.log('[JellyEmu Play!] Successfully called bootDiscImage.');
+                    } else if (typeof playModuleInstance._bootDiscImage === 'function') {
+                        playModuleInstance._bootDiscImage(discFilename);
+                    } else {
+                        console.warn('[JellyEmu Play!] No bootDiscImage method found on PlayModule instance.');
+                    }
+                } catch (bootErr) {
+                    console.error('[JellyEmu Play!] bootDiscImage error:', bootErr);
+                }
+
+                // Focus canvas and attach WebGL context lost guard
+                const canvasEl = document.getElementById('outputCanvas');
+                if (canvasEl) {
+                    canvasEl.addEventListener('webglcontextlost', function(e) {
+                        e.preventDefault();
+                        console.warn('[JellyEmu Play!] WebGL context lost.');
+                        showCrashRecovery('WebGL graphics context lost.');
+                    }, false);
+                    canvasEl.focus();
+                }
+
+                // Dismiss loader
+                setTimeout(() => {
+                    loaderEl.classList.add('je-dismiss');
+                }, 800);
+
+            } catch (err) {
+                console.error('[JellyEmu Play!] Initialization error:', err);
+                statusEl.textContent = 'Error: ' + err.message;
+                statusEl.style.color = '#ff6b6b';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', initPlay);
+    </script>
+</body>
+</html>

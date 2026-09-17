@@ -10,9 +10,9 @@
     <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
     <RootNamespace>JellyEmu</RootNamespace>
-    <Version>0.9.2.1</Version>
-    <AssemblyVersion>0.9.2.1</AssemblyVersion>
-    <FileVersion>0.9.2.1</FileVersion>
+    <Version>0.9.2.2</Version>
+    <AssemblyVersion>0.9.2.2</AssemblyVersion>
+    <FileVersion>0.9.2.2</FileVersion>
     <Authors>Jellyfin-PG</Authors>
     <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -42,6 +42,7 @@
     <!-- Templates -->
     <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html" />
     <EmbeddedResource Include="Templates\ejs.html" LogicalName="JellyEmu.Templates.ejs.html" />
+    <EmbeddedResource Include="Templates\play.html" LogicalName="JellyEmu.Templates.play.html" />
     <!-- Script & Asset Modules-->
     <EmbeddedResource Include="Web/ejs.input.js" />
     <EmbeddedResource Include="Web/ejs.xr.js" />
@@ -49,6 +50,11 @@
     <EmbeddedResource Include="Web/ejs.setting.js" />
     <EmbeddedResource Include="Web/ejs.netplay.js" />
     <EmbeddedResource Include="Web/ejs.style.css" />
+    <EmbeddedResource Include="Web/play.style.css" />
+    <EmbeddedResource Include="Web/play.disc.js" />
+    <EmbeddedResource Include="Web/play.input.js" />
+    <EmbeddedResource Include="Web/play.save.js" />
+    <EmbeddedResource Include="Web/play.setting.js" />
     <!-- Frontend Injection Modules -->
     <EmbeddedResource Include="Web/Injection/*" />
     <!-- Resources -->

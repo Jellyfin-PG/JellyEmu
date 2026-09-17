@@ -286,6 +286,11 @@ namespace JellyEmu.Controllers
                     {
                         new("pico8", "Lexaloffle HTML5", false)
                     }
+                },
+                { "PlayStation 2", new List<CoreOption>
+                    {
+                        new("play", "Play! (WASM)", true)
+                    }
                 }
             };
 
@@ -312,6 +317,8 @@ namespace JellyEmu.Controllers
                 { "Sega 32X",         "picodrive"     },
                 { "Sega Saturn",      "yabause"       },
                 { "PlayStation",      "pcsx_rearmed"  },
+                { "PlayStation 2",    "play"          },
+                { "PS2",              "play"          },
                 { "PSP",              "ppsspp"        },
                 { "3DO",              "opera"         },
                 { "Atari 2600",       "stella2014"    },
@@ -377,6 +384,8 @@ namespace JellyEmu.Controllers
                 { "exe", "dosbox_pure" }, { "com", "dosbox_pure" }, { "bat", "dosbox_pure" },
                 // PICO-8
                 { "p8", "pico8" },
+                // PS2
+                { "elf", "play" },
             };
 
         /// <summary>
@@ -698,6 +707,7 @@ namespace JellyEmu.Controllers
                 "vb" => "beetle_vb",
                 "mednafen_psx" => "mednafen_psx_hw",
                 "3ds" or "citra" or "citra_canary" => "azahar",
+                "ps2" or "playstation2" or "playstation 2" or "play" => "play",
                 _ => core ?? string.Empty
             };
         }
@@ -853,7 +863,12 @@ namespace JellyEmu.Controllers
         {
             var core = ResolveCoreDefault(item);
             var needsThreads = IsThreadedCore(core);
-            var launcher = core == "pico8" ? "pico8" : "ejs";
+            var launcher = core switch
+            {
+                "pico8" => "pico8",
+                "play"  => "play",
+                _       => "ejs"
+            };
             return new CoreInfo(core, needsThreads, launcher);
         }
 
@@ -861,7 +876,12 @@ namespace JellyEmu.Controllers
         {
             var core = ResolveCore(item, userId, queryCoreOverride);
             var needsThreads = IsThreadedCore(core);
-            var launcher = core == "pico8" ? "pico8" : "ejs";
+            var launcher = core switch
+            {
+                "pico8" => "pico8",
+                "play"  => "play",
+                _       => "ejs"
+            };
             return new CoreInfo(core, needsThreads, launcher);
         }
 

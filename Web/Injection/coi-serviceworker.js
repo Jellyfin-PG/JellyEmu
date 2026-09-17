@@ -45,8 +45,8 @@
 
         self.addEventListener('fetch', function(event) {
             var r = event.request;
-            // Only intercept top-level HTML document navigations (COOP/COEP only required on documents)
-            if (r.mode === 'navigate' || r.destination === 'document') {
+            // Intercept top-level HTML document navigations as well as workers and scripts for cross-origin isolation
+            if (r.mode === 'navigate' || r.destination === 'document' || r.destination === 'worker' || r.destination === 'sharedworker' || r.destination === 'script') {
                 if (r.cache === 'only-if-cached' && r.mode !== 'same-origin') return;
 
                 event.respondWith(
@@ -56,6 +56,7 @@
                         var newHeaders = new Headers(res.headers);
                         newHeaders.set('Cross-Origin-Embedder-Policy', 'credentialless');
                         newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
+                        newHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
 
                         return new Response(res.body, {
                             status: res.status,

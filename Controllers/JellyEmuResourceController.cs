@@ -39,16 +39,19 @@ namespace JellyEmu.Controllers
 
         private static byte[]? _cachedJsBundle;
         private static byte[]? _cachedCssBundle;
+        private readonly JellyEmuPlayManager _playManager;
 
         public JellyEmuResourceController(
             ILibraryManager libraryManager,
             IApplicationPaths appPaths,
             ILogger<JellyEmuResourceController> logger,
             JellyEmuEjsManager ejsManager,
+            JellyEmuPlayManager playManager,
             JellyEmuSessionService sessionService,
             IHttpClientFactory httpClientFactory)
             : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory)
         {
+            _playManager = playManager;
         }
 
         /// <summary>
@@ -157,6 +160,118 @@ namespace JellyEmu.Controllers
             if (stream == null) return NotFound();
 
             return File(stream, contentType);
+        }
+
+        /// <summary>
+        /// Serves the Play! stylesheet embedded CSS resource.
+        /// Path: GET /jellyemu/assets/play.style.css
+        /// </summary>
+        [HttpGet("/jellyemu/assets/play.style.css")]
+        [Produces("text/css")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlayStyleCss()
+        {
+            const string contentType = "text/css; charset=utf-8";
+            Response.ContentType = contentType;
+
+            var assembly = typeof(JellyEmuResourceController).Assembly;
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("play.style.css", StringComparison.OrdinalIgnoreCase));
+
+            if (resourceName == null)
+            {
+                Logger.LogError("[JellyEmu] Embedded stylesheet play.style.css not found.");
+                return NotFound();
+            }
+
+            var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null) return NotFound();
+
+            return File(stream, contentType);
+        }
+
+        /// <summary>
+        /// Serves the Play! disc I/O worker embedded JS resource.
+        /// Path: GET /jellyemu/assets/play.disc.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/play.disc.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlayDiscJs()
+        {
+            return ServeEmbeddedJs("play.disc.js");
+        }
+
+        /// <summary>
+        /// Serves the Play! input manager embedded JS resource.
+        /// Path: GET /jellyemu/assets/play.input.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/play.input.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlayInputJs()
+        {
+            return ServeEmbeddedJs("play.input.js");
+        }
+
+        /// <summary>
+        /// Serves the Play! save manager embedded JS resource.
+        /// Path: GET /jellyemu/assets/play.save.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/play.save.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlaySaveJs()
+        {
+            return ServeEmbeddedJs("play.save.js");
+        }
+
+        /// <summary>
+        /// Serves the Play! settings manager embedded JS resource.
+        /// Path: GET /jellyemu/assets/play.setting.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/play.setting.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlaySettingJs()
+        {
+            return ServeEmbeddedJs("play.setting.js");
+        }
+
+        /// <summary>
+        /// Serves downloaded Play! wasm core runtime files (Play.js, Play.wasm).
+        /// Path: GET /jellyemu/play/runtime/{*filename}
+        /// </summary>
+        [HttpGet("/jellyemu/play/runtime/{*filename}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PlayRuntimeFile(string filename)
+        {
+            if (string.IsNullOrWhiteSpace(filename) || filename.Contains(".."))
+                return NotFound();
+
+            var filePath = _playManager.GetRuntimeFilePath(filename);
+            if (filePath == null || !System.IO.File.Exists(filePath))
+                return NotFound();
+
+            Response.Headers["Access-Control-Allow-Origin"] = "*";
+            Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
+            Response.Headers["Cross-Origin-Embedder-Policy"] = "credentialless";
+            Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+            Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
+
+            string contentType = filename.EndsWith(".wasm", StringComparison.OrdinalIgnoreCase)
+                ? "application/wasm"
+                : filename.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+                    ? "text/javascript; charset=utf-8"
+                    : "application/octet-stream";
+
+            return PhysicalFile(filePath, contentType);
         }
 
         /// <summary>

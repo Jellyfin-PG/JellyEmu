@@ -41,9 +41,9 @@
         "Asia","Scandinavia","Unlicensed","Prototype","Demo","Sample"
     ]);
 
-    // Platforms recognised for library management but not supported by EmulatorJS.
+    // Platforms recognised for library management but not supported by in-browser emulation.
     JE.ejsUnsupportedPlatforms = new Set([
-        "Dreamcast","PlayStation 2","PlayStation 3",
+        "Dreamcast","PlayStation 3",
         "Xbox","Xbox 360",
         "GameCube","Wii","Wii U","Nintendo Switch",
         "PlayStation Vita","Windows","Linux","MacOS","Android","Unsupported"

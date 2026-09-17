@@ -207,6 +207,23 @@ namespace JellyEmu.Services
                     }
                 },
                 {
+                    "ps2", new()
+                    {
+                        { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } }, // CROSS
+                        { 1,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } }, // SQUARE
+                        { 2,  new() { Kb1 = 86, Kb2 = 0, Gp1 = "SELECT", Gp2 = "" } },
+                        { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },
+                        { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } }, // CIRCLE
+                        { 9,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } }, // TRIANGLE
+                        { 10, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_TOP_SHOULDER", Gp2 = "" } },
+                        { 11, new() { Kb1 = 69, Kb2 = 0, Gp1 = "RIGHT_TOP_SHOULDER", Gp2 = "" } },
+                        { 12, new() { Kb1 = 9,  Kb2 = 0, Gp1 = "LEFT_BOTTOM_SHOULDER", Gp2 = "" } },
+                        { 13, new() { Kb1 = 82, Kb2 = 0, Gp1 = "RIGHT_BOTTOM_SHOULDER", Gp2 = "" } },
+                        { 14, new() { Kb1 = 0,  Kb2 = 0, Gp1 = "LEFT_STICK", Gp2 = "" } },
+                        { 15, new() { Kb1 = 0,  Kb2 = 0, Gp1 = "RIGHT_STICK", Gp2 = "" } }
+                    }
+                },
+                {
                     "psp", new()
                     {
                         { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },
@@ -659,6 +676,36 @@ namespace JellyEmu.Services
                     }, new List<int> { 16, 17, 18, 19, 20, 21, 22, 23 })
                 },
                 {
+                    "ps2",
+                    ("PlayStation 2", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 9, Label = "△ TRIANGLE" },
+                        new() { Id = 1, Label = "□ SQUARE" },
+                        new() { Id = 0, Label = "⨯ CROSS" },
+                        new() { Id = 8, Label = "○ CIRCLE" },
+                        new() { Id = 2, Label = "SELECT" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 10, Label = "L1" },
+                        new() { Id = 11, Label = "R1" },
+                        new() { Id = 12, Label = "L2" },
+                        new() { Id = 13, Label = "R2" },
+                        new() { Id = 14, Label = "L3" },
+                        new() { Id = 15, Label = "R3" },
+                        new() { Id = 19, Label = "L STICK UP" },
+                        new() { Id = 18, Label = "L STICK DOWN" },
+                        new() { Id = 17, Label = "L STICK LEFT" },
+                        new() { Id = 16, Label = "L STICK RIGHT" },
+                        new() { Id = 23, Label = "R STICK UP" },
+                        new() { Id = 22, Label = "R STICK DOWN" },
+                        new() { Id = 21, Label = "R STICK LEFT" },
+                        new() { Id = 20, Label = "R STICK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19, 20, 21, 22, 23 })
+                },
+                {
                     "arcade",
                     ("Arcade", new List<InputButtonDefinition>
                     {
@@ -744,6 +791,7 @@ namespace JellyEmu.Services
             { "mednafen_pcfx", "pcfx" },
             { "ppsspp", "psp" },
             { "pcsx_rearmed", "psx" }, { "mednafen_psx_hw", "psx" },
+            { "play", "ps2" }, { "play!", "ps2" },
             { "fbneo", "arcade" }, { "fbalpha2012_cps1", "arcade" }, { "fbalpha2012_cps2", "arcade" },
             { "same_cdi", "arcade" }, { "mame2003", "arcade" }, { "mame2003_plus", "arcade" },
             { "a5200", "default" },
@@ -781,6 +829,7 @@ namespace JellyEmu.Services
             { "PC-FX", "pcfx" }, { "PCFX", "pcfx" },
             { "PSP", "psp" }, { "PLAYSTATION PORTABLE", "psp" },
             { "PLAYSTATION", "psx" }, { "PSX", "psx" }, { "PS1", "psx" },
+            { "PLAYSTATION 2", "ps2" }, { "PLAYSTATION2", "ps2" }, { "PS2", "ps2" },
             { "ARCADE", "arcade" }, { "MAME", "arcade" }, { "MAME 2003", "arcade" }
         };
 

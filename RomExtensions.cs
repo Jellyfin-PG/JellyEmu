@@ -100,7 +100,7 @@ namespace JellyEmu
 
                     var trimmedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                     var dirName = Path.GetFileName(trimmedPath);
-                    if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName))
+                    if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName) && !PlatformResolver.LibraryOnlyAliases.ContainsKey(dirName))
                     {
                         var platform = new PlatformResolver(null!).Resolve(trimmedPath);
                         if (platform != "Unknown" && Directory.EnumerateFileSystemEntries(path).Any())

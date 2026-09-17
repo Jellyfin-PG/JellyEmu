@@ -271,6 +271,38 @@ namespace JellyEmu.Tests
             }
         }
 
+        [Fact]
+        public void DefaultCoreResolution_PlayStation2_ReturnsPlayAndIsSupported()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var controller = new CoreResolutionTestController(new MockAppPaths(tempDir));
+                var item = new Book
+                {
+                    Id = Guid.NewGuid(),
+                    Tags = new[] { "PlayStation 2" },
+                    Path = "C:\\Games\\PS2\\Game.iso"
+                };
+
+                var resolvedCore = controller.TestResolveCore(item);
+                var resolvedInfo = controller.TestResolveCoreInfo(item);
+                var availableCores = controller.TestGetAvailableCores(item);
+
+                Assert.Equal("play", resolvedCore);
+                Assert.Equal("play", resolvedInfo.Launcher);
+                Assert.True(resolvedInfo.NeedsThreads);
+                Assert.True(PlatformResolver.IsEjsSupported("PlayStation 2"));
+                Assert.Contains(availableCores, c => c.Id == "play");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
+
         private static void WithController(Action<CoreResolutionTestController> body)
         {
             var tempDir = Path.Combine(Path.GetTempPath(), "JellyEmuTests_" + Guid.NewGuid().ToString("N"));
@@ -292,6 +324,8 @@ namespace JellyEmu.Tests
         [InlineData("Game Boy Advance", "mgba")]
         [InlineData("SNES", "snes9x")]
         [InlineData("Sega Saturn", "yabause")]
+        [InlineData("PlayStation 2", "play")]
+        [InlineData("PS2", "play")]
         [InlineData("Atari 2600", "stella2014")]
         [InlineData("Atari 7800", "prosystem")]
         public void ResolveCore_ConsoleTag_ResolvesExpectedCore(string tag, string expected)
