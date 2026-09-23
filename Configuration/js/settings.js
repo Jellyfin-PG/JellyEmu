@@ -150,7 +150,7 @@
         if (!containerEl) return;
         var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
 
-        fetch('/jellyemu/bios/list', {
+        fetch(window.JellyEmu.getUrl('jellyemu/bios/list'), {
             headers: { 'Authorization': authHeader }
         })
         .then(function(r) { return r.json(); })
@@ -238,7 +238,7 @@
                     var sys = this.getAttribute('data-sys');
                     var rel = this.getAttribute('data-rel');
 
-                    fetch('/jellyemu/bios/active', {
+                    fetch(window.JellyEmu.getUrl('jellyemu/bios/active'), {
                         method: 'POST',
                         headers: {
                             'Authorization': authHeader,
@@ -520,7 +520,7 @@
                 statusEl.textContent = 'Triggering re-download…';
                 statusEl.style.color = '#aaa';
                 var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
-                fetch('/jellyemu/ejs/redownload', {
+                fetch(window.JellyEmu.getUrl('jellyemu/ejs/redownload'), {
                     method: 'POST',
                     headers: { 'Authorization': authHeader }
                 })
@@ -550,7 +550,7 @@
                 }
                 statusEl.textContent = 'Checking…';
                 statusEl.style.color = '#aaa';
-                fetch('/jellyemu/romm/health')
+                fetch(window.JellyEmu.getUrl('jellyemu/romm/health'))
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
                         if (d.reachable) {
@@ -577,7 +577,7 @@
                 status.style.color = '#aaa';
                 var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
 
-                fetch('/jellyemu/romm/collections', {
+                fetch(window.JellyEmu.getUrl('jellyemu/romm/collections'), {
                     headers: { 'Authorization': authHeader }
                 })
                 .then(function (r) { return r.json(); })

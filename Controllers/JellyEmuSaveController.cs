@@ -394,7 +394,7 @@ namespace JellyEmu.Controllers
                         lastModified = fi.LastWriteTimeUtc.ToString("o"),
                         hasArt,
                         hasScreenshot = System.IO.File.Exists(GetSaveScreenshotPath(userId, itemId, slotNumber)),
-                        downloadUrl   = $"/jellyemu/save/{itemId}/{userId}?slot={slotNumber}",
+                        downloadUrl   = ToAppUrl($"jellyemu/save/{itemId}/{userId}?slot={slotNumber}"),
                     });
                 }
             }

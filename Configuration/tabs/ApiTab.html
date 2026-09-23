@@ -101,7 +101,7 @@
         <div class="je-api-item">
             <div class="je-api-header">
                 <span class="je-api-method get">GET</span>
-                <span class="je-api-path">/jellyemu/rom/download-zip/{itemId}</span>
+                <span class="je-api-path" id="coreRomZipUrl">/jellyemu/rom/download-zip/{itemId}</span>
             </div>
             <p class="je-api-desc">Builds and streams a ZIP file packaging all multi-part installer files (designed for Windows/GOG installer packages).</p>
         </div>
@@ -116,7 +116,7 @@
         <div class="je-api-item">
             <div class="je-api-header">
                 <span class="je-api-method get">GET</span>
-                <span class="je-api-path">/jellyemu/save-slots/{itemId}/{userId}</span>
+                <span class="je-api-path" id="saveSlotsUrl">/jellyemu/save-slots/{itemId}/{userId}</span>
             </div>
             <p class="je-api-desc">Retrieves a list of saved state slots, file sizes, timestamps, and screenshots for the given game and user.</p>
         </div>
@@ -127,7 +127,7 @@
                 <span class="je-api-method get" style="margin-left: 4px;">GET</span>
                 <span class="je-api-method post" style="margin-left: 4px;">POST</span>
                 <span class="je-api-method delete" style="margin-left: 4px;">DELETE</span>
-                <span class="je-api-path" style="margin-left: 4px;">/jellyemu/save/{itemId}/{userId}?slot={slot}</span>
+                <span class="je-api-path" id="saveSlotUrl" style="margin-left: 4px;">/jellyemu/save/{itemId}/{userId}?slot={slot}</span>
             </div>
             <p class="je-api-desc">Checks existence (HEAD), downloads (GET), uploads (POST), or deletes (DELETE) the save state file for the specified slot (also supports path route <code>/jellyemu/save/{itemId}/{userId}/{slot}</code>). Omitting the slot on HEAD checks whether any save state exists for the item.</p>
         </div>
@@ -138,7 +138,7 @@
                 <span class="je-api-method get" style="margin-left: 4px;">GET</span>
                 <span class="je-api-method post" style="margin-left: 4px;">POST</span>
                 <span class="je-api-method delete" style="margin-left: 4px;">DELETE</span>
-                <span class="je-api-path" style="margin-left: 4px;">/jellyemu/sram/{itemId}/{userId}?slot={slot}</span>
+                <span class="je-api-path" id="sramSlotUrl" style="margin-left: 4px;">/jellyemu/sram/{itemId}/{userId}?slot={slot}</span>
             </div>
             <p class="je-api-desc">Checks existence (HEAD), downloads (GET), uploads (POST), or deletes (DELETE) SRAM cartridge battery-backed save data for the specified slot (also supports path route <code>/jellyemu/sram/{itemId}/{userId}/{slot}</code>).</p>
         </div>
@@ -147,7 +147,7 @@
             <div class="je-api-header">
                 <span class="je-api-method get">GET</span>
                 <span class="je-api-method post" style="margin-left: 4px;">POST</span>
-                <span class="je-api-path" style="margin-left: 4px;">/jellyemu/prefs/{userId}</span>
+                <span class="je-api-path" id="prefsUrl" style="margin-left: 4px;">/jellyemu/prefs/{userId}</span>
             </div>
             <p class="je-api-desc">Downloads (GET) or updates (POST) user emulator preferences and controller mappings.</p>
         </div>

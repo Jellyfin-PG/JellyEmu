@@ -5,10 +5,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ game_name }}</title>
-    <script src="/jellyemu/assets/coi-serviceworker.js"></script>
-    <script src="/jellyemu/threejs/three.min.js"></script>
+    <script src="{{ base_url }}/jellyemu/assets/jellyemu.utils.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/coi-serviceworker.js"></script>
+    <script src="{{ base_url }}/jellyemu/threejs/three.min.js"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="/jellyemu/assets/ejs.style.css">
+    <link rel="stylesheet" href="{{ base_url }}/jellyemu/assets/ejs.style.css">
 </head>
 
 <body>
@@ -571,16 +572,16 @@
     <script id="je-available-cores-json" type="application/json">{{ available_cores_json }}</script>
     <script>
         (function () {
-            var token = '';
-            try {
-                var creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
-                var server = (creds.Servers || []).find(function (s) { return s.UserId === '{{ user_id }}'; });
-                token = (server && server.AccessToken) || '';
-            } catch (e) { }
-
+            var token = (window.JellyEmu && typeof window.JellyEmu.getAuthToken === 'function')
+                ? window.JellyEmu.getAuthToken('{{ user_id }}')
+                : '';
             window._jellyToken = token;
 
+            window.JellyEmu = window.JellyEmu || {};
+            window.JellyEmu.baseUrl = '{{ base_url }}';
+
             window.JellyEmuConfig = {
+                baseUrl: '{{ base_url }}',
                 itemId: '{{ item_id }}',
                 userId: '{{ user_id }}',
                 savePostUrl: '{{ save_post_url }}',
@@ -740,7 +741,7 @@
                     if (typeof _jellyToken !== 'undefined' && _jellyToken) {
                         loadHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
                     }
-                    fetch('/jellyemu/save/{{ item_id }}/{{ user_id }}?slot={{ slot_value }}', { headers: loadHeaders })
+                    fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/save/{{ item_id }}/{{ user_id }}?slot={{ slot_value }}', { headers: loadHeaders })
                         .then(function (r) { if (r.ok) return r.arrayBuffer(); throw new Error('No save data'); })
                         .then(function (buf) {
                             var g = gm(); if (g) g.loadState(new Uint8Array(buf));
@@ -1072,7 +1073,7 @@
                         headers['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
                     }
 
-                    fetch('/jellyemu/prefs/{{ user_id }}', {
+                    fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/prefs/{{ user_id }}', {
                         method: 'POST',
                         headers: headers,
                         body: JSON.stringify({
@@ -1224,7 +1225,7 @@
                     var volToSave = (_jeCurrentVol > 0 ? _jeCurrentVol : _jeLastVol).toString();
                     var muteToSave = (_jeCurrentVol === 0 ? '1' : '0');
 
-                    fetch('/jellyemu/prefs/' + userId, {
+                    fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/prefs/' + userId, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1395,7 +1396,7 @@
                 if (typeof _jellyToken !== 'undefined' && _jellyToken) {
                     headers['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
                 }
-                fetch('/jellyemu/cheats/{{ item_id }}', { headers: headers })
+                fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/cheats/{{ item_id }}', { headers: headers })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         _jeCheatsLoaded = true;
@@ -1427,32 +1428,21 @@
             // Screenshot — uploads to the configured screenshots folder when set,
             // otherwise downloads in the browser.
             var _jeShotsToLibrary = {{ screenshots_to_library }};
-            function _jeSaveShotToLibrary(dataUrl) {
-                fetch('/jellyemu/screenshot/{{ item_id }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'MediaBrowser Token="' + (_jellyToken || '') + '"'
-                    },
-                    body: JSON.stringify({ dataUrl: dataUrl })
-                }).then(function (r) {
-                    if (!r.ok) throw new Error('Server rejected screenshot');
-                    var btn = document.getElementById('je-btn-screenshot');
-                    if (btn) {
-                        btn.style.filter = 'drop-shadow(0 0 6px #7f7)';
-                        setTimeout(function () { btn.style.filter = ''; }, 800);
-                    }
-                }).catch(function (err) { console.warn('[JellyEmu] Screenshot upload failed:', err); });
-            }
             function _jeHandleShot(dataUrl) {
                 if (!dataUrl || !dataUrl.startsWith('data:image')) return;
-                if (_jeShotsToLibrary) {
-                    _jeSaveShotToLibrary(dataUrl);
-                } else {
-                    var a = document.createElement('a');
-                    a.href = dataUrl;
-                    a.download = (window.EJS_gameName || 'screenshot') + '.png';
-                    a.click();
+                if (window.JellyEmu && typeof window.JellyEmu.uploadScreenshot === 'function') {
+                    window.JellyEmu.uploadScreenshot('{{ item_id }}', dataUrl, {
+                        toLibrary: _jeShotsToLibrary,
+                        gameName: window.EJS_gameName || 'screenshot'
+                    }).then(function (ok) {
+                        if (ok && _jeShotsToLibrary) {
+                            var btn = document.getElementById('je-btn-screenshot');
+                            if (btn) {
+                                btn.style.filter = 'drop-shadow(0 0 6px #7f7)';
+                                setTimeout(function () { btn.style.filter = ''; }, 800);
+                            }
+                        }
+                    });
                 }
                 try {
                     window.parent.postMessage({ type: 'jellyemu-screenshot', itemId: '{{ item_id }}', dataUrl: dataUrl }, '*');
@@ -1588,7 +1578,7 @@
             }
             var secs = _jeGetActivePlaytimeSeconds();
             var query = '?isPaused=' + (isPaused ? 'true' : 'false') + '&seconds=' + secs;
-            fetch('/jellyemu/session/ping/{{ item_id }}/{{ user_id }}' + query, {
+            fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/session/ping/{{ item_id }}/{{ user_id }}' + query, {
                 method: 'POST',
                 headers: pingHeaders
             }).catch(function () { });
@@ -1622,9 +1612,22 @@
             _isSessionActive = true;
 
             // Mark game as played in Jellyfin when the game starts
-            fetch('/Users/{{ user_id }}/PlayedItems/{{ item_id }}', {
+            var playedHeaders = (window.JellyEmu && typeof window.JellyEmu.getAuthHeaders === 'function')
+                ? window.JellyEmu.getAuthHeaders(_jellyToken)
+                : {
+                    'X-Emby-Authorization': 'MediaBrowser Client="JellyEmu", Device="Browser", DeviceId="jellyemu", Version="1.0", Token="' + _jellyToken + '"',
+                    'Authorization': 'MediaBrowser Token="' + _jellyToken + '"',
+                    'X-MediaBrowser-Token': _jellyToken,
+                    'X-Emby-Token': _jellyToken
+                };
+
+            var playedUrl = (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function')
+                ? window.JellyEmu.getUrl('/Users/{{ user_id }}/PlayedItems/{{ item_id }}')
+                : ((window.JellyEmuConfig.baseUrl || '') + '/Users/{{ user_id }}/PlayedItems/{{ item_id }}');
+
+            fetch(playedUrl, {
                 method: 'POST',
-                headers: { 'X-Emby-Authorization': 'MediaBrowser Client="JellyEmu", Device="Browser", DeviceId="jellyemu", Version="1.0", Token="' + _jellyToken + '"' }
+                headers: playedHeaders
             }).catch(function (err) {
                 console.warn('[JellyEmu] Could not mark item as played:', err);
             });
@@ -1637,8 +1640,14 @@
             };
             if (typeof _jellyToken !== 'undefined' && _jellyToken) {
                 startHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
+                startHeaders['X-MediaBrowser-Token'] = _jellyToken;
+                startHeaders['X-Emby-Token'] = _jellyToken;
             }
-            fetch('/jellyemu/session/start/{{ item_id }}/{{ user_id }}', {
+            var startUrl = (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function')
+                ? window.JellyEmu.getUrl('/jellyemu/session/start/{{ item_id }}/{{ user_id }}')
+                : ((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/session/start/{{ item_id }}/{{ user_id }}');
+
+            fetch(startUrl, {
                 method: 'POST',
                 headers: startHeaders
             }).catch(function (err) {
@@ -1714,7 +1723,7 @@
             var dataUrl = _jeCaptureCanvas();
             if (!dataUrl || !dataUrl.startsWith('data:image')) return;
             (afterPromise || Promise.resolve()).then(function () {
-                fetch('/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/' + slot, {
+                fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/save-screenshot/{{ item_id }}/{{ user_id }}/' + slot, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -1767,14 +1776,14 @@
             if (typeof _jellyToken !== 'undefined' && _jellyToken) {
                 stopHeaders['Authorization'] = 'MediaBrowser Token="' + _jellyToken + '"';
             }
-            var sessionStop = fetch('/jellyemu/session/stop/{{ item_id }}/{{ user_id }}?seconds=' + sessionSeconds, {
+            var sessionStop = fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/session/stop/{{ item_id }}/{{ user_id }}?seconds=' + sessionSeconds, {
                 method: 'POST',
                 headers: stopHeaders
             }).catch(function () { });
 
             // Always record playtime for this session (excluding paused/background time)
             var playtimeFlush = sessionSeconds > 0
-                ? fetch('/jellyemu/playtime/{{ item_id }}/{{ user_id }}', {
+                ? fetch((window.JellyEmuConfig.baseUrl || '') + '/jellyemu/playtime/{{ item_id }}/{{ user_id }}', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'text/plain',
@@ -1793,7 +1802,7 @@
                     if (window.history.length > 1) {
                         window.history.back();
                     } else {
-                        window.location.href = '/web/#/details?id={{ item_id }}';
+                        window.location.href = (window.JellyEmuConfig.baseUrl || '') + '/web/#/details?id={{ item_id }}';
                     }
                 } else {
                     window.parent.postMessage('close-jellyemu', '*');
@@ -1829,12 +1838,12 @@
         {{ end }}
     </script>
 
-    <script src="/jellyemu/assets/ejs.input.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/ejs.core.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/ejs.save.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/ejs.setting.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/ejs.xr.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/ejs.netplay.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/ejs.input.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/ejs.core.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/ejs.save.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/ejs.setting.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/ejs.xr.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/ejs.netplay.js?v={{ version }}"></script>
     <script src="{{ ejs_base }}/loader.js"></script>
     <script>
         window.addEventListener('load', function () {

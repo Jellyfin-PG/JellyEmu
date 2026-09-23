@@ -75,13 +75,13 @@ namespace JellyEmu.Controllers
             var cleanFilename = CleanCosmeticFilename(filename);
             if (string.IsNullOrWhiteSpace(cleanFilename)) cleanFilename = itemId;
 
-            var romUrl = $"/jellyemu/rom/{itemId}/{cleanFilename}{ext}";
+            var romUrl = ToAppUrl($"jellyemu/rom/{itemId}/{cleanFilename}{ext}");
             if (!string.IsNullOrEmpty(userId)) romUrl += $"?userId={userId}";
 
             var hasSaves = !string.IsNullOrEmpty(userId);
             var activeSlot = Math.Max(1, slot ?? 1);
-            var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
-            var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
+            var saveGetUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+            var savePostUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
 
             var platformTag = "PlayStation 2";
             var effectivePrefs = hasSaves
@@ -120,6 +120,7 @@ namespace JellyEmu.Controllers
                 game_name = gameName,
                 item_id = itemId,
                 user_id = userId ?? string.Empty,
+                base_url = GetPathBase(),
                 rom_url = romUrl,
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,
@@ -164,7 +165,7 @@ namespace JellyEmu.Controllers
 
             var ext = RomExtensions.GetPico8Extension(item);
 
-            var cartUrl = $"/jellyemu/rom/{itemId}/{itemId}{ext}";
+            var cartUrl = ToAppUrl($"jellyemu/rom/{itemId}/{itemId}{ext}");
             var gameName = HtmlEncoder.Default.Encode(item.Name);
 
             Logger.LogInformation("[JellyEmu] PICO-8 play: {Name} ({ItemId}) cart={CartUrl}",
@@ -195,6 +196,7 @@ namespace JellyEmu.Controllers
             var html = template.Render(new
             {
                 game_name = gameName,
+                base_url = GetPathBase(),
                 cart_url = cartUrl,
                 item_id = itemId,
                 screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder)
@@ -259,7 +261,7 @@ namespace JellyEmu.Controllers
             {
                 cleanFilename = itemId;
             }
-            var romUrl = $"/jellyemu/rom/{itemId}/{cleanFilename}{ext}";
+            var romUrl = ToAppUrl($"jellyemu/rom/{itemId}/{cleanFilename}{ext}");
             if (!string.IsNullOrEmpty(userId))
             {
                 romUrl += $"?userId={userId}";
@@ -275,8 +277,8 @@ namespace JellyEmu.Controllers
             var activeSlot = Math.Max(1, slot ?? 1);
             var activeShader = effectivePrefs.Shader;
             var videoRotation = effectivePrefs.VideoRotation;
-            var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
-            var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
+            var saveGetUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+            var savePostUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
 
             var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId, activeSlot));
 
@@ -288,14 +290,14 @@ namespace JellyEmu.Controllers
                 if (numericGameId == 0) numericGameId = 1;
             }
 
-            const string netplayServer = "/jellyemu/netplay";
+            var netplayServer = ToAppUrl("jellyemu/netplay");
             var netplayIceServers = Plugin.Instance?.Configuration.NetplayIceServers ?? string.Empty;
             var netplayIceServersJson = System.Text.Json.JsonSerializer.Serialize(netplayIceServers);
             const bool hasNetplay = true;
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
             var ejsBase = EjsManager.IsReady
-                ? $"/jellyemu/ejs"
+                ? ToAppUrl("jellyemu/ejs")
                 : JellyEmuEjsManager.CdnBase;
 
             // Load the embedded Scriban template
@@ -322,7 +324,7 @@ namespace JellyEmu.Controllers
 
             var biosService = HttpContext.RequestServices.GetService(typeof(JellyEmuBiosService)) as JellyEmuBiosService;
             var relBios = biosService?.ResolveBiosRelativePath(platformTag, resolvedCore);
-            var biosUrl = !string.IsNullOrEmpty(relBios) ? $"/jellyemu/bios/file/{relBios}" : string.Empty;
+            var biosUrl = !string.IsNullOrEmpty(relBios) ? ToAppUrl($"jellyemu/bios/file/{relBios}") : string.Empty;
 
             var inputService = HttpContext.RequestServices.GetService(typeof(JellyEmuInputService)) as JellyEmuInputService;
             var inputScheme = inputService?.GetScheme(platformTag ?? resolvedCore);
@@ -337,6 +339,7 @@ namespace JellyEmu.Controllers
             var html = template.Render(new
             {
                 game_name = gameName,
+                base_url = GetPathBase(),
                 core = resolvedCore,
                 platform_tag = platformTag,
                 input_scheme_json = inputSchemeJson,

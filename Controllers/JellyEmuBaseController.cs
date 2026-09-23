@@ -55,6 +55,36 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Gets the configured or proxied base path for the application, e.g. "/jellyfin", or empty string if root.
+        /// </summary>
+        protected string GetPathBase()
+        {
+            return Request?.PathBase.HasValue == true
+                ? Request.PathBase.Value.TrimEnd('/')
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Gets the full server base URL including scheme, host, and path base (e.g. "http://localhost:8096/jellyfin").
+        /// </summary>
+        protected string GetServerBase()
+        {
+            return $"{Request.Scheme}://{Request.Host}{GetPathBase()}";
+        }
+
+        /// <summary>
+        /// Converts an app-relative path into a fully qualified path with PathBase prefixed (e.g. "/jellyfin/jellyemu/rom/123").
+        /// </summary>
+        protected string ToAppUrl(string relativePath)
+        {
+            var basePrefix = GetPathBase();
+            var cleanPath = relativePath.TrimStart('/');
+            return string.IsNullOrEmpty(basePrefix)
+                ? $"/{cleanPath}"
+                : $"{basePrefix}/{cleanPath}";
+        }
+
+        /// <summary>
         /// Applies the cross-origin isolation headers.
         /// This is skipped on insecure requests to avoid browser security errors.
         /// </summary>

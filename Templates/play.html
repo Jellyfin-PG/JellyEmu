@@ -4,12 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{{ game_name }} - PlayStation 2</title>
-    <script src="/jellyemu/assets/coi-serviceworker.js?v={{ version }}"></script>
-    <link rel="stylesheet" href="/jellyemu/assets/play.style.css?v={{ version }}">
-    <script src="/jellyemu/assets/play.disc.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/play.input.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/play.save.js?v={{ version }}"></script>
-    <script src="/jellyemu/assets/play.setting.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/jellyemu.utils.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/coi-serviceworker.js?v={{ version }}"></script>
+    <link rel="stylesheet" href="{{ base_url }}/jellyemu/assets/play.style.css?v={{ version }}">
+    <script src="{{ base_url }}/jellyemu/assets/play.disc.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/play.input.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/play.save.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/play.setting.js?v={{ version }}"></script>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -305,14 +306,15 @@
             };
             if (window.webkitAudioContext) window.webkitAudioContext = window.AudioContext;
         })();
-        let userToken = '';
-        try {
-            const creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
-            const server = (creds.Servers || []).find(function(s) { return s.UserId === '{{ user_id }}'; }) || (creds.Servers || [])[0];
-            userToken = (server && server.AccessToken) || '';
-        } catch (e) {}
+        let userToken = (window.JellyEmu && typeof window.JellyEmu.getAuthToken === 'function')
+            ? window.JellyEmu.getAuthToken('{{ user_id }}')
+            : '';
+
+        window.JellyEmu = window.JellyEmu || {};
+        window.JellyEmu.baseUrl = '{{ base_url }}';
 
         const JELLYEMU_CONFIG = {
+            baseUrl: '{{ base_url }}',
             itemId: '{{ item_id }}',
             userId: '{{ user_id }}',
             token: userToken,
@@ -450,7 +452,7 @@
                 }
 
                 // Fetch Play.js and create a Blob URL for guaranteed same-origin module worker instantiation
-                const playJsResp = await fetch('/jellyemu/play/runtime/Play.js');
+                const playJsResp = await fetch((JELLYEMU_CONFIG.baseUrl || '') + '/jellyemu/play/runtime/Play.js');
                 if (!playJsResp.ok) throw new Error('Failed to download Play.js from server (' + playJsResp.status + ')');
                 const playJsText = await playJsResp.text();
                 const playJsBlob = new Blob([playJsText], { type: 'text/javascript' });
@@ -466,7 +468,7 @@
                     throw new Error('Play! core factory function not found in Play.js module export.');
                 }
 
-                const runtimeBase = window.location.origin + '/jellyemu/play/runtime/';
+                const runtimeBase = window.location.origin + (JELLYEMU_CONFIG.baseUrl || '') + '/jellyemu/play/runtime/';
                 const moduleOverrides = {
                     canvas: document.getElementById('outputCanvas'),
                     locateFile: function(path) {

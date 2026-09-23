@@ -85,14 +85,14 @@
     JE.launchEmulator = function(itemId, slot) {
         console.log('[JellyEmu] Launching emulator for item:', itemId);
         var userId = window.ApiClient ? window.ApiClient.getCurrentUserId() : '';
-        var playUrl = '/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : '');
+        var playUrl = JE.getUrl('/jellyemu/play/' + itemId + (userId ? '?userId=' + userId : ''));
         if (slot) {
             playUrl += (playUrl.indexOf('?') !== -1 ? '&' : '?') + 'slot=' + slot;
         }
 
         // Romm sync-on-launch: pull if Romm has a newer save before launching
         var syncPromise = userId
-            ? fetch('/jellyemu/romm/sync-on-launch/' + itemId + '/' + userId, { method: 'POST' }).catch(function() {})
+            ? JE.fetch('/jellyemu/romm/sync-on-launch/' + itemId + '/' + userId, { method: 'POST' }).catch(function() {})
             : Promise.resolve();
 
         syncPromise.finally(function() {
@@ -103,15 +103,8 @@
     JE.deleteSave = async function(itemId, slot) {
         try {
             const userId = ApiClient.getCurrentUserId();
-            const token = ApiClient.accessToken();
-            const url = `/jellyemu/save/${itemId}/${userId}?slot=${slot}`;
-
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `MediaBrowser Token="${token}"`, 
-                    'Accept': 'application/json'
-                }
+            const response = await JE.fetch(`/jellyemu/save/${itemId}/${userId}?slot=${slot}`, {
+                method: 'DELETE'
             });
 
             if (response.status === 204) {
@@ -155,7 +148,7 @@
         if (e.data && e.data.type === 'jellyemu-save-written') {
             var itemId2 = e.data.itemId;
             if (userId && itemId2) {
-                fetch('/jellyemu/romm/sync-after-save/' + itemId2 + '/' + userId, { method: 'POST' })
+                JE.fetch('/jellyemu/romm/sync-after-save/' + itemId2 + '/' + userId, { method: 'POST' })
                     .then(function(r) { return r.ok ? r.json() : null; })
                     .then(function(d) { if (d && d.pushed) JE.jeToast('\u2601 Save synced to Romm'); })
                     .catch(function() {});
@@ -165,7 +158,7 @@
             var itemId3 = e.data.itemId;
             var seconds3 = e.data.seconds || 0;
             if (userId && itemId3 && seconds3 > 0) {
-                fetch('/jellyemu/romm/report-playtime/' + itemId3 + '/' + userId, {
+                JE.fetch('/jellyemu/romm/report-playtime/' + itemId3 + '/' + userId, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ seconds: seconds3 })
@@ -176,7 +169,7 @@
             var itemId4 = e.data.itemId;
             var dataUrl = e.data.dataUrl;
             if (userId && itemId4 && dataUrl) {
-                fetch('/jellyemu/romm/screenshot/' + itemId4 + '/' + userId, {
+                JE.fetch('/jellyemu/romm/screenshot/' + itemId4 + '/' + userId, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ dataUrl: dataUrl })

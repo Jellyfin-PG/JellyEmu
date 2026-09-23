@@ -20,6 +20,7 @@ namespace JellyEmu.Controllers
     {
         private static readonly string[] InjectionJsModules =
         {
+            "utils.js",
             "core.js",
             "cards.js",
             "details.js",
@@ -254,6 +255,19 @@ namespace JellyEmu.Controllers
         public IActionResult PlaySettingJs()
         {
             return ServeEmbeddedJs("play.setting.js");
+        }
+
+        /// <summary>
+        /// Serves the shared client utility script.
+        /// Path: GET /jellyemu/assets/jellyemu.utils.js
+        /// </summary>
+        [HttpGet("/jellyemu/assets/jellyemu.utils.js")]
+        [Produces("application/javascript")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult JellyEmuUtilsJs()
+        {
+            return ServeEmbeddedJs("jellyemu.utils.js");
         }
 
         /// <summary>

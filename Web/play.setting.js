@@ -24,34 +24,32 @@
 
         setupPopups() {
             window._jeOpenPopup = (popupId) => {
-                const el = document.getElementById(popupId);
-                if (el) el.classList.add('je-active');
+                if (window.JellyEmu && typeof window.JellyEmu.openModal === 'function') {
+                    window.JellyEmu.openModal(popupId);
+                } else {
+                    const el = document.getElementById(popupId);
+                    if (el) el.classList.add('je-active');
+                }
             };
 
             window._jeClosePopup = (popupId) => {
-                const el = document.getElementById(popupId);
-                if (el) el.classList.remove('je-active');
+                if (window.JellyEmu && typeof window.JellyEmu.closeModal === 'function') {
+                    window.JellyEmu.closeModal(popupId);
+                } else {
+                    const el = document.getElementById(popupId);
+                    if (el) el.classList.remove('je-active');
+                }
             };
 
             window._jeToast = (msg, durationMs = 2500) => {
-                const toast = document.createElement('div');
-                toast.className = 'je-toast';
-                toast.textContent = msg;
-                document.body.appendChild(toast);
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    toast.style.transform = 'translateX(-50%) translateY(10px)';
-                    setTimeout(() => toast.remove(), 300);
-                }, durationMs);
+                if (window.JellyEmu && typeof window.JellyEmu.toast === 'function') {
+                    window.JellyEmu.toast(msg, durationMs);
+                }
             };
 
-            document.querySelectorAll('.je-popup').forEach(popup => {
-                popup.addEventListener('click', (e) => {
-                    if (e.target === popup) {
-                        popup.classList.remove('je-active');
-                    }
-                });
-            });
+            if (window.JellyEmu && typeof window.JellyEmu.initModals === 'function') {
+                window.JellyEmu.initModals();
+            }
         }
 
         setupSettingsHandlers() {
@@ -188,32 +186,12 @@
 
             try {
                 const dataUrl = canvas.toDataURL('image/png');
-
-                if (this.screenshotsToLibrary && this.itemId) {
-                    // Upload to Jellyfin screenshots library
-                    const blob = await (await fetch(dataUrl)).blob();
-                    const formData = new FormData();
-                    formData.append('file', blob, `${this.itemId}_${Date.now()}.png`);
-
-                    const res = await fetch(`/jellyemu/screenshot/${this.itemId}`, {
-                        method: 'POST',
-                        body: formData
+                if (window.JellyEmu && typeof window.JellyEmu.uploadScreenshot === 'function') {
+                    await window.JellyEmu.uploadScreenshot(this.itemId, dataUrl, {
+                        toLibrary: this.screenshotsToLibrary,
+                        gameName: `PlayStation2_${this.itemId}`
                     });
-
-                    if (res.ok) {
-                        window._jeToast('Screenshot saved to Jellyfin library');
-                        return;
-                    }
                 }
-
-                // Fallback: Browser download
-                const a = document.createElement('a');
-                a.href = dataUrl;
-                a.download = `PlayStation2_${this.itemId}_${Date.now()}.png`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window._jeToast('Screenshot downloaded');
             } catch (err) {
                 console.error('[JellyEmu Play!] Screenshot failed:', err);
                 window._jeToast('Screenshot capture failed');

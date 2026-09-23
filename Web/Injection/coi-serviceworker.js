@@ -2,7 +2,10 @@
 (function() {
     if (typeof window !== 'undefined') {
         if ('serviceWorker' in navigator && window.isSecureContext) {
-            navigator.serviceWorker.register('/jellyemu/assets/coi-serviceworker.js', { scope: '/' })
+            var swUrl = (document.currentScript && document.currentScript.src)
+                || (window.JellyEmu && window.JellyEmu.getUrl ? window.JellyEmu.getUrl('/jellyemu/assets/coi-serviceworker.js') : null)
+                || (window.JellyEmuConfig && window.JellyEmuConfig.baseUrl ? window.JellyEmuConfig.baseUrl + '/jellyemu/assets/coi-serviceworker.js' : '/jellyemu/assets/coi-serviceworker.js');
+            navigator.serviceWorker.register(swUrl)
                 .then(function(reg) {
                     reg.addEventListener('updatefound', function() {
                         if (!navigator.serviceWorker.controller) return;

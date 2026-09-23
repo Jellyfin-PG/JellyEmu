@@ -24,6 +24,9 @@
             options.headers = options.headers || {};
             options.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
         }
+        if (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function') {
+            return fetch(window.JellyEmu.getUrl(url), options);
+        }
         return fetch(url, options);
     }
 

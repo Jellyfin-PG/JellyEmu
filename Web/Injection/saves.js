@@ -51,19 +51,8 @@
             return;
         }
 
-        function fmtDate(iso) {
-            try {
-                const d = new Date(iso);
-                return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
-                       ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-            } catch { return iso; }
-        }
-
-        function fmtSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / 1048576).toFixed(1) + ' MB';
-        }
+        const fmtDate = (iso) => (JE.formatDate ? JE.formatDate(iso) : iso);
+        const fmtSize = (bytes) => (JE.formatBytes ? JE.formatBytes(bytes) : `${bytes} B`);
 
         let allSaves = [];
 
@@ -113,7 +102,7 @@
                     ssImg.style.display = 'none';
                     artWrap.appendChild(ssImg);
 
-                    fetch(`/jellyemu/save-screenshot/${s.itemId}/${userId}/${s.slot}`)
+                    JE.fetch(`/jellyemu/save-screenshot/${s.itemId}/${userId}/${s.slot}`)
                         .then(function(r) { return r.ok ? r.json() : null; })
                         .then(function(data) {
                             if (!data || !data.dataUrl) return;
@@ -175,7 +164,7 @@
 
                 // Romm sync status + push/pull buttons
                 (function(itemId, slot, bodyEl) {
-                    fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + slot)
+                    JE.fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + slot)
                         .then(function(r) { return r.ok ? r.json() : null; })
                         .then(function(d) {
                             if (!d || d.status === 'Disabled') return;
@@ -195,7 +184,7 @@
                             if (pullBtn) { pullBtn.style.display = ''; }
                             pushBtn && pushBtn.addEventListener('click', function() {
                                 pushBtn.disabled = true;
-                                fetch('/jellyemu/romm/push/' + itemId + '/' + userId + '/' + slot, { method: 'POST' })
+                                JE.fetch('/jellyemu/romm/push/' + itemId + '/' + userId + '/' + slot, { method: 'POST' })
                                     .then(function(r) { return r.json(); })
                                     .then(function(d2) {
                                         if (statusEl) statusEl.textContent = d2.pushed ? '\u2601\ufe0f Pushed to Romm' : '\u274c Push failed';
@@ -204,7 +193,7 @@
                             });
                             pullBtn && pullBtn.addEventListener('click', function() {
                                 pullBtn.disabled = true;
-                                fetch('/jellyemu/romm/pull/' + itemId + '/' + userId + '/' + slot, { method: 'POST' })
+                                JE.fetch('/jellyemu/romm/pull/' + itemId + '/' + userId + '/' + slot, { method: 'POST' })
                                     .then(function(r) { return r.json(); })
                                     .then(function(d2) {
                                         if (statusEl) statusEl.textContent = d2.pulled ? '\u2193 Pulled from Romm' : '\u274c Pull failed';
@@ -232,14 +221,11 @@
         }
 
         function reloadGrid() {
-            fetch('/jellyemu/saves/' + userId, {
-                headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
-            })
-            .then(r => r.ok ? r.json() : [])
+            JE.json('/jellyemu/saves/' + userId)
             .then(saves => {
-                allSaves = saves;
+                allSaves = saves || [];
 
-                const platforms = [...new Set(saves.map(s => s.platform).filter(Boolean))].sort();
+                const platforms = [...new Set(allSaves.map(s => s.platform).filter(Boolean))].sort();
                 const platformSelect = activePage.querySelector('#je-filter-platform');
                 if (platformSelect) {
                     platformSelect.innerHTML = '<option value="">All platforms</option>';

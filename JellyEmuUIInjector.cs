@@ -32,9 +32,31 @@ namespace JellyEmu.Services
                 string versionStr = JellyEmuVersion.Value;
 
                 string injection = $$"""
-                <link rel="stylesheet" href="/jellyemu/assets/injection/bundle.css?v={{versionStr}}" data-jellyemu-mods="1">
-                <script data-jellyemu-mods="1">window.__JELLYEMU_CONFIG__ = { vantageEnabled: {{vantageStr}} };</script>
-                <script src="/jellyemu/assets/injection/bundle.js?v={{versionStr}}" defer data-jellyemu-mods="1"></script>
+                <script data-jellyemu-mods="1">
+                    (function() {
+                        var base = '';
+                        if (window.location && window.location.pathname) {
+                            var idx = window.location.pathname.indexOf('/web');
+                            if (idx > 0) {
+                                base = window.location.pathname.substring(0, idx);
+                            }
+                        }
+                        base = (base || '').replace(/\/+$/, '');
+                        window.__JELLYEMU_CONFIG__ = { vantageEnabled: {{vantageStr}} };
+
+                        var link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = (base ? base : '') + '/jellyemu/assets/injection/bundle.css?v={{versionStr}}';
+                        link.setAttribute('data-jellyemu-mods', '1');
+                        document.head.appendChild(link);
+
+                        var script = document.createElement('script');
+                        script.src = (base ? base : '') + '/jellyemu/assets/injection/bundle.js?v={{versionStr}}';
+                        script.defer = true;
+                        script.setAttribute('data-jellyemu-mods', '1');
+                        document.body.appendChild(script);
+                    })();
+                </script>
                 """;
 
                 string block = "\n" + StartMarker + "\n" + injection + "\n" + EndMarker + "\n";

@@ -71,7 +71,7 @@
         const itemId = JE.currentItemId;
 
         const saveSlotsPromise = (userId && itemId)
-            ? fetch('/jellyemu/save-slots/' + itemId + '/' + userId)
+            ? JE.fetch('/jellyemu/save-slots/' + itemId + '/' + userId)
                 .then(r => r.ok ? r.json() : [])
                 .catch(() => [])
             : Promise.resolve([]);
@@ -87,11 +87,8 @@
                     pill.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;';
                     let title = 'Save in Slot ' + s.slot;
                     if (s.lastModified) {
-                        try {
-                            const d = new Date(s.lastModified);
-                            title += ' (' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
-                                d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) + ')';
-                        } catch {}
+                        const formattedDate = (JE.formatDate ? JE.formatDate(s.lastModified) : s.lastModified);
+                        title += ' (' + formattedDate + ')';
                     }
                     title += ' \u2014 Click to play';
                     pill.title = title;
@@ -108,14 +105,7 @@
         }
 
         if (userId && itemId && !wrap.querySelector('.jellyemu-playtime-pill')) {
-            const token = window.ApiClient ? window.ApiClient.accessToken() : '';
-            fetch('/jellyemu/playtime/' + itemId + '/' + userId, {
-                headers: {
-                    'Authorization': 'MediaBrowser Token="' + token + '"',
-                    'Accept': 'application/json'
-                }
-            })
-                .then(r => r.ok ? r.json() : null)
+            JE.json('/jellyemu/playtime/' + itemId + '/' + userId)
                 .then(data => {
                     if (!data || data.seconds === undefined) return;
                     const pill = document.createElement('div');
@@ -135,7 +125,7 @@
             saveSlotsPromise
                 .then(slots => {
                     const activeSlot = (slots && slots.length > 0) ? slots[0].slot : 1;
-                    return fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + activeSlot);
+                    return JE.fetch('/jellyemu/romm/sync-status/' + itemId + '/' + userId + '/' + activeSlot);
                 })
                 .then(r => r.ok ? r.json() : null)
                 .then(data => {
@@ -160,10 +150,7 @@
         }
 
         if (userId && itemId && !wrap.querySelector('.jellyemu-ra-pill')) {
-            const token = window.ApiClient ? window.ApiClient.accessToken() : '';
-            fetch('/jellyemu/retroachievements/progress/' + itemId + '/' + userId, {
-                headers: { 'Authorization': 'MediaBrowser Token="' + token + '"' }
-            })
+            JE.fetch('/jellyemu/retroachievements/progress/' + itemId + '/' + userId)
                 .then(r => {
                     if (r.status === 401) return { error: 'unauthorized' };
                     return r.ok ? r.json() : null;
@@ -226,7 +213,7 @@
                 guideUrl += '&gameId=' + encodeURIComponent(ssId);
             }
 
-            fetch(guideUrl)
+            JE.fetch(guideUrl)
                 .then(r => r.ok ? r.json() : null)
                 .then(data => {
                     if (!data) return;
