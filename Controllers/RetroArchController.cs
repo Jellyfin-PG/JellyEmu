@@ -60,7 +60,12 @@ namespace JellyEmu.Controllers
         }
 
         private string ServerBase()
-            => $"{Request.Scheme}://{Request.Host}";
+        {
+            var req = Request;
+            if (req == null) return string.Empty;
+            var pathBase = req.PathBase.HasValue ? req.PathBase.Value.TrimEnd('/') : string.Empty;
+            return $"{req.Scheme}://{req.Host}{pathBase}";
+        }
 
         private static string ResolveCoreFile(BaseItem item)
         {

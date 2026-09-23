@@ -23,6 +23,13 @@ namespace JellyEmu
                 client.Timeout = TimeSpan.FromMinutes(5);
             });
 
+            serviceCollection.AddHttpClient("JellyEmuPlay", client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    JellyEmuVersion.BrowserUserAgent);
+                client.Timeout = TimeSpan.FromMinutes(5);
+            });
+
             serviceCollection.AddSingleton<PlatformResolver>();
 
             serviceCollection.AddSingleton<JellyEmuEjsManager>();
@@ -30,6 +37,8 @@ namespace JellyEmu
             serviceCollection.AddSingleton<JellyEmuPico8Manager>();
 
             serviceCollection.AddSingleton<JellyEmuThreeJsManager>();
+
+            serviceCollection.AddSingleton<JellyEmuPlayManager>();
 
             serviceCollection.AddSingleton<JellyEmuSessionService>();
             serviceCollection.AddSingleton<IgdbClientService>();

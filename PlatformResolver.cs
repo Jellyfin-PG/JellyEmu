@@ -108,6 +108,8 @@ namespace JellyEmu
                 { "ss", "Sega Saturn"}, { "saturn", "Sega Saturn" }, { "sega saturn", "Sega Saturn" }, { "segasaturn", "Sega Saturn" },
                 // PlayStation
                 { "psx", "PlayStation" }, { "ps1", "PlayStation" }, { "playstation", "PlayStation" }, { "playstation 1", "PlayStation" }, { "ps one", "PlayStation" }, { "playstation1", "PlayStation" }, { "play station", "PlayStation" }, { "play station 1", "PlayStation" },
+                // PlayStation 2
+                { "ps2", "PlayStation 2" }, { "playstation 2", "PlayStation 2" }, { "playstation2", "PlayStation 2" }, { "ps 2", "PlayStation 2" }, { "play station 2", "PlayStation 2" }, { "sony playstation 2", "PlayStation 2" }, { "sony playstation2", "PlayStation 2" }, { "sony ps2", "PlayStation 2" },
                 // Atari
                 { "atari 2600", "Atari 2600" }, { "2600", "Atari 2600" }, { "atari 7800", "Atari 7800" }, { "7800", "Atari 7800" },
                 { "lynx", "Atari Lynx" }, { "atari lynx", "Atari Lynx" }, { "jaguar", "Atari Jaguar" }, { "atari jaguar", "Atari Jaguar" },
@@ -162,7 +164,6 @@ namespace JellyEmu
             new(StringComparer.OrdinalIgnoreCase)
             {
                 { "dreamcast", "Dreamcast" }, { "dc", "Dreamcast" }, { "sega dreamcast", "Dreamcast" },
-                { "ps2", "PlayStation 2" }, { "playstation 2", "PlayStation 2" }, { "play station 2", "PlayStation 2" },
                 { "ps3", "PlayStation 3" }, { "playstation 3", "PlayStation 3" }, { "play station 3", "PlayStation 3" },
                 { "xbox", "Xbox" }, { "xbox 360", "Xbox 360" }, { "x360", "Xbox 360" },
                 { "gamecube", "GameCube" }, { "nintendo gamecube", "GameCube" }, { "gc", "GameCube" },
@@ -383,7 +384,7 @@ namespace JellyEmu
                 ".col", ".cv", ".ngp", ".ngc", ".pbp", ".cue", ".iso", ".chd", ".gdi", ".cdi", ".mdf",
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
-                ".xex", ".xiso", ".vpk", ".j3u", ".exe", ".msi",
+                ".xex", ".xiso", ".vpk", ".j3u", ".exe", ".msi", ".elf", ".nrg",
                 ".appimage", ".deb", ".flatpak", ".snap", ".sh", ".x86_64", ".x86",
                 ".app", ".dmg", ".pkg", ".apk", ".xapk"
             };

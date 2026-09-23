@@ -40,7 +40,8 @@ namespace JellyEmu
 
                         var parentFolder = Path.GetFileName(Path.GetDirectoryName(args.Path));
                         var seriesName   = (!string.IsNullOrEmpty(parentFolder) &&
-                                            !PlatformResolver.Aliases.ContainsKey(parentFolder))
+                                            !PlatformResolver.Aliases.ContainsKey(parentFolder) &&
+                                            !PlatformResolver.LibraryOnlyAliases.ContainsKey(parentFolder))
                                            ? parentFolder
                                            : null;
 
@@ -56,7 +57,7 @@ namespace JellyEmu
 
                     var trimmedPath = args.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                     var dirName = Path.GetFileName(trimmedPath);
-                    if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName))
+                    if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName) && !PlatformResolver.LibraryOnlyAliases.ContainsKey(dirName))
                     {
                         var consoleTag = _platformResolver.Resolve(trimmedPath);
                         if (consoleTag != "Unknown" && Directory.EnumerateFileSystemEntries(args.Path).Any())
@@ -69,7 +70,8 @@ namespace JellyEmu
 
                             var parentFolder = Path.GetFileName(Path.GetDirectoryName(trimmedPath));
                             var seriesName = (!string.IsNullOrEmpty(parentFolder) &&
-                                                !PlatformResolver.Aliases.ContainsKey(parentFolder))
+                                                !PlatformResolver.Aliases.ContainsKey(parentFolder) &&
+                                                !PlatformResolver.LibraryOnlyAliases.ContainsKey(parentFolder))
                                                ? parentFolder
                                                : null;
 
@@ -133,7 +135,8 @@ namespace JellyEmu
 
                 var parentFolder = Path.GetFileName(Path.GetDirectoryName(args.Path));
                 var seriesName   = (!string.IsNullOrEmpty(parentFolder) &&
-                                    !PlatformResolver.Aliases.ContainsKey(parentFolder))
+                                    !PlatformResolver.Aliases.ContainsKey(parentFolder) &&
+                                    !PlatformResolver.LibraryOnlyAliases.ContainsKey(parentFolder))
                                    ? parentFolder
                                    : null;
 
@@ -157,7 +160,8 @@ namespace JellyEmu
 
                 var parentFolder = Path.GetFileName(Path.GetDirectoryName(args.Path));
                 var seriesName   = (!string.IsNullOrEmpty(parentFolder) &&
-                                    !PlatformResolver.Aliases.ContainsKey(parentFolder))
+                                    !PlatformResolver.Aliases.ContainsKey(parentFolder) &&
+                                    !PlatformResolver.LibraryOnlyAliases.ContainsKey(parentFolder))
                                    ? parentFolder
                                    : null;
 

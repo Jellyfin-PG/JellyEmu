@@ -39,6 +39,9 @@
             options.headers = options.headers || {};
             options.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
         }
+        if (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function') {
+            return fetch(window.JellyEmu.getUrl(url), options);
+        }
         return fetch(url, options);
     }
 
@@ -425,11 +428,7 @@
         // Subscribe to jellyemu:gamestart to check and restore Slot 99 SRAM
         window.addEventListener('jellyemu:gamestart', function () {
             setTimeout(function () {
-                var loadHeaders = {};
-                if (token) {
-                    loadHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
-                }
-                fetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', { headers: loadHeaders })
+                jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99')
                     .then(function (r) {
                         if (r.ok) return r.arrayBuffer();
                         throw new Error('No Slot 99 backup');
@@ -446,9 +445,8 @@
                         console.log('[JellyEmu] Restored Slot 99 SRAM for next disc.');
 
                         // Delete the slot 99 save from server
-                        fetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', {
-                            method: 'DELETE',
-                            headers: loadHeaders
+                        jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', {
+                            method: 'DELETE'
                         }).catch(function () {});
                     })
             }, 500);

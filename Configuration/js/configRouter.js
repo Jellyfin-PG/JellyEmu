@@ -53,10 +53,13 @@
         if (jeLoadedTabs[tabId]) {
             renderTab(jeLoadedTabs[tabId]);
         } else {
-            var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
-            fetch('/jellyemu/config/partial/' + templateName, {
-                headers: { 'Authorization': authHeader }
-            })
+            var fetchPromise = (window.JellyEmu && typeof window.JellyEmu.fetch === 'function')
+                ? window.JellyEmu.fetch('jellyemu/config/partial/' + templateName)
+                : fetch(window.JellyEmu.getUrl('jellyemu/config/partial/' + templateName), {
+                    headers: { 'Authorization': 'MediaBrowser Token="' + (typeof ApiClient !== 'undefined' ? ApiClient.accessToken() : '') + '"' }
+                });
+
+            fetchPromise
             .then(function(r) { return r.text(); })
             .then(function(html) {
                 jeLoadedTabs[tabId] = html;
@@ -154,19 +157,50 @@
     window.jeShowNotification = showNotification;
 
     function loadRetroArchUrl(page) {
-        var base = window.location.origin;
-        var set = function (id, val) { var el = page.querySelector('#' + id); if (el) el.textContent = val; };
-        set('raPlaylistUrl', base + '/jellyemu/retroarch/playlist');
-        set('raPlaylistSystemUrl', base + '/jellyemu/retroarch/playlist/{system}');
-        set('raLaunchUrl', base + '/jellyemu/retroarch/launch/{itemId}');
-        set('raInfoUrl', base + '/jellyemu/retroarch/info');
-        set('raRomUrl', base + '/jellyemu/rom/{itemId}');
-        set('raAssetsBaseUrl', base + '/jellyemu/retroarch/');
-        set('raCoresIndexDirsUrl', base + '/jellyemu/retroarch/cores/.index-dirs');
-        set('raCoresIndexUrl', base + '/jellyemu/retroarch/cores/{system}/.index');
-        set('raCoresFileUrl', base + '/jellyemu/retroarch/cores/{system}/{filename}');
-        set('raSystemIndexUrl', base + '/jellyemu/retroarch/system/{path}');
-        set('raFrontendUrl', base + '/jellyemu/retroarch/frontend/{file}');
+        var origin = window.location.origin;
+        if (typeof ApiClient !== 'undefined' && typeof ApiClient.serverAddress === 'function') {
+            var addr = ApiClient.serverAddress();
+            if (addr) {
+                try { origin = new URL(addr, window.location.origin).origin; } catch(e) {}
+            }
+        }
+        var getFullUrl = function(endpoint) {
+            var url = (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function')
+                ? window.JellyEmu.getUrl(endpoint)
+                : ((window.JellyEmuConfig && window.JellyEmuConfig.baseUrl) || '') + '/' + endpoint.replace(/^\//, '');
+
+            if (/^https?:\/\//i.test(url)) {
+                return url;
+            }
+            return origin + (url.startsWith('/') ? url : '/' + url);
+        };
+
+        var set = function (id, path) {
+            var el = page.querySelector('#' + id);
+            if (el) el.textContent = getFullUrl(path);
+        };
+
+        // RetroArch Integration
+        set('raPlaylistUrl', 'jellyemu/retroarch/playlist');
+        set('raPlaylistSystemUrl', 'jellyemu/retroarch/playlist/{system}');
+        set('raLaunchUrl', 'jellyemu/retroarch/launch/{itemId}');
+        set('raInfoUrl', 'jellyemu/retroarch/info');
+        set('raAssetsBaseUrl', 'jellyemu/retroarch/');
+        set('raCoresIndexDirsUrl', 'jellyemu/retroarch/cores/.index-dirs');
+        set('raCoresIndexUrl', 'jellyemu/retroarch/cores/{system}/.index');
+        set('raCoresFileUrl', 'jellyemu/retroarch/cores/{system}/{filename}');
+        set('raSystemIndexUrl', 'jellyemu/retroarch/system/{path}');
+        set('raFrontendUrl', 'jellyemu/retroarch/frontend/{file}');
+
+        // Core File Delivery
+        set('raRomUrl', 'jellyemu/rom/{itemId}');
+        set('coreRomZipUrl', 'jellyemu/rom/download-zip/{itemId}');
+
+        // Saves & Preferences
+        set('saveSlotsUrl', 'jellyemu/save-slots/{itemId}/{userId}');
+        set('saveSlotUrl', 'jellyemu/save/{itemId}/{userId}?slot={slot}');
+        set('sramSlotUrl', 'jellyemu/sram/{itemId}/{userId}?slot={slot}');
+        set('prefsUrl', 'jellyemu/prefs/{userId}');
     }
 
     function loadRomCount(page) {
@@ -295,7 +329,7 @@
 
     function loadProviders() {
         var authHeader = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
-        fetch('/jellyemu/marketplace/feed-providers', {
+        fetch(window.JellyEmu.getUrl('jellyemu/marketplace/feed-providers'), {
             headers: { 'Authorization': authHeader }
         })
         .then(function(r) { return r.json(); })
@@ -337,7 +371,7 @@
 
                 toggleBtn.addEventListener('click', function() {
                     var willEnable = !isEnabled;
-                    var endpoint = willEnable ? '/jellyemu/marketplace/providers' : ('/jellyemu/marketplace/providers?url=' + encodeURIComponent(providerUrl));
+                    var endpoint = window.JellyEmu.getUrl(willEnable ? 'jellyemu/marketplace/providers' : ('jellyemu/marketplace/providers?url=' + encodeURIComponent(providerUrl)));
                     var options = {
                         method: willEnable ? 'POST' : 'DELETE',
                         headers: {
@@ -405,7 +439,7 @@
         if (activeSystemFilter) params.append('system', activeSystemFilter);
         if (activeLetterFilter) params.append('letter', activeLetterFilter);
 
-        var endpoint = query ? '/jellyemu/marketplace/search?' : '/jellyemu/marketplace/browse?';
+        var endpoint = window.JellyEmu.getUrl(query ? 'jellyemu/marketplace/search?' : 'jellyemu/marketplace/browse?');
 
         fetch(endpoint + params.toString(), {
             headers: { 'Authorization': authHeader }
@@ -499,7 +533,7 @@
                     dlBtn.className = 'je-rom-dl-btn downloading';
                     dlBtn.innerHTML = '<span class="material-icons je-spinner" style="font-size: 16px;">sync</span><span>Downloading...</span>';
 
-                    fetch('/jellyemu/marketplace/download', {
+                    fetch(window.JellyEmu.getUrl('jellyemu/marketplace/download'), {
                         method: 'POST',
                         headers: {
                             'Authorization': authHeader,
@@ -579,7 +613,7 @@
         }
     }
 
-    document.addEventListener('pageshow', function () {
+    function initCurrentTab() {
         var page = document.querySelector('#JellyEmuConfigPage');
         if (!page) return;
 
@@ -594,5 +628,13 @@
         }
 
         jeSwitchTab(initialTab);
-    }, true);
+    }
+
+    document.addEventListener('pageshow', initCurrentTab, true);
+    document.addEventListener('viewshow', initCurrentTab, true);
+    document.addEventListener('DOMContentLoaded', initCurrentTab, true);
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive' || document.querySelector('#JellyEmuConfigPage')) {
+        initCurrentTab();
+    }
 })();

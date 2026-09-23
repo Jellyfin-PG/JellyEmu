@@ -14,7 +14,10 @@
     'use strict';
 
     var cfg = window.JellyEmuConfig || {};
-    var netplayServer = window.location.origin + '/jellyemu/netplay';
+    var getUrl = (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function')
+        ? window.JellyEmu.getUrl
+        : function(p) { return ((window.JellyEmuConfig && window.JellyEmuConfig.baseUrl) || '') + (p.startsWith('/') ? p : '/' + p); };
+    var netplayServer = cfg.netplayServer || (window.location.origin + getUrl('/jellyemu/netplay'));
     var gameId = cfg.gameId || window.EJS_gameID || 0;
 
     // State
@@ -47,7 +50,7 @@
                 opts = opts || {};
                 var targetUrl = (typeof url === 'string') ? url : '';
                 if (!targetUrl || targetUrl.indexOf('/jellyemu/netplay') !== -1 || targetUrl.indexOf(window.location.host) !== -1 || targetUrl.startsWith('/')) {
-                    opts.path = '/jellyemu/netplay/socket.io';
+                    opts.path = getUrl('/jellyemu/netplay/socket.io');
                     opts.transports = ['websocket'];
                     opts.upgrade = false;
                     var token = window._jellyToken || (cfg && cfg.token) || '';

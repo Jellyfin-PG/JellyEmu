@@ -48,72 +48,48 @@
     let _selectedSystem = "";
 
     function showToast(msg) {
-        const existing = document.querySelector('.je-toast');
-        if (existing) existing.remove();
-
-        const toast = document.createElement('div');
-        toast.className = 'je-toast';
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'material-icons';
-        iconSpan.style.cssText = 'font-size:18px';
-        iconSpan.textContent = 'check_circle';
-
-        const msgSpan = document.createElement('span');
-        msgSpan.textContent = msg || '';
-
-        toast.appendChild(iconSpan);
-        toast.appendChild(document.createTextNode(' '));
-        toast.appendChild(msgSpan);
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        if (JE && typeof JE.toast === 'function') {
+            JE.toast(msg);
+        }
     }
 
-    async function ensureSystemsLoaded(token) {
+    async function ensureSystemsLoaded() {
         try {
-            const headers = {};
-            if (token) headers['Authorization'] = `MediaBrowser Token="${token}"`;
-            
-            const [sysRes, optsRes] = await Promise.all([
-                _knownSystems.length > 0 ? Promise.resolve(null) : fetch('/jellyemu/systems', { headers }).catch(() => null),
-                fetch('/jellyemu/setting-options', { headers }).catch(() => null)
+            const [sysData, optsData] = await Promise.all([
+                _knownSystems.length > 0 ? Promise.resolve(null) : JE.json('/jellyemu/systems'),
+                JE.json('/jellyemu/setting-options')
             ]);
 
-            if (optsRes && optsRes.ok) {
-                const optsData = await optsRes.json();
-                if (optsData) {
-                    _settingOptions = {
-                        shaders: optsData.shaders || [],
-                        scaling: optsData.scaling || [],
-                        rotation: optsData.rotation || [],
-                        fastForwardRates: optsData.fastForwardRates || [],
-                        slowMotionRates: optsData.slowMotionRates || [],
-                        volume: optsData.volume || [],
-                        mute: optsData.mute || [],
-                        fps: optsData.fps || [],
-                        autosave: optsData.autosave || [],
-                        haptics: optsData.haptics || [],
-                        virtualGamepad: optsData.virtualGamepad || [],
-                        virtualGamepadLefty: optsData.virtualGamepadLefty || []
-                    };
-                }
+            if (optsData) {
+                _settingOptions = {
+                    shaders: optsData.shaders || [],
+                    scaling: optsData.scaling || [],
+                    rotation: optsData.rotation || [],
+                    fastForwardRates: optsData.fastForwardRates || [],
+                    slowMotionRates: optsData.slowMotionRates || [],
+                    volume: optsData.volume || [],
+                    mute: optsData.mute || [],
+                    fps: optsData.fps || [],
+                    autosave: optsData.autosave || [],
+                    haptics: optsData.haptics || [],
+                    virtualGamepad: optsData.virtualGamepad || [],
+                    virtualGamepadLefty: optsData.virtualGamepadLefty || []
+                };
             }
 
-            if (sysRes && sysRes.ok) {
-                const data = await sysRes.json();
-                if (data && data.systems) {
-                    _systemsData = data.systems;
-                    _systemCoreMap = {};
-                    _knownSystems = [];
-                    data.systems.forEach(s => {
-                        _knownSystems.push(s.name);
-                        _systemCoreMap[s.name] = (s.cores || []).map(c => ({
-                            id: c.id,
-                            name: c.name || c.id
-                        }));
-                    });
-                    if (!_selectedSystem && _knownSystems.length > 0) {
-                        _selectedSystem = _knownSystems[0];
-                    }
+            if (sysData && sysData.systems) {
+                _systemsData = sysData.systems;
+                _systemCoreMap = {};
+                _knownSystems = [];
+                sysData.systems.forEach(s => {
+                    _knownSystems.push(s.name);
+                    _systemCoreMap[s.name] = (s.cores || []).map(c => ({
+                        id: c.id,
+                        name: c.name || c.id
+                    }));
+                });
+                if (!_selectedSystem && _knownSystems.length > 0) {
+                    _selectedSystem = _knownSystems[0];
                 }
             }
         } catch (e) {
@@ -148,7 +124,7 @@
             return;
         }
 
-        await ensureSystemsLoaded(token);
+        await ensureSystemsLoaded();
 
         function renderContainer() {
             activePage.innerHTML = `
@@ -196,7 +172,7 @@
                 resetBtn.addEventListener('click', () => {
                     if (confirm('Are you sure you want to reset ALL your JellyEmu settings and custom system overrides back to factory defaults?')) {
                         resetBtn.disabled = true;
-                        fetch(`/jellyemu/prefs/${userId}/reset`, {
+                        JE.fetch(`/jellyemu/prefs/${userId}/reset`, {
                             method: 'DELETE',
                             headers: { 'Authorization': `MediaBrowser Token="${token}"` }
                         })
@@ -234,7 +210,7 @@
         function renderGlobalTab(container) {
             container.innerHTML = `<div class="je-empty-state">Loading global settings...</div>`;
 
-            fetch(`/jellyemu/prefs/${userId}?scope=global`, {
+            JE.fetch(`/jellyemu/prefs/${userId}?scope=global`, {
                 headers: { 'Authorization': `MediaBrowser Token="${token}"` }
             })
             .then(r => r.ok ? r.json() : {})
@@ -397,7 +373,7 @@
                         }
                     };
 
-                    fetch(`/jellyemu/prefs/${userId}`, {
+                    JE.fetch(`/jellyemu/prefs/${userId}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -455,7 +431,7 @@
 
             formContainer.innerHTML = `<div class="je-empty-state">Loading ${_selectedSystem} settings...</div>`;
 
-            fetch(`/jellyemu/prefs/${userId}?scope=system&targetId=${encodeURIComponent(_selectedSystem)}`, {
+            JE.fetch(`/jellyemu/prefs/${userId}?scope=system&targetId=${encodeURIComponent(_selectedSystem)}`, {
                 headers: { 'Authorization': `MediaBrowser Token="${token}"` }
             })
             .then(r => r.ok ? r.json() : {})
@@ -516,7 +492,7 @@
                         if (coreVal) prefsObj.core = coreVal;
                         else prefsObj.core = null;
 
-                        fetch(`/jellyemu/prefs/${userId}`, {
+                        JE.fetch(`/jellyemu/prefs/${userId}`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -546,7 +522,7 @@
                     clearBtn.addEventListener('click', () => {
                         if (confirm(`Reset ${_selectedSystem} core back to default?`)) {
                             clearBtn.disabled = true;
-                            fetch(`/jellyemu/prefs/${userId}?scope=system&targetId=${encodeURIComponent(_selectedSystem)}`, {
+                            JE.fetch(`/jellyemu/prefs/${userId}?scope=system&targetId=${encodeURIComponent(_selectedSystem)}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `MediaBrowser Token="${token}"` }
                             })
@@ -598,7 +574,7 @@
             const keyInp  = container.querySelector('#je-ra-key');
             const saveBtn = container.querySelector('#je-save-ra');
 
-            fetch(`/jellyemu/retroachievements/${userId}`, {
+            JE.fetch(`/jellyemu/retroachievements/${userId}`, {
                 headers: { 'Authorization': `MediaBrowser Token="${token}"` }
             })
             .then(r => r.ok ? r.json() : null)
@@ -613,7 +589,7 @@
                 saveBtn.disabled = true;
                 saveBtn.innerHTML = `<span class="material-icons" style="font-size:18px">sync</span> Saving...`;
 
-                fetch(`/jellyemu/retroachievements/${userId}`, {
+                JE.fetch(`/jellyemu/retroachievements/${userId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

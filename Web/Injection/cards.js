@@ -29,7 +29,7 @@
                 resolves[b.cardId] = b.resolve;
             });
 
-            fetch('/jellyemu/cardmeta?ids=' + ids.join(','))
+            JE.fetch('/jellyemu/cardmeta?ids=' + ids.join(','))
                 .then(r => r.ok ? r.json() : {})
                 .catch(() => ({}))
                 .then(function(data) {

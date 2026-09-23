@@ -41,8 +41,98 @@ namespace JellyEmu.Controllers
             return resolvedCore switch
             {
                 "pico8" => PlayPico8(itemId),
+                "play"  => await PlayPlay(itemId, userId, slot),
                 _       => await PlayEjs(itemId, userId, slot, core, httpClientFactory)
             };
+        }
+
+        /// <summary>
+        /// Returns a standalone Play! PS2 HTML play page for the given item.
+        /// Loads the Play! WebAssembly runtime and streams the disc via worker-based IO.
+        ///
+        /// Path: GET /jellyemu/play/play/{itemId}
+        /// </summary>
+        [HttpGet("/jellyemu/play/play/{itemId}")]
+        [HttpGet("/jellyemu/ps2/play/{itemId}")]
+        [Produces(MediaTypeNames.Text.Html)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> PlayPlay(string itemId, [FromQuery] string? userId = null, [FromQuery] int? slot = null)
+        {
+            if (!IsValidId(itemId) || (!string.IsNullOrEmpty(userId) && !IsValidId(userId)))
+                return BadRequest("Invalid item or user ID.");
+
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null)
+            {
+                Logger.LogWarning("[JellyEmu] PlayPlay: item {ItemId} not found", SanitizeForLog(itemId));
+                return NotFound();
+            }
+
+            var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".iso";
+            var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
+            var cleanFilename = CleanCosmeticFilename(filename);
+            if (string.IsNullOrWhiteSpace(cleanFilename)) cleanFilename = itemId;
+
+            var romUrl = ToAppUrl($"jellyemu/rom/{itemId}/{cleanFilename}{ext}");
+            if (!string.IsNullOrEmpty(userId)) romUrl += $"?userId={userId}";
+
+            var hasSaves = !string.IsNullOrEmpty(userId);
+            var activeSlot = Math.Max(1, slot ?? 1);
+            var saveGetUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+            var savePostUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+
+            var platformTag = "PlayStation 2";
+            var effectivePrefs = hasSaves
+                ? await PreferenceService.GetEffectivePreferencesAsync(userId!, platformTag)
+                : JellyEmuPreferenceService.SystemDefaults;
+
+            var customBindingsJson = !string.IsNullOrWhiteSpace(effectivePrefs.Controls) && effectivePrefs.Controls.Trim().StartsWith("{")
+                ? effectivePrefs.Controls.Trim()
+                : "null";
+
+            var gameName = HtmlEncoder.Default.Encode(item.Name);
+
+            var assembly = typeof(JellyEmuPlayController).Assembly;
+            var resourceName = "JellyEmu.Templates.play.html";
+
+            using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+            {
+                Logger.LogError("[JellyEmu] Play! PS2 embedded template not found at {ResourceName}", resourceName);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Template resource is missing.");
+            }
+
+            using StreamReader reader = new StreamReader(stream);
+            var templateContent = reader.ReadToEnd();
+            var template = Template.Parse(templateContent);
+
+            if (template.HasErrors)
+            {
+                var errors = string.Join(", ", template.Messages);
+                Logger.LogError("[JellyEmu] Play! PS2 template parse error: {Errors}", errors);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error parsing Scriban template.");
+            }
+
+            var html = template.Render(new
+            {
+                game_name = gameName,
+                item_id = itemId,
+                user_id = userId ?? string.Empty,
+                base_url = GetPathBase(),
+                rom_url = romUrl,
+                save_get_url = saveGetUrl,
+                save_post_url = savePostUrl,
+                active_slot = activeSlot,
+                custom_bindings_json = customBindingsJson,
+                screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder),
+                version = Plugin.Instance?.Version.ToString() ?? "1.0.8"
+            });
+
+            ApplyCrossOriginIsolationHeaders();
+
+            return Content(html, MediaTypeNames.Text.Html);
         }
 
         /// <summary>
@@ -75,7 +165,7 @@ namespace JellyEmu.Controllers
 
             var ext = RomExtensions.GetPico8Extension(item);
 
-            var cartUrl = $"/jellyemu/rom/{itemId}/{itemId}{ext}";
+            var cartUrl = ToAppUrl($"jellyemu/rom/{itemId}/{itemId}{ext}");
             var gameName = HtmlEncoder.Default.Encode(item.Name);
 
             Logger.LogInformation("[JellyEmu] PICO-8 play: {Name} ({ItemId}) cart={CartUrl}",
@@ -106,6 +196,7 @@ namespace JellyEmu.Controllers
             var html = template.Render(new
             {
                 game_name = gameName,
+                base_url = GetPathBase(),
                 cart_url = cartUrl,
                 item_id = itemId,
                 screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder)
@@ -170,7 +261,7 @@ namespace JellyEmu.Controllers
             {
                 cleanFilename = itemId;
             }
-            var romUrl = $"/jellyemu/rom/{itemId}/{cleanFilename}{ext}";
+            var romUrl = ToAppUrl($"jellyemu/rom/{itemId}/{cleanFilename}{ext}");
             if (!string.IsNullOrEmpty(userId))
             {
                 romUrl += $"?userId={userId}";
@@ -186,8 +277,8 @@ namespace JellyEmu.Controllers
             var activeSlot = Math.Max(1, slot ?? 1);
             var activeShader = effectivePrefs.Shader;
             var videoRotation = effectivePrefs.VideoRotation;
-            var saveGetUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
-            var savePostUrl = hasSaves ? $"/jellyemu/save/{itemId}/{userId}" : "";
+            var saveGetUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+            var savePostUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
 
             var saveExists = hasSaves && System.IO.File.Exists(GetSavePath(userId!, itemId, activeSlot));
 
@@ -199,14 +290,14 @@ namespace JellyEmu.Controllers
                 if (numericGameId == 0) numericGameId = 1;
             }
 
-            const string netplayServer = "/jellyemu/netplay";
+            var netplayServer = ToAppUrl("jellyemu/netplay");
             var netplayIceServers = Plugin.Instance?.Configuration.NetplayIceServers ?? string.Empty;
             var netplayIceServersJson = System.Text.Json.JsonSerializer.Serialize(netplayIceServers);
             const bool hasNetplay = true;
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
             var ejsBase = EjsManager.IsReady
-                ? $"/jellyemu/ejs"
+                ? ToAppUrl("jellyemu/ejs")
                 : JellyEmuEjsManager.CdnBase;
 
             // Load the embedded Scriban template
@@ -233,7 +324,7 @@ namespace JellyEmu.Controllers
 
             var biosService = HttpContext.RequestServices.GetService(typeof(JellyEmuBiosService)) as JellyEmuBiosService;
             var relBios = biosService?.ResolveBiosRelativePath(platformTag, resolvedCore);
-            var biosUrl = !string.IsNullOrEmpty(relBios) ? $"/jellyemu/bios/file/{relBios}" : string.Empty;
+            var biosUrl = !string.IsNullOrEmpty(relBios) ? ToAppUrl($"jellyemu/bios/file/{relBios}") : string.Empty;
 
             var inputService = HttpContext.RequestServices.GetService(typeof(JellyEmuInputService)) as JellyEmuInputService;
             var inputScheme = inputService?.GetScheme(platformTag ?? resolvedCore);
@@ -248,6 +339,7 @@ namespace JellyEmu.Controllers
             var html = template.Render(new
             {
                 game_name = gameName,
+                base_url = GetPathBase(),
                 core = resolvedCore,
                 platform_tag = platformTag,
                 input_scheme_json = inputSchemeJson,

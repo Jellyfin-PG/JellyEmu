@@ -12,10 +12,16 @@
     function _jeEnsureBinary(data) { return window._jeEnsureBinary ? window._jeEnsureBinary(data) : data; }
     function openPopup(id)  { window._jeOpenPopup  && window._jeOpenPopup(id);  }
     function closePopup(id) { window._jeClosePopup && window._jeClosePopup(id); }
-    function syncVGToggles(){ window._jeSyncVGToggles && window._jeSyncVGToggles(); }
-    function _isInputWindowOpen() {
-        var pop = document.getElementById('je-pop-inputmap');
-        return !!(pop && (pop.classList.contains('je-open') || pop.classList.contains('je-popup-active')));
+    function jeFetch(url, options) {
+        options = options || {};
+        if (token) {
+            options.headers = options.headers || {};
+            options.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+        }
+        if (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function') {
+            return fetch(window.JellyEmu.getUrl(url), options);
+        }
+        return fetch(url, options);
     }
 
     // ==========================================
@@ -143,8 +149,7 @@
                 Promise.resolve(g.getState()).then(function (rawState) {
                     var state = _jeEnsureBinary(rawState); if (!state) return;
                     var saveHeaders = { 'Content-Type': 'application/octet-stream' };
-                    if (token) saveHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
-                    fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot, {
+                    jeFetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot, {
                         method: 'POST', headers: saveHeaders, body: state
                     }).then(function (r) {
                         if (!r.ok) throw new Error('Save rejected');
@@ -152,8 +157,7 @@
                         if (canvas) {
                             try {
                                 var ssHeaders = { 'Content-Type': 'application/json' };
-                                if (token) ssHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
-                                fetch('/jellyemu/save-screenshot/' + itemId + '/' + userId + '/' + _jeActiveSlot, {
+                                jeFetch('/jellyemu/save-screenshot/' + itemId + '/' + userId + '/' + _jeActiveSlot, {
                                     method: 'POST', headers: ssHeaders,
                                     body: JSON.stringify({ dataUrl: canvas.toDataURL('image/png') })
                                 }).catch(function () {});
@@ -163,9 +167,7 @@
                 });
                 break;
             case 25: // Quick Load
-                var loadHeaders = {};
-                if (token) loadHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
-                fetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot, { headers: loadHeaders })
+                jeFetch('/jellyemu/save/' + itemId + '/' + userId + '?slot=' + _jeActiveSlot)
                     .then(function (r) { if (!r.ok) throw new Error('No save'); return r.arrayBuffer(); })
                     .then(function (buf) { var g = gm(); if (g) g.loadState(new Uint8Array(buf)); })
                     .catch(function (err) { console.warn('[JellyEmu] Quick load failed:', err); });
@@ -351,7 +353,7 @@
         var cPlatform = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) || window.EJS_platformTag || '';
         var consoleKey = getActiveControlScheme();
         var platformQuery = consoleKey || cPlatform;
-        fetch('/jellyemu/prefs/' + userId + '/effective?itemId=' + cItemId + '&platform=' + encodeURIComponent(platformQuery), { headers: prefHeaders })
+        jeFetch('/jellyemu/prefs/' + userId + '/effective?itemId=' + cItemId + '&platform=' + encodeURIComponent(platformQuery))
             .then(function (r) { if (r.ok) return r.json(); })
             .then(function (data) {
                 if (data && (data.jeBindings || data.controls)) {
@@ -367,12 +369,10 @@
 
     // - Synchronize controller schemes from backend (single source of truth) -
     function _jeSyncSchemesFromBackend() {
-        var schemeHeaders = {};
-        if (token) schemeHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
         var platformOrCore = (window.JellyEmuConfig && window.JellyEmuConfig.platformTag) || window.EJS_platformTag || window.EJS_core || '';
         var endpoint = platformOrCore ? ('/jellyemu/input/schemes/' + encodeURIComponent(platformOrCore)) : '/jellyemu/input/schemes';
 
-        fetch(endpoint, { headers: schemeHeaders })
+        jeFetch(endpoint)
             .then(function (r) { if (r.ok) return r.json(); })
             .then(function (data) {
                 if (!data) return;
@@ -811,9 +811,9 @@
                 controls: JSON.stringify(_jeBindings),
                 jeBindings: JSON.stringify(_jeBindings)
             };
-            fetch(url, {
+            jeFetch(url, {
                 method: 'POST',
-                headers: headers,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).then(function (r) {
                 if (r.ok) console.log('[JellyEmu] Custom controller bindings saved to SQLite for console ' + targetConsole);
@@ -1159,11 +1159,9 @@
             window.JellyEmuConfig.virtualGamepad = payload.virtualGamepad;
             window.JellyEmuConfig.virtualGamepadLefty = payload.virtualGamepadLefty;
         }
-        var headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
-        fetch('/jellyemu/prefs/' + userId, {
+        jeFetch('/jellyemu/prefs/' + userId, {
             method: 'POST',
-            headers: headers,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         }).catch(function (err) { console.warn('[JellyEmu] VG prefs sync failed:', err); });
     }

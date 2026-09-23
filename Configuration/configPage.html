@@ -682,7 +682,32 @@
     </div>
 
     <!-- Modular Script Controllers -->
-    <script type="text/javascript" src="/jellyemu/config/js/settings"></script>
-    <script type="text/javascript" src="/jellyemu/config/js/community"></script>
-    <script type="text/javascript" src="/jellyemu/config/js/configRouter"></script>
+    <script type="text/javascript">
+        (function() {
+            var getUrl = function(path) {
+                if (window.JellyEmu && typeof window.JellyEmu.getUrl === 'function') {
+                    return window.JellyEmu.getUrl(path);
+                }
+                var clean = path.replace(/^\//, '');
+                if (typeof ApiClient !== 'undefined' && typeof ApiClient.getUrl === 'function') {
+                    return ApiClient.getUrl(clean);
+                }
+                return '/' + clean;
+            };
+
+            var scripts = [
+                getUrl('/jellyemu/config/js/settings'),
+                getUrl('/jellyemu/config/js/community'),
+                getUrl('/jellyemu/config/js/configRouter')
+            ];
+
+            scripts.forEach(function(src) {
+                var s = document.createElement('script');
+                s.type = 'text/javascript';
+                s.src = src;
+                s.async = false;
+                document.head.appendChild(s);
+            });
+        })();
+    </script>
 </div>

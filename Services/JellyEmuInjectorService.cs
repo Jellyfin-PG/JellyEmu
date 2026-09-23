@@ -14,6 +14,7 @@ namespace JellyEmu.Services
         private readonly JellyEmuEjsManager _ejsManager;
         private readonly JellyEmuPico8Manager _pico8Manager;
         private readonly JellyEmuThreeJsManager _threeJsManager;
+        private readonly JellyEmuPlayManager _playManager;
         private readonly IServiceProvider _serviceProvider;
         private string? _resolvedPluginName;
 
@@ -24,12 +25,14 @@ namespace JellyEmu.Services
             JellyEmuEjsManager ejsManager,
             JellyEmuPico8Manager pico8Manager,
             JellyEmuThreeJsManager threeJsManager,
+            JellyEmuPlayManager playManager,
             IServiceProvider serviceProvider)
         {
             _logger = logger;
             _ejsManager = ejsManager;
             _pico8Manager = pico8Manager;
             _threeJsManager = threeJsManager;
+            _playManager = playManager;
             _serviceProvider = serviceProvider;
         }
 
@@ -129,6 +132,8 @@ namespace JellyEmu.Services
             _threeJsManager.EnsureRuntimeAsync();
 
             _pico8Manager.EnsureRuntimeAsync();
+
+            _playManager.EnsureRuntimeAsync();
 
             try
             {

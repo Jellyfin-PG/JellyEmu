@@ -21,6 +21,9 @@ namespace JellyEmu.Tests
         [InlineData("C:\\Games\\Game Boy Advance\\Pokemon.zip", "Game Boy Advance")] // Matches directory name
         [InlineData("C:\\Games\\genesis\\Sonic.zip", "Sega Genesis")] // Matches directory name
         [InlineData("C:\\Games\\PSX\\Spyro.cue", "PlayStation")] // Matches directory name
+        [InlineData("C:\\Games\\PlayStation 2\\Shadow of the Colossus.iso", "PlayStation 2")]
+        [InlineData("C:\\Games\\PS2\\God of War.iso", "PlayStation 2")]
+        [InlineData("C:\\Games\\ps2\\homebrew.elf", "PlayStation 2")]
         [InlineData("C:\\Games\\Windows\\Fallout.exe", "Windows")]
         [InlineData("C:\\Games\\windows\\Half-Life.zip", "Windows")]
         [InlineData("C:\\Games\\Linux\\Celeste.AppImage", "Linux")]
