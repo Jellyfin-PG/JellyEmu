@@ -12,6 +12,10 @@
     function _jeEnsureBinary(data) { return window._jeEnsureBinary ? window._jeEnsureBinary(data) : data; }
     function openPopup(id)  { window._jeOpenPopup  && window._jeOpenPopup(id);  }
     function closePopup(id) { window._jeClosePopup && window._jeClosePopup(id); }
+    function _isInputWindowOpen() {
+        var el = document.getElementById('je-pop-inputmap') || document.getElementById('je-popup-input');
+        return !!(el && (el.classList.contains('je-open') || el.classList.contains('open') || el.style.display === 'flex' || el.style.display === 'block'));
+    }
     function jeFetch(url, options) {
         options = options || {};
         if (token) {
