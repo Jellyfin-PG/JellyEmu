@@ -179,7 +179,7 @@ namespace JellyEmu.Tests
                 Parent = musicFolder,
                 FileInfo = new MediaBrowser.Model.IO.FileSystemMetadata
                 {
-                    FullName = "C:\\Library\\Music\\Genesis\\Invisible Touch (1986).flac",
+                    FullName = Path.Combine(Path.GetTempPath(), "Library", "Music", "Genesis", "Invisible Touch (1986).flac"),
                     IsDirectory = false
                 }
             };
@@ -202,7 +202,7 @@ namespace JellyEmu.Tests
                 Parent = booksFolder,
                 FileInfo = new MediaBrowser.Model.IO.FileSystemMetadata
                 {
-                    FullName = "C:\\Library\\Games\\SNES\\Super Mario World (USA).sfc",
+                    FullName = Path.Combine(Path.GetTempPath(), "Library", "Games", "SNES", "Super Mario World (USA).sfc"),
                     IsDirectory = false
                 }
             };
