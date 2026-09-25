@@ -176,7 +176,7 @@ namespace JellyEmu
                 { "android", "Android" },
             };
 
-        private static readonly Dictionary<string, string> LibraryOnlyExtensions =
+        internal static readonly Dictionary<string, string> LibraryOnlyExtensions =
             new(StringComparer.OrdinalIgnoreCase)
             {
                 { ".gcm", "GameCube" }, { ".gcz", "GameCube" }, { ".rvz", "Wii" },
