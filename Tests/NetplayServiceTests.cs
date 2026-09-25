@@ -36,6 +36,20 @@ namespace JellyEmu.Tests
             _state = WebSocketState.CloseReceived;
         }
 
+        public async Task<string> WaitForMessageAsync(Func<string, bool> predicate, int timeoutMs = 4000)
+        {
+            var start = DateTime.UtcNow;
+            while ((DateTime.UtcNow - start).TotalMilliseconds < timeoutMs)
+            {
+                foreach (var msg in SentMessages)
+                {
+                    if (predicate(msg)) return msg;
+                }
+                await Task.Delay(10);
+            }
+            throw new TimeoutException($"Timed out waiting for message matching predicate. Received messages ({SentMessages.Count}):\n{string.Join("\n", SentMessages)}");
+        }
+
         public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
         {
             if (_state != WebSocketState.Open)
@@ -102,19 +116,16 @@ namespace JellyEmu.Tests
             var hostWs = new TestWebSocket();
             var hostTask = Task.Run(() => service.HandleWebSocketSessionAsync(hostWs, CancellationToken.None));
 
-            await Task.Delay(50); // Allow handshake
+            await hostWs.WaitForMessageAsync(m => m.StartsWith("0{")); // Engine.IO open packet
             Assert.NotEmpty(hostWs.SentMessages);
-            var hostOpenPacket = hostWs.SentMessages.ToArray()[0];
-            Assert.StartsWith("0{", hostOpenPacket); // Engine.IO open packet
 
             // Host connects to Socket.IO: sends "40"
             hostWs.EnqueueClientMessage("40");
-            await Task.Delay(30);
 
             // Host opens a room
             var openRoomPayload = "421[\"open-room\",{\"password\":\"\",\"maxPlayers\":3,\"extra\":{\"sessionid\":\"room123\",\"userid\":\"hostUser\",\"player_name\":\"HostPlayer\",\"room_name\":\"My Mario Room\",\"game_id\":\"42\",\"domain\":\"localhost:8096\"}}]";
             hostWs.EnqueueClientMessage(openRoomPayload);
-            await Task.Delay(50);
+            await hostWs.WaitForMessageAsync(m => m.Contains("open-room") || m.Contains("users-updated") || m.Contains("room123"));
 
             // Check room listing
             var list = service.GetRoomList("localhost:8096", "42");
@@ -128,13 +139,13 @@ namespace JellyEmu.Tests
             // Connect Guest Socket
             var guestWs = new TestWebSocket();
             var guestTask = Task.Run(() => service.HandleWebSocketSessionAsync(guestWs, CancellationToken.None));
-            await Task.Delay(50);
+            await guestWs.WaitForMessageAsync(m => m.StartsWith("0{"));
             guestWs.EnqueueClientMessage("40");
 
             // Guest joins room
             var joinRoomPayload = "422[\"join-room\",{\"password\":\"\",\"extra\":{\"sessionid\":\"room123\",\"userid\":\"guestUser\",\"player_name\":\"GuestPlayer\",\"domain\":\"localhost:8096\"}}]";
             guestWs.EnqueueClientMessage(joinRoomPayload);
-            await Task.Delay(50);
+            await hostWs.WaitForMessageAsync(m => m.Contains("guestUser") || m.Contains("GuestPlayer"));
 
             // Verify room current player count is 2
             list = service.GetRoomList("localhost:8096", "42");
@@ -144,27 +155,22 @@ namespace JellyEmu.Tests
             // Guest sends public chat
             var chatPayload = "423[\"chat-message\",{\"message\":\"Hello from Guest!\",\"to\":\"all\"}]";
             guestWs.EnqueueClientMessage(chatPayload);
-            await Task.Delay(50);
 
-            var hostReceivedMessages = string.Join("\n", hostWs.SentMessages);
-            Assert.Contains("Hello from Guest!", hostReceivedMessages);
-            Assert.Contains("GuestPlayer", hostReceivedMessages);
+            var hostChat = await hostWs.WaitForMessageAsync(m => m.Contains("Hello from Guest!"));
+            Assert.Contains("GuestPlayer", hostChat);
 
             // Test Host Departure
             // When Host leaves, room closes immediately and Guest receives host-left / room-closed
             hostWs.CompleteClient();
-            await Task.Delay(80);
+            var guestLeaveNotif = await guestWs.WaitForMessageAsync(m => m.Contains("host-left") || m.Contains("room-closed"));
+            Assert.True(guestLeaveNotif.Contains("host-left") || guestLeaveNotif.Contains("room-closed"));
 
             // Room should be closed and removed from room list
             list = service.GetRoomList("localhost:8096", "42");
             Assert.False(list.ContainsKey("room123"));
 
-            // Verify Guest received host-left or room-closed
-            var guestReceivedMessages = string.Join("\n", guestWs.SentMessages);
-            Assert.True(guestReceivedMessages.Contains("host-left") || guestReceivedMessages.Contains("room-closed"));
-
             guestWs.CompleteClient();
-            await Task.Delay(80);
+            await Task.WhenAll(hostTask, guestTask);
 
             service.Dispose();
         }
@@ -176,27 +182,27 @@ namespace JellyEmu.Tests
 
             // Connect Player 1 (Initial Host)
             var p1Ws = new TestWebSocket();
-            _ = Task.Run(() => service.HandleWebSocketSessionAsync(p1Ws, CancellationToken.None));
-            await Task.Delay(50);
+            var p1Task = Task.Run(() => service.HandleWebSocketSessionAsync(p1Ws, CancellationToken.None));
+            await p1Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
             p1Ws.EnqueueClientMessage("40");
             p1Ws.EnqueueClientMessage("421[\"open-room\",{\"password\":\"\",\"maxPlayers\":4,\"extra\":{\"sessionid\":\"close-room\",\"userid\":\"p1\",\"player_name\":\"PlayerOne\",\"room_name\":\"Test Room\",\"game_id\":\"100\",\"domain\":\"localhost:8096\"}}]");
-            await Task.Delay(50);
+            await p1Ws.WaitForMessageAsync(m => m.Contains("open-room") || m.Contains("close-room"));
 
             // Connect Player 2 (Guest)
             var p2Ws = new TestWebSocket();
-            _ = Task.Run(() => service.HandleWebSocketSessionAsync(p2Ws, CancellationToken.None));
-            await Task.Delay(50);
+            var p2Task = Task.Run(() => service.HandleWebSocketSessionAsync(p2Ws, CancellationToken.None));
+            await p2Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
             p2Ws.EnqueueClientMessage("40");
             p2Ws.EnqueueClientMessage("422[\"join-room\",{\"password\":\"\",\"extra\":{\"sessionid\":\"close-room\",\"userid\":\"p2\",\"player_name\":\"PlayerTwo\",\"domain\":\"localhost:8096\"}}]");
-            await Task.Delay(50);
+            await p1Ws.WaitForMessageAsync(m => m.Contains("PlayerTwo"));
 
             // Connect Player 3 (Guest)
             var p3Ws = new TestWebSocket();
-            _ = Task.Run(() => service.HandleWebSocketSessionAsync(p3Ws, CancellationToken.None));
-            await Task.Delay(50);
+            var p3Task = Task.Run(() => service.HandleWebSocketSessionAsync(p3Ws, CancellationToken.None));
+            await p3Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
             p3Ws.EnqueueClientMessage("40");
             p3Ws.EnqueueClientMessage("423[\"join-room\",{\"password\":\"\",\"extra\":{\"sessionid\":\"close-room\",\"userid\":\"p3\",\"player_name\":\"PlayerThree\",\"domain\":\"localhost:8096\"}}]");
-            await Task.Delay(50);
+            await p1Ws.WaitForMessageAsync(m => m.Contains("PlayerThree"));
 
             var list = service.GetRoomList("localhost:8096", "100");
             Assert.Equal(3, list["close-room"].current);
@@ -204,20 +210,19 @@ namespace JellyEmu.Tests
 
             // Player 1 (Host) leaves -> Room MUST close immediately and notify P2 and P3
             p1Ws.CompleteClient();
-            await Task.Delay(80);
+
+            // Verify P2 and P3 received host-left / room-closed
+            var p2LeaveNotif = await p2Ws.WaitForMessageAsync(m => m.Contains("host-left") || m.Contains("room-closed"));
+            var p3LeaveNotif = await p3Ws.WaitForMessageAsync(m => m.Contains("host-left") || m.Contains("room-closed"));
+            Assert.NotNull(p2LeaveNotif);
+            Assert.NotNull(p3LeaveNotif);
 
             list = service.GetRoomList("localhost:8096", "100");
             Assert.False(list.ContainsKey("close-room"));
 
-            // Verify P2 and P3 received host-left / room-closed
-            var p2Msgs = string.Join("\n", p2Ws.SentMessages);
-            var p3Msgs = string.Join("\n", p3Ws.SentMessages);
-            Assert.True(p2Msgs.Contains("host-left") || p2Msgs.Contains("room-closed"));
-            Assert.True(p3Msgs.Contains("host-left") || p3Msgs.Contains("room-closed"));
-
             p2Ws.CompleteClient();
             p3Ws.CompleteClient();
-            await Task.Delay(80);
+            await Task.WhenAll(p1Task, p2Task, p3Task);
 
             service.Dispose();
         }
@@ -229,13 +234,13 @@ namespace JellyEmu.Tests
 
             var hostWs = new TestWebSocket();
             var hostTask = Task.Run(() => service.HandleWebSocketSessionAsync(hostWs, CancellationToken.None));
-            await Task.Delay(30);
+            await hostWs.WaitForMessageAsync(m => m.StartsWith("0{"));
             hostWs.EnqueueClientMessage("40");
 
             // Open room with max 2 players and password "secret"
             var openRoomPayload = "421[\"open-room\",{\"password\":\"secret\",\"maxPlayers\":2,\"extra\":{\"sessionid\":\"pwRoom\",\"userid\":\"p1\",\"player_name\":\"Player 1\",\"game_id\":\"99\"}}]";
             hostWs.EnqueueClientMessage(openRoomPayload);
-            await Task.Delay(50);
+            await hostWs.WaitForMessageAsync(m => m.Contains("pwRoom") || m.Contains("open-room"));
 
             // Check room list indicates password
             var list = service.GetRoomList(null, "99");
@@ -244,17 +249,16 @@ namespace JellyEmu.Tests
             // Guest 1 tries wrong password
             var guest1Ws = new TestWebSocket();
             var g1Task = Task.Run(() => service.HandleWebSocketSessionAsync(guest1Ws, CancellationToken.None));
-            await Task.Delay(30);
+            await guest1Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
             guest1Ws.EnqueueClientMessage("40");
 
             guest1Ws.EnqueueClientMessage("422[\"join-room\",{\"password\":\"wrong\",\"extra\":{\"sessionid\":\"pwRoom\",\"userid\":\"p2\",\"player_name\":\"Player 2\"}}]");
-            await Task.Delay(50);
-            var g1Messages = string.Join("\n", guest1Ws.SentMessages);
-            Assert.Contains("Incorrect password", g1Messages);
+            var g1Err = await guest1Ws.WaitForMessageAsync(m => m.Contains("Incorrect password"));
+            Assert.Contains("Incorrect password", g1Err);
 
             // Guest 1 joins with correct password
             guest1Ws.EnqueueClientMessage("423[\"join-room\",{\"password\":\"secret\",\"extra\":{\"sessionid\":\"pwRoom\",\"userid\":\"p2\",\"player_name\":\"Player 2\"}}]");
-            await Task.Delay(50);
+            await hostWs.WaitForMessageAsync(m => m.Contains("Player 2") || m.Contains("p2"));
             list = service.GetRoomList(null, "99");
             // Room is full (2/2), so GetRoomList should not include it in joinable list
             Assert.False(list.ContainsKey("pwRoom"));
@@ -262,18 +266,17 @@ namespace JellyEmu.Tests
             // Guest 2 tries to join full room
             var guest2Ws = new TestWebSocket();
             var g2Task = Task.Run(() => service.HandleWebSocketSessionAsync(guest2Ws, CancellationToken.None));
-            await Task.Delay(30);
+            await guest2Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
             guest2Ws.EnqueueClientMessage("40");
 
             guest2Ws.EnqueueClientMessage("424[\"join-room\",{\"password\":\"secret\",\"extra\":{\"sessionid\":\"pwRoom\",\"userid\":\"p3\",\"player_name\":\"Player 3\"}}]");
-            await Task.Delay(50);
-            var g2Messages = string.Join("\n", guest2Ws.SentMessages);
-            Assert.Contains("Room full", g2Messages);
+            var g2Err = await guest2Ws.WaitForMessageAsync(m => m.Contains("Room full"));
+            Assert.Contains("Room full", g2Err);
 
             hostWs.CompleteClient();
             guest1Ws.CompleteClient();
             guest2Ws.CompleteClient();
-            await Task.Delay(50);
+            await Task.WhenAll(hostTask, g1Task, g2Task);
 
             service.Dispose();
         }
@@ -285,41 +288,39 @@ namespace JellyEmu.Tests
 
             var hostWs = new TestWebSocket();
             var hostTask = Task.Run(() => service.HandleWebSocketSessionAsync(hostWs, CancellationToken.None));
-            await Task.Delay(30);
             hostWs.EnqueueClientMessage("40");
-
             hostWs.EnqueueClientMessage("421[\"open-room\",{\"extra\":{\"sessionid\":\"sigRoom\",\"userid\":\"host\",\"player_name\":\"Host\"}}]");
-            await Task.Delay(50);
+
+            // Wait for host room open
+            await hostWs.WaitForMessageAsync(m => m.Contains("open-room") || m.Contains("users-updated") || m.Contains("sigRoom"));
 
             var guestWs = new TestWebSocket();
             var guestTask = Task.Run(() => service.HandleWebSocketSessionAsync(guestWs, CancellationToken.None));
-            await Task.Delay(30);
             guestWs.EnqueueClientMessage("40");
-
             guestWs.EnqueueClientMessage("422[\"join-room\",{\"extra\":{\"sessionid\":\"sigRoom\",\"userid\":\"guest\",\"player_name\":\"Guest\"}}]");
-            await Task.Delay(50);
 
-            // Find guest socket ID from host's received users-updated message
-            var hostLastMsg = string.Join("\n", hostWs.SentMessages);
+            // Wait until host receives users-updated notification containing guest
+            var hostUpdatedMsg = await hostWs.WaitForMessageAsync(m => m.Contains("\"guest\""));
+
+            // Parse guest socket ID safely with regex
+            var match = System.Text.RegularExpressions.Regex.Match(hostUpdatedMsg, "\"guest\"\\s*:\\s*\\{[^}]*\"socketId\"\\s*:\\s*\"([^\"]+)\"");
+            if (!match.Success)
+            {
+                match = System.Text.RegularExpressions.Regex.Match(hostUpdatedMsg, "\"socketId\"\\s*:\\s*\"([^\"]+)\"");
+            }
+            Assert.True(match.Success, $"Could not extract guest socketId from host message:\n{hostUpdatedMsg}");
+            var guestSid = match.Groups[1].Value;
+
             // Host sends webrtc offer to guest
-            // Get guest socket ID by looking in the users-updated payload
-            int guestIdx = hostLastMsg.IndexOf("\"guest\":");
-            Assert.True(guestIdx > 0);
-            int sidIdx = hostLastMsg.IndexOf("\"socketId\":\"", guestIdx);
-            Assert.True(sidIdx > 0);
-            var guestSid = hostLastMsg.Substring(sidIdx + 12, 32);
-
-            // Host sends offer to guest
             hostWs.EnqueueClientMessage($"42[\"webrtc-signal\",{{\"target\":\"{guestSid}\",\"offer\":{{\"type\":\"offer\",\"sdp\":\"dummy_sdp\"}}}}]");
-            await Task.Delay(50);
 
-            var guestReceived = string.Join("\n", guestWs.SentMessages);
-            Assert.Contains("dummy_sdp", guestReceived);
+            // Wait for guest to receive the webrtc signal
+            var guestReceived = await guestWs.WaitForMessageAsync(m => m.Contains("dummy_sdp"));
             Assert.Contains("webrtc-signal", guestReceived);
 
             hostWs.CompleteClient();
             guestWs.CompleteClient();
-            await Task.Delay(50);
+            await Task.WhenAll(hostTask, guestTask);
 
             service.Dispose();
         }
