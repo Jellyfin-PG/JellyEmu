@@ -103,7 +103,7 @@ namespace JellyEmu
                     if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName) && !PlatformResolver.LibraryOnlyAliases.ContainsKey(dirName))
                     {
                         var platform = new PlatformResolver(null!).Resolve(trimmedPath);
-                        if (platform != "Unknown" && Directory.EnumerateFileSystemEntries(path).Any())
+                        if (platform != "Unknown" && DirectoryContainsRomFiles(path))
                         {
                             return true;
                         }
@@ -112,6 +112,35 @@ namespace JellyEmu
                 catch { }
             }
             return false;
+        }
+
+        public static bool DirectoryContainsRomFiles(string? path)
+        {
+            if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) return false;
+            try
+            {
+                var cues = Directory.GetFiles(path, "*.cue");
+                if (cues.Length == 1 && CueParser.HasResolvedBin(cues[0]))
+                    return true;
+
+                return Directory.EnumerateFiles(path, "*", SearchOption.TopDirectoryOnly)
+                    .Any(f =>
+                    {
+                        var ext = Path.GetExtension(f);
+                        if (string.IsNullOrEmpty(ext)) return false;
+                        if (PlatformResolver.AllRomExtensions.Contains(ext) || PlatformResolver.LibraryOnlyExtensions.ContainsKey(ext))
+                        {
+                            if (string.Equals(ext, ".cue", StringComparison.OrdinalIgnoreCase))
+                                return CueParser.HasResolvedBin(f);
+                            return true;
+                        }
+                        return IsPico8Path(f);
+                    });
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static string EffectiveRomPath(string? path)

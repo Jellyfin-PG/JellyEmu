@@ -138,17 +138,21 @@ namespace JellyEmu.Tests
         }
 
         [Theory]
-        [InlineData("windows")]
-        [InlineData("linux")]
-        [InlineData("macos")]
-        [InlineData("android")]
-        public void IsRomPath_PlatformCategoryFolderItself_ShouldReturnFalse(string platformFolder)
+        [InlineData("NEON GENESIS EVANGELION (Original Series Soundtrack)")]
+        [InlineData("Genesis - The Last Domino")]
+        [InlineData("Arcade Fire - The Suburbs")]
+        [InlineData("The Saturns - Greatest Hits")]
+        public void IsRomPath_MusicFolderWithPlatformKeyword_WithoutRomFiles_ShouldReturnFalse(string albumFolder)
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), platformFolder);
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), albumFolder);
             Directory.CreateDirectory(tempDir);
             try
             {
-                File.WriteAllText(Path.Combine(tempDir, "somefile.txt"), "dummy");
+                File.WriteAllText(Path.Combine(tempDir, "01 - Track.flac"), "dummy audio");
+                File.WriteAllText(Path.Combine(tempDir, "02 - Track.mp3"), "dummy audio");
+                File.WriteAllText(Path.Combine(tempDir, "cover.jpg"), "dummy image");
+                File.WriteAllText(Path.Combine(tempDir, "album.nfo"), "dummy nfo");
+
                 Assert.False(RomExtensions.IsRomPath(tempDir));
             }
             finally
@@ -159,6 +163,53 @@ namespace JellyEmu.Tests
                     Directory.Delete(root, true);
                 }
             }
+        }
+
+        [Fact]
+        public void RomResolver_WhenInsideMusicLibrary_ShouldReturnNull()
+        {
+            var resolver = new RomResolver(_resolver);
+            var musicFolder = new MediaBrowser.Controller.Entities.CollectionFolder
+            {
+                CollectionType = Jellyfin.Data.Enums.CollectionType.music
+            };
+
+            var itemArgs = new MediaBrowser.Controller.Library.ItemResolveArgs(null!, null!)
+            {
+                Parent = musicFolder,
+                FileInfo = new MediaBrowser.Model.IO.FileSystemMetadata
+                {
+                    FullName = "C:\\Library\\Music\\Genesis\\Invisible Touch (1986).flac",
+                    IsDirectory = false
+                }
+            };
+
+            var result = resolver.ResolvePath(itemArgs);
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void RomResolver_WhenInsideBookLibrary_ShouldResolveRom()
+        {
+            var resolver = new RomResolver(_resolver);
+            var booksFolder = new MediaBrowser.Controller.Entities.CollectionFolder
+            {
+                CollectionType = Jellyfin.Data.Enums.CollectionType.books
+            };
+
+            var itemArgs = new MediaBrowser.Controller.Library.ItemResolveArgs(null!, null!)
+            {
+                Parent = booksFolder,
+                FileInfo = new MediaBrowser.Model.IO.FileSystemMetadata
+                {
+                    FullName = "C:\\Library\\Games\\SNES\\Super Mario World (USA).sfc",
+                    IsDirectory = false
+                }
+            };
+
+            var result = resolver.ResolvePath(itemArgs);
+            Assert.NotNull(result);
+            Assert.Equal("Super Mario World", result.Name);
         }
     }
 }

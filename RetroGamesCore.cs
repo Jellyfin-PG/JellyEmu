@@ -1,3 +1,4 @@
+using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Resolvers;
@@ -9,6 +10,20 @@ namespace JellyEmu
     /// </summary>
     public class RomResolver : IItemResolver
     {
+        private static readonly HashSet<CollectionType> ExcludedLibraryTypes = new()
+        {
+            CollectionType.music,
+            CollectionType.movies,
+            CollectionType.tvshows,
+            CollectionType.musicvideos,
+            CollectionType.homevideos,
+            CollectionType.photos,
+            CollectionType.livetv,
+            CollectionType.playlists,
+            CollectionType.boxsets,
+            CollectionType.trailers
+        };
+
         private readonly PlatformResolver _platformResolver;
 
         public RomResolver(PlatformResolver platformResolver)
@@ -18,8 +33,32 @@ namespace JellyEmu
 
         public ResolverPriority Priority => ResolverPriority.First;
 
+        private static CollectionType? GetLibraryCollectionType(Folder? folder)
+        {
+            var current = folder;
+            while (current != null)
+            {
+                if (current is CollectionFolder colFolder && colFolder.CollectionType.HasValue)
+                {
+                    return colFolder.CollectionType.Value;
+                }
+                current = current.GetParent() as Folder;
+            }
+            return null;
+        }
+
         public BaseItem? ResolvePath(ItemResolveArgs args)
         {
+            // Do not resolve ROMs inside non-gaming / non-book libraries (Music, Movies, TV, etc.)
+            if (args.Parent != null)
+            {
+                var libraryType = GetLibraryCollectionType(args.Parent);
+                if (libraryType.HasValue && ExcludedLibraryTypes.Contains(libraryType.Value))
+                {
+                    return null;
+                }
+            }
+
             if (args.IsDirectory)
             {
                 try
@@ -60,7 +99,7 @@ namespace JellyEmu
                     if (!string.IsNullOrEmpty(dirName) && !PlatformResolver.Aliases.ContainsKey(dirName) && !PlatformResolver.LibraryOnlyAliases.ContainsKey(dirName))
                     {
                         var consoleTag = _platformResolver.Resolve(trimmedPath);
-                        if (consoleTag != "Unknown" && Directory.EnumerateFileSystemEntries(args.Path).Any())
+                        if (consoleTag != "Unknown" && RomExtensions.DirectoryContainsRomFiles(args.Path))
                         {
                             var regionTag = PlatformResolver.ResolveRegions(trimmedPath).FirstOrDefault();
                             var displayName = PlatformResolver.CleanDisplayName(dirName);
