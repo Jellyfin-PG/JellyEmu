@@ -36,6 +36,8 @@ namespace JellyEmu.Services
         public List<string> DownloadMediaIdRegexes { get; set; } = new();
         public string DownloadMethod { get; set; } = "GET";
         public string DownloadParamName { get; set; } = "mediaId";
+        public string? ThumbnailUrl { get; set; }
+        public string? DownloadUrl { get; set; }
         public Dictionary<string, string> SystemMap { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -105,45 +107,130 @@ namespace JellyEmu.Services
             return client;
         }
 
+        public static readonly List<ScraperProvider> DefaultProviders = new();
+
         public async Task<List<ScraperProvider>> LoadProvidersAsync()
         {
             var config = Plugin.Instance?.Configuration;
             var feedUrl = config?.MarketplaceFeedUrl;
 
-            if (string.IsNullOrWhiteSpace(feedUrl))
+            List<ScraperProvider>? providers = null;
+
+            if (!string.IsNullOrWhiteSpace(feedUrl))
             {
-                return new List<ScraperProvider>();
+                try
+                {
+                    if (feedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        feedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var client = GetClient();
+                        var json = await client.GetStringAsync(feedUrl);
+                        providers = System.Text.Json.JsonSerializer.Deserialize<List<ScraperProvider>>(json, new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                    }
+                    else
+                    {
+                        var localPath = feedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                            ? new Uri(feedUrl).LocalPath
+                            : feedUrl;
+                        if (File.Exists(localPath))
+                        {
+                            var json = await File.ReadAllTextAsync(localPath);
+                            providers = System.Text.Json.JsonSerializer.Deserialize<List<ScraperProvider>>(json, new System.Text.Json.JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[JellyEmu] Failed to load external scraper providers from {Url}.", feedUrl);
+                }
             }
 
-            try
+            if (providers == null || providers.Count == 0)
             {
-                var client = GetClient();
-                var json = await client.GetStringAsync(feedUrl);
-                var providers = System.Text.Json.JsonSerializer.Deserialize<List<ScraperProvider>>(json, new System.Text.Json.JsonSerializerOptions
+                // Fallback to local providers.json file if present on disk
+                var candidatePaths = new[]
                 {
-                    PropertyNameCaseInsensitive = true
-                });
-                return providers ?? new List<ScraperProvider>();
+                    Path.Combine(AppContext.BaseDirectory, "providers.json"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "providers.json"),
+                    Path.Combine(Path.GetDirectoryName(typeof(MarketplaceService).Assembly.Location) ?? "", "providers.json")
+                };
+
+                foreach (var candidate in candidatePaths)
+                {
+                    if (File.Exists(candidate))
+                    {
+                        try
+                        {
+                            var json = await File.ReadAllTextAsync(candidate);
+                            var loaded = System.Text.Json.JsonSerializer.Deserialize<List<ScraperProvider>>(json, new System.Text.Json.JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            });
+                            if (loaded != null && loaded.Count > 0)
+                            {
+                                providers = loaded;
+                                break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "[JellyEmu] Failed reading candidate providers file at {Path}", candidate);
+                        }
+                    }
+                }
             }
-            catch (Exception ex)
+
+            return providers ?? new List<ScraperProvider>();
+        }
+
+        private string ResolveThumbnailUrl(ScraperProvider provider, Match m, string rawSys, string id, string title)
+        {
+            if (m.Groups["thumbnailUrl"].Success && !string.IsNullOrWhiteSpace(m.Groups["thumbnailUrl"].Value))
             {
-                _logger.LogError(ex, "[JellyEmu] Failed to load external scraper providers from {Url}", feedUrl);
-                return new List<ScraperProvider>();
+                var t = m.Groups["thumbnailUrl"].Value.Trim();
+                return t.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? t : $"https://{provider.Domain}{t}";
             }
+            if (m.Groups["thumb"].Success && !string.IsNullOrWhiteSpace(m.Groups["thumb"].Value))
+            {
+                var t = m.Groups["thumb"].Value.Trim();
+                return t.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? t : $"https://{provider.Domain}{t}";
+            }
+
+            if (!string.IsNullOrEmpty(provider.ThumbnailUrl))
+            {
+                var sysSlug = m.Groups["systemSlug"].Success ? m.Groups["systemSlug"].Value : rawSys.ToLowerInvariant();
+                return provider.ThumbnailUrl
+                    .Replace("{domain}", provider.Domain)
+                    .Replace("{system}", sysSlug)
+                    .Replace("{id}", id)
+                    .Replace("{title}", Uri.EscapeDataString(title));
+            }
+
+            return string.Empty;
         }
 
         public async Task<List<MarketplaceGameResult>> SearchAsync(string query, string systemFilter = "", string letterFilter = "")
         {
             var results = new List<MarketplaceGameResult>();
-            var activeProviders = GetActiveProviders();
             var allProviders = await LoadProvidersAsync();
-
-            foreach (var provider in allProviders)
+            if (allProviders.Count == 0)
             {
-                if (activeProviders.Count > 0 && !activeProviders.Any(ap => ap.Contains(provider.Domain)))
-                {
-                    continue;
-                }
+                return results;
+            }
+
+            var activeProviders = GetActiveProviders();
+            var targetProviders = activeProviders.Count > 0
+                ? allProviders.Where(p => activeProviders.Any(ap => ap.Contains(p.Domain, StringComparison.OrdinalIgnoreCase))).ToList()
+                : allProviders;
+
+            foreach (var provider in targetProviders)
+            {
 
                 try
                 {
@@ -193,6 +280,10 @@ namespace JellyEmu.Services
                 var id = m.Groups["id"].Value;
                 var title = System.Net.WebUtility.HtmlDecode(m.Groups["title"].Value.Trim());
                 var rawSys = m.Groups["system"].Value.Trim();
+                if (string.IsNullOrEmpty(rawSys) && m.Groups["systemSlug"].Success)
+                {
+                    rawSys = m.Groups["systemSlug"].Value.Trim();
+                }
 
                 var normalizedSystem = NormalizeSystem(rawSys);
                 if (provider.SystemMap.TryGetValue(rawSys, out var mappedSys))
@@ -203,7 +294,8 @@ namespace JellyEmu.Services
                 var fullUrl = detailPath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                     ? detailPath
                     : $"https://{provider.Domain}{detailPath}";
-                var thumbnailUrl = $"https://dl.{provider.Domain}/image.php?type=box&id={id}";
+                
+                var thumbnailUrl = ResolveThumbnailUrl(provider, m, rawSys, id, title);
 
                 var regionsHtml = m.Groups["regions"].Value;
                 var version = m.Groups["version"].Value.Trim();
@@ -296,7 +388,7 @@ namespace JellyEmu.Services
 
             var client = GetClient();
             var html = await client.GetStringAsync(url);
-            var matches = Regex.Matches(html, provider.BrowseRegex, RegexOptions.IgnoreCase);
+            var matches = Regex.Matches(html, provider.BrowseRegex, RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             foreach (Match m in matches)
             {
@@ -307,7 +399,8 @@ namespace JellyEmu.Services
                 var fullUrl = detailPath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                     ? detailPath
                     : $"https://{provider.Domain}{detailPath}";
-                var thumbnailUrl = $"https://dl.{provider.Domain}/image.php?type=box&id={id}";
+                
+                var thumbnailUrl = ResolveThumbnailUrl(provider, m, sysSlug, id, title);
 
                 var regionsHtml = m.Groups["regions"].Value;
                 var version = m.Groups["version"].Value.Trim();
@@ -338,52 +431,62 @@ namespace JellyEmu.Services
         private List<string> GetActiveProviders()
         {
             var config = Plugin.Instance?.Configuration;
-            if (config == null || (!config.MarketplaceConfigured && (config.MarketplaceProviders == null || config.MarketplaceProviders.Count == 0)))
+            if (config == null || config.MarketplaceProviders == null)
             {
-                return new List<string>
-                {
-                    "https://vimm.net"
-                };
+                return new List<string>();
             }
-            return config.MarketplaceProviders ?? new List<string>();
+            return config.MarketplaceProviders;
         }
 
         public string NormalizeSystem(string rawSystem)
         {
-            var clean = rawSystem.Trim().ToLowerInvariant().Replace("-", " ");
+            if (string.IsNullOrWhiteSpace(rawSystem)) return "Unknown";
+            var trimmed = rawSystem.Trim();
+
+            if (PlatformResolver.Aliases.TryGetValue(trimmed, out var aliasPlatform))
+            {
+                return aliasPlatform;
+            }
+
+            var clean = trimmed.ToLowerInvariant().Replace("-", " ");
             
             if (clean.Contains("gba") || clean.Contains("game boy advance") || clean.Contains("gameboy advance"))
                 return "Game Boy Advance";
             if (clean.Contains("gbc") || clean.Contains("game boy color") || clean.Contains("gameboy color"))
                 return "Game Boy Color";
-            if (clean.Contains("gb") || clean.Contains("game boy") || clean.Contains("gameboy"))
+            if (clean.Contains("game boy") || clean.Contains("gameboy") || clean == "gb")
                 return "Game Boy";
                 
-            if (clean.Contains("nes") || clean.Contains("famicom") || clean.Contains("nintendo entertainment system"))
-                return "NES";
             if (clean.Contains("snes") || clean.Contains("super nintendo") || clean.Contains("super famicom") || clean.Contains("supernintendo"))
                 return "SNES";
             if (clean.Contains("n64") || clean.Contains("nintendo 64") || clean.Contains("nintendo64"))
                 return "N64";
-            if (clean.Contains("nds") || clean.Contains("nintendo ds") || clean.Contains("nintendods") || clean.Contains(" ds"))
+            if (clean.Contains("nds") || clean.Contains("nintendo ds") || clean.Contains("nintendods") || clean.Contains(" ds") || clean == "ds")
                 return "Nintendo DS";
-            if (clean.Contains("virtual boy") || clean.Contains("virtualboy") || clean.Contains("vb"))
+            if (clean.Contains("virtual boy") || clean.Contains("virtualboy") || clean == "vb")
                 return "Virtual Boy";
                 
             if (clean.Contains("sega cd") || clean.Contains("segacd") || clean.Contains("mega cd") || clean.Contains("megacd"))
                 return "Sega CD";
             if (clean.Contains("32x") || clean.Contains("sega 32x"))
                 return "Sega 32X";
-            if (clean.Contains("genesis") || clean.Contains("mega drive") || clean.Contains("megadrive") || clean.Contains("md"))
+            if (clean.Contains("genesis") || clean.Contains("mega drive") || clean.Contains("megadrive") || clean == "md")
                 return "Sega Genesis";
-            if (clean.Contains("game gear") || clean.Contains("gamegear") || clean.Contains("gg"))
+            if (clean.Contains("game gear") || clean.Contains("gamegear") || clean == "gg")
                 return "Game Gear";
-            if (clean.Contains("saturn") || clean.Contains("ss"))
+            if (clean.Contains("saturn") || clean == "ss")
                 return "Sega Saturn";
                 
+            if (clean.Contains("playstation 2") || clean.Contains("playstation2") || clean.Contains("ps2"))
+                return "PlayStation 2";
             if (clean.Contains("playstation 1") || clean.Contains("playstation1") || clean.Contains("ps1") || clean.Contains("psx") || clean.Contains("playstation") || clean.Contains("ps one"))
                 return "PlayStation";
-                
+            if (clean.Contains("psp") || clean.Contains("playstation portable"))
+                return "PSP";
+
+            if (clean == "nes" || clean.Contains(" nes ") || clean.StartsWith("nes ") || clean.EndsWith(" nes") || clean.Contains("famicom") || clean.Contains("nintendo entertainment system"))
+                return "NES";
+
             if (clean.Contains("2600") || clean.Contains("atari 2600") || clean.Contains("atari2600"))
                 return "Atari 2600";
             if (clean.Contains("7800") || clean.Contains("atari 7800") || clean.Contains("atari7800"))
@@ -393,7 +496,7 @@ namespace JellyEmu.Services
             if (clean.Contains("jaguar") || clean.Contains("atari jaguar"))
                 return "Atari Jaguar";
                 
-            if (clean.Contains("wonderswan") || clean.Contains("ws") || clean.Contains("wonder swan"))
+            if (clean.Contains("wonderswan") || clean == "ws" || clean.Contains("wonder swan"))
                 return "WonderSwan";
             if (clean.Contains("pce") || clean.Contains("turbografx") || clean.Contains("pc engine") || clean.Contains("pcengine") || clean.Contains("tg16") || clean.Contains("tg 16"))
                 return "TurboGrafx-16";
@@ -446,7 +549,14 @@ namespace JellyEmu.Services
 
             if (string.IsNullOrEmpty(action))
             {
-                action = $"https://dl.{provider.Domain}/";
+                if (!string.IsNullOrEmpty(provider.DownloadUrl))
+                {
+                    action = provider.DownloadUrl.Replace("{domain}", provider.Domain);
+                }
+                else
+                {
+                    action = $"https://{provider.Domain}/";
+                }
             }
             else if (action.StartsWith("//"))
             {
@@ -470,14 +580,22 @@ namespace JellyEmu.Services
 
             if (string.IsNullOrEmpty(mediaId))
             {
-                var fallbackMatch = Regex.Match(detailUrl, @"/(?:vault|game)/(?<id>\d+)");
+                var fallbackMatch = Regex.Match(detailUrl, @"(?<id>\d+)(?:\.php|\.html|/|$|\?)");
                 if (fallbackMatch.Success)
                 {
                     mediaId = fallbackMatch.Groups["id"].Value;
                 }
                 else
                 {
-                    throw new Exception("Could not resolve media/game ID from the detail page or URL.");
+                    fallbackMatch = Regex.Match(detailUrl, @"(?<id>\d+)");
+                    if (fallbackMatch.Success)
+                    {
+                        mediaId = fallbackMatch.Groups["id"].Value;
+                    }
+                    else
+                    {
+                        throw new Exception("Could not resolve media/game ID from the detail page or URL.");
+                    }
                 }
             }
 
@@ -526,7 +644,7 @@ namespace JellyEmu.Services
             {
                 var responseHtml = await response.Content.ReadAsStringAsync();
                 _logger.LogError("[JellyEmu] Download failed. Server returned HTML: {Content}", responseHtml.Substring(0, Math.Min(500, responseHtml.Length)));
-                throw new Exception("The download server returned an HTML page instead of the ROM binary. Vimm's Lair might be blocking the request or experiencing high traffic.");
+                throw new Exception($"The download server returned an HTML page instead of the ROM binary. {provider.Name} might be blocking the request or experiencing high traffic.");
             }
 
             fileBytes = await response.Content.ReadAsByteArrayAsync();
@@ -541,6 +659,13 @@ namespace JellyEmu.Services
             return SaveFileToDisk(fileBytes, filename, system, gamesLibraryPath);
         }
 
+        public string GetSystemFolderName(string system)
+        {
+            var normalized = NormalizeSystem(system);
+            if (normalized != "Unknown") return normalized;
+            return string.IsNullOrWhiteSpace(system) ? "Unknown" : system.Trim();
+        }
+
         private string SaveFileToDisk(byte[] fileBytes, string originalFilename, string system, string libraryPath)
         {
             var ext = Path.GetExtension(originalFilename);
@@ -548,15 +673,25 @@ namespace JellyEmu.Services
             
             title = PlatformResolver.CleanDisplayName(title);
 
-            var platformTag = GetPlatformFilenameTag(system);
-            var targetFilename = $"{title} ({platformTag}){ext}";
-            
+            var systemFolder = GetSystemFolderName(system);
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                systemFolder = systemFolder.Replace(c.ToString(), "");
+            }
+
+            var targetFilename = $"{title}{ext}";
             foreach (var c in Path.GetInvalidFileNameChars())
             {
                 targetFilename = targetFilename.Replace(c.ToString(), "");
             }
 
-            var fullPath = Path.Combine(libraryPath, targetFilename);
+            var systemDirPath = Path.Combine(libraryPath, systemFolder);
+            if (!Directory.Exists(systemDirPath))
+            {
+                Directory.CreateDirectory(systemDirPath);
+            }
+
+            var fullPath = Path.Combine(systemDirPath, targetFilename);
             
             _logger.LogInformation("[JellyEmu] Writing ROM to: {Path}", fullPath);
             File.WriteAllBytes(fullPath, fileBytes);
@@ -571,7 +706,7 @@ namespace JellyEmu.Services
                 _logger.LogWarning(scanEx, "[JellyEmu] Failed to queue Jellyfin library scan automatically.");
             }
 
-            return targetFilename;
+            return Path.Combine(systemFolder, targetFilename);
         }
     }
 }

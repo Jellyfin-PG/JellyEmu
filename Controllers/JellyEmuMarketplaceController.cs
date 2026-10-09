@@ -109,6 +109,24 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Updates the marketplace feed URL.
+        /// </summary>
+        [HttpPost("/jellyemu/marketplace/feed-url")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult UpdateFeedUrl([FromBody] UpdateFeedUrlRequest request)
+        {
+            var plugin = Plugin.Instance;
+            if (plugin == null) return BadRequest(new { message = "Plugin instance is null." });
+            var config = plugin.Configuration;
+            if (config == null) return BadRequest(new { message = "Plugin configuration not loaded." });
+
+            config.MarketplaceFeedUrl = request?.Url?.Trim() ?? string.Empty;
+            plugin.UpdateConfiguration(config);
+            return Ok(new { feedUrl = config.MarketplaceFeedUrl });
+        }
+
+        /// <summary>
         /// Adds a new provider URL to the configuration.
         /// </summary>
         [HttpPost("/jellyemu/marketplace/providers")]
@@ -127,19 +145,13 @@ namespace JellyEmu.Controllers
                 return BadRequest(new { message = "Invalid absolute URL." });
             }
 
-            var allProviders = await _marketplaceService.LoadProvidersAsync();
-            var isSupported = allProviders.Any(p => url.Contains(p.Domain, StringComparison.OrdinalIgnoreCase));
-            if (!isSupported)
-            {
-                return BadRequest(new { message = "Domain not supported by the external feed configuration." });
-            }
-
             var plugin = Plugin.Instance;
             if (plugin == null) return BadRequest(new { message = "Plugin instance is null." });
 
             var config = plugin.Configuration;
             if (config == null) return BadRequest(new { message = "Plugin configuration not loaded." });
 
+            var allProviders = await _marketplaceService.LoadProvidersAsync();
             var isConfigured = config.MarketplaceConfigured || (config.MarketplaceProviders != null && config.MarketplaceProviders.Count > 0);
             if (!isConfigured)
             {
@@ -319,6 +331,12 @@ namespace JellyEmu.Controllers
     }
 
     public class AddProviderRequest
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("url")]
+        public string Url { get; set; } = string.Empty;
+    }
+
+    public class UpdateFeedUrlRequest
     {
         [System.Text.Json.Serialization.JsonPropertyName("url")]
         public string Url { get; set; } = string.Empty;

@@ -312,6 +312,17 @@ namespace JellyEmu.Services
                 return raw;
             }
 
+            string GetControls()
+            {
+                var raw = Get("controls", SystemDefaults.Controls);
+                if (!string.IsNullOrWhiteSpace(raw) && raw != "{}") return raw;
+                var legacyJe = Get("jeBindings", string.Empty);
+                if (!string.IsNullOrWhiteSpace(legacyJe) && legacyJe != "{}") return legacyJe;
+                var legacyPb = Get("playerBindings", string.Empty);
+                if (!string.IsNullOrWhiteSpace(legacyPb) && legacyPb != "{}") return legacyPb;
+                return SystemDefaults.Controls;
+            }
+
             return new EffectiveUserPrefs(
                 Scale: GetScale(),
                 Mute: Get("mute", SystemDefaults.Mute),
@@ -321,7 +332,7 @@ namespace JellyEmu.Services
                 Autosave: Get("autosave", SystemDefaults.Autosave),
                 Shader: GetShader(),
                 VideoRotation: GetInt("videoRotation", SystemDefaults.VideoRotation),
-                Controls: Get("controls", SystemDefaults.Controls),
+                Controls: GetControls(),
                 ControllerControls: Get("controllerControls", SystemDefaults.ControllerControls),
                 RaUsername: Get("raUsername", SystemDefaults.RaUsername),
                 RaApiKey: Get("raApiKey", SystemDefaults.RaApiKey),

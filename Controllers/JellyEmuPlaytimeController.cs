@@ -155,18 +155,41 @@ namespace JellyEmu.Controllers
                         totalSeconds
                     });
                 }
+
+                // Query Top 10 Most Played Game Titles across all users
+                var topGames = new List<object>();
+                using (var topGamesCommand = connection.CreateCommand())
+                {
+                    topGamesCommand.CommandText = "SELECT ItemId, SUM(Seconds) AS TotalSecs FROM Playtime GROUP BY ItemId ORDER BY TotalSecs DESC LIMIT 10;";
+                    using var topGamesReader = topGamesCommand.ExecuteReader();
+                    while (topGamesReader.Read())
+                    {
+                        var itemId = topGamesReader.GetString(0);
+                        var seconds = topGamesReader.GetInt64(1);
+                        var item = LibraryManager.GetItemById(itemId);
+                        var itemName = item?.Name ?? "Unknown Game";
+
+                        topGames.Add(new
+                        {
+                            itemId,
+                            itemName,
+                            seconds
+                        });
+                    }
+                }
+
+                return Ok(new
+                {
+                    totalSeconds = grandTotalSeconds,
+                    users = usersPlaytime,
+                    topGames
+                });
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "[JellyEmu] Failed to query all users playtime from SQLite");
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to query database.");
             }
-
-            return Ok(new
-            {
-                totalSeconds = grandTotalSeconds,
-                users = usersPlaytime
-            });
         }
 
         /// <summary>

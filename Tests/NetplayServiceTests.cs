@@ -742,6 +742,43 @@ namespace JellyEmu.Tests
         }
 
         [Fact]
+        public async Task Netplay_GetRoomList_CrossDomainAndLocalIp_DiscoversRoomAcrossNetworkPaths()
+        {
+            var service = new JellyEmuNetplayService(NullLogger<JellyEmuNetplayService>.Instance);
+            var hostWs = new TestWebSocket();
+            var hostTask = service.HandleWebSocketSessionAsync(hostWs, CancellationToken.None);
+
+            // Connect host and open room on reverse proxy domain
+            hostWs.EnqueueClientMessage("40");
+            await Task.Delay(30);
+
+            var openRoomPayload = "421[\"open-room\",{\"password\":\"\",\"maxPlayers\":4,\"extra\":{\"sessionid\":\"crossDomainRoom\",\"userid\":\"hostUser\",\"player_name\":\"HostPlayer\",\"room_name\":\"CrossDomain Mario\",\"game_id\":\"42\",\"domain\":\"jellyfin.example.com\"}}]";
+            hostWs.EnqueueClientMessage(openRoomPayload);
+            await Task.Delay(50);
+
+            // 1. LAN IP client discovers the room
+            var lanRooms = service.GetRoomList("192.168.1.100:8096", "42");
+            Assert.True(lanRooms.ContainsKey("crossDomainRoom"), "LAN IP client should discover room created via reverse proxy domain");
+            Assert.Equal("CrossDomain Mario", lanRooms["crossDomainRoom"].room_name);
+
+            // 2. Client with no domain specified discovers the room
+            var noDomainRooms = service.GetRoomList(null, "42");
+            Assert.True(noDomainRooms.ContainsKey("crossDomainRoom"), "Client without domain param should discover room");
+
+            // 3. Localhost client discovers the room
+            var localhostRooms = service.GetRoomList("localhost:8096", "42");
+            Assert.True(localhostRooms.ContainsKey("crossDomainRoom"), "Localhost client should discover room");
+
+            // 4. ROM / Game ID isolation remains strictly enforced
+            var differentGameRooms = service.GetRoomList("192.168.1.100:8096", "999");
+            Assert.False(differentGameRooms.ContainsKey("crossDomainRoom"), "Rooms must remain isolated by game_id");
+
+            // Cleanup
+            await service.StopAsync(CancellationToken.None);
+            await hostTask;
+        }
+
+        [Fact]
         public void Netplay_Dispose_SafelyCleansUpWithoutThrowing()
         {
             var service = new JellyEmuNetplayService(NullLogger<JellyEmuNetplayService>.Instance);
