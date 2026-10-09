@@ -233,7 +233,7 @@
 
             if (fpsEl) {
                 if (fpsMode === '1') {
-                    fpsEl.innerHTML = '<div class="je-fps-row"><span class="material-icons">speed</span><span>' + Math.round(currentFps) + ' FPS</span></div>';
+                    fpsEl.innerHTML = '<svg class="je-fps-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span class="je-fps-val">' + Math.round(currentFps) + ' FPS</span>';
                 } else if (fpsMode === '2') {
                     var avgMs = (elapsed / fpsFrames).toFixed(1);
                     var minMs = _frameDeltas.length ? Math.min.apply(null, _frameDeltas).toFixed(1) : avgMs;
@@ -247,20 +247,26 @@
                         dispInfo = Math.round(r.width) + '×' + Math.round(r.height);
                     }
 
+                    var iconSpeed = '<svg class="je-fps-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>';
+                    var iconTimer = '<svg class="je-fps-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+                    var iconTv = '<svg class="je-fps-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>';
+                    var iconGamepad = '<svg class="je-fps-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/></svg>';
+                    var iconMemory = '<svg class="je-fps-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 19v2"/><path d="M10 19v2"/><path d="M14 19v2"/><path d="M18 19v2"/><path d="M6 3v2"/><path d="M10 3v2"/><path d="M14 3v2"/><path d="M18 3v2"/><rect width="16" height="12" x="4" y="6" rx="2"/></svg>';
+
                     var rows = [
-                        '<div class="je-fps-row"><span class="material-icons">speed</span><span>' + currentFps + ' FPS (' + avgMs + ' ms)</span></div>',
-                        '<div class="je-fps-row"><span class="material-icons">timer</span><span>Timing: ' + minMs + ' - ' + maxMs + ' ms' + (_stutterCount > 0 ? ' (' + _stutterCount + ' stutters)' : '') + '</span></div>',
-                        '<div class="je-fps-row"><span class="material-icons">tv</span><span>Canvas: ' + bufInfo + ' → ' + dispInfo + '</span></div>'
+                        '<div class="je-fps-row">' + iconSpeed + '<span>' + currentFps + ' FPS (' + avgMs + ' ms)</span></div>',
+                        '<div class="je-fps-row">' + iconTimer + '<span>Timing: ' + minMs + ' - ' + maxMs + ' ms' + (_stutterCount > 0 ? ' (' + _stutterCount + ' stutters)' : '') + '</span></div>',
+                        '<div class="je-fps-row">' + iconTv + '<span>Canvas: ' + bufInfo + ' → ' + dispInfo + '</span></div>'
                     ];
 
                     var coreName = window.EJS_core || (window.JellyEmuConfig && window.JellyEmuConfig.platformTag);
                     if (coreName) {
-                        rows.push('<div class="je-fps-row"><span class="material-icons">sports_esports</span><span>Core: ' + coreName + '</span></div>');
+                        rows.push('<div class="je-fps-row">' + iconGamepad + '<span>Core: ' + coreName + '</span></div>');
                     }
 
                     if (window.performance && window.performance.memory && window.performance.memory.usedJSHeapSize) {
                         var mb = Math.round(window.performance.memory.usedJSHeapSize / (1024 * 1024));
-                        rows.push('<div class="je-fps-row"><span class="material-icons">memory</span><span>Heap: ' + mb + ' MB</span></div>');
+                        rows.push('<div class="je-fps-row">' + iconMemory + '<span>Heap: ' + mb + ' MB</span></div>');
                     }
 
                     fpsEl.innerHTML = rows.join('');
@@ -347,6 +353,27 @@
     });
     window.addEventListener('resize', applyLiveScreenSize);
     window.addEventListener('orientationchange', applyLiveScreenSize);
+
+    window.addEventListener('jellyemu:settings-changed', function () {
+        applyAllLiveSettings();
+    });
+    window.addEventListener('jellyemu:fps-changed', function (ev) {
+        if (ev && ev.detail && ev.detail.mode !== undefined) {
+            if (_globPrefs) _globPrefs.showFps = ev.detail.mode;
+            if (cfg) cfg.showFps = ev.detail.mode;
+        }
+        applyLiveFps();
+    });
+
+    window.JellyEmuSettings = {
+        applyLiveShader: applyLiveShader,
+        applyLiveRotation: applyLiveRotation,
+        applyLiveFfRate: applyLiveFfRate,
+        applyLiveSmRate: applyLiveSmRate,
+        applyLiveScreenSize: applyLiveScreenSize,
+        applyLiveFps: applyLiveFps,
+        applyAllLiveSettings: applyAllLiveSettings
+    };
 
     // Tab Management
     var tabSysBtn  = document.getElementById('je-set-tab-sys');

@@ -371,15 +371,15 @@ canvas.ejs_canvas,
 }
 
 .je-popup {
-    background: rgba(20, 20, 20, .95);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, .1);
+    background: #121216;
+    border: 1px solid rgba(255, 255, 255, .12);
     border-radius: 16px;
     width: 90%;
     max-width: 480px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.1);
     animation: je-pop-in .2s ease;
 }
 
@@ -667,25 +667,32 @@ canvas.ejs_canvas,
 }
 
 .je-setting select {
-    background: rgba(30, 30, 30, .95);
-    border: 1px solid rgba(255, 255, 255, .2);
-    border-radius: 8px;
-    padding: 6px 10px;
+    background-color: #16161a;
+    border: 1px solid rgba(255, 255, 255, .15);
+    border-radius: 10px;
+    padding: 8px 12px;
     color: #fff;
     font-size: 13px;
     -webkit-appearance: none;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 8px center;
+    background-position: right 10px center;
     padding-right: 28px;
     cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.je-setting select:focus {
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .je-setting select option {
-    background: #1a1a1a;
+    background: #141418;
     color: #fff;
-    padding: 6px;
+    padding: 8px;
 }
 
 .je-section-title {
@@ -890,37 +897,41 @@ canvas.ejs_canvas,
     top: 56px;
     left: 16px;
     z-index: 89999;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
     color: #fff;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 6px 14px;
-    border-radius: 14px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(18, 18, 22, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 6px 12px;
+    border-radius: 10px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     pointer-events: none;
     display: none;
-    line-height: 1.4;
+    line-height: 1.2;
     user-select: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
 }
 
 #je-fps.je-active {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 #je-fps.je-detailed {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 500;
-    font-family: 'SF Mono', Consolas, Monaco, monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     color: #eee;
-    padding: 12px 16px;
-    border-radius: 16px;
-    background: rgba(0, 0, 0, 0.75);
-    border: none;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-    min-width: 230px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(18, 18, 22, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    min-width: 220px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -929,17 +940,22 @@ canvas.ejs_canvas,
 #je-fps .je-fps-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     white-space: nowrap;
+    line-height: 1.3;
 }
 
-#je-fps .je-fps-row .material-icons {
-    font-size: 15px;
-    width: 15px;
-    height: 15px;
-    line-height: 15px;
+#je-fps .je-fps-icon {
+    width: 14px;
+    height: 14px;
     flex-shrink: 0;
-    opacity: 0.85;
+    stroke: currentColor;
+    opacity: 0.9;
+}
+
+#je-fps .je-fps-val {
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 /* Dock Minimize */

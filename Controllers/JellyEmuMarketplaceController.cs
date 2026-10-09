@@ -56,7 +56,7 @@ namespace JellyEmu.Controllers
                 {
                     // Fallback
                 }
-                return Ok(new List<string> { "https://vimm.net" });
+                return Ok(new List<string>());
             }
 
             return Ok(config.MarketplaceProviders ?? new List<string>());
@@ -87,7 +87,7 @@ namespace JellyEmu.Controllers
                     }
                     catch
                     {
-                        active = new List<string> { "https://vimm.net" };
+                        active = new List<string>();
                     }
                 }
 

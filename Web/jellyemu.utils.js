@@ -174,6 +174,12 @@
     JE.toast = function (message, durationOrType) {
         if (!global.document || !global.document.body) return;
         var duration = typeof durationOrType === 'number' ? durationOrType : 2500;
+        var variant = typeof durationOrType === 'string' ? durationOrType : 'default';
+        try {
+            global.dispatchEvent(new CustomEvent('jellyemu:notify', {
+                detail: { message: message, duration: duration, variant: variant, icon: 'info' }
+            }));
+        } catch (_) {}
         var toast = global.document.createElement('div');
         toast.className = 'je-toast' + (typeof durationOrType === 'string' ? ' je-toast-' + durationOrType : '');
         toast.textContent = message;

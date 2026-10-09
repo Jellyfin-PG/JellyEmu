@@ -20,26 +20,49 @@
     var arBtn   = document.getElementById('je-ar-btn');
     var arLabel = document.getElementById('je-ar-label');
 
-    if (!vrBtn || !vrLabel || !arBtn || !arLabel) return; // guard: elements must exist
-
     /* ── State ── */
-    var _xrSession = null;
-    var _xrMode    = null; // 'immersive-ar' | 'immersive-vr'
+    var _xrSession   = null;
+    var _xrMode      = null; // 'immersive-ar' | 'immersive-vr'
+    var _vrSupported = false;
+    var _arSupported = false;
+
+    function _notifyXRStatus() {
+        try {
+            window.dispatchEvent(new CustomEvent('jellyemu:xr-status', {
+                detail: {
+                    vrSupported: _vrSupported,
+                    arSupported: _arSupported,
+                    inSession: !!_xrSession,
+                    mode: _xrMode
+                }
+            }));
+        } catch (_) { }
+    }
 
     /* ── XR availability check ── */
-    if (!navigator.xr) return;
+    if (navigator.xr && typeof navigator.xr.isSessionSupported === 'function') {
+        navigator.xr.isSessionSupported('immersive-vr').then(function (vrOk) {
+            _vrSupported = !!vrOk;
+            if (vrOk && vrBtn) {
+                vrBtn.classList.add('je-vr-available');
+            }
+            _notifyXRStatus();
+        }).catch(function () {
+            _vrSupported = false;
+            _notifyXRStatus();
+        });
 
-    navigator.xr.isSessionSupported('immersive-vr').then(function (vrOk) {
-        if (vrOk) {
-            vrBtn.classList.add('je-vr-available');
-        }
-    }).catch(function () {});
-
-    navigator.xr.isSessionSupported('immersive-ar').then(function (arOk) {
-        if (arOk) {
-            arBtn.classList.add('je-ar-available');
-        }
-    }).catch(function () {});
+        navigator.xr.isSessionSupported('immersive-ar').then(function (arOk) {
+            _arSupported = !!arOk;
+            if (arOk && arBtn) {
+                arBtn.classList.add('je-ar-available');
+            }
+            _notifyXRStatus();
+        }).catch(function () {
+            _arSupported = false;
+            _notifyXRStatus();
+        });
+    }
 
     /* ── Enter XR ── */
     function _enterXR(mode) {
@@ -366,19 +389,30 @@
             if (gCurrent && typeof gCurrent.simulateInput === 'function') gCurrent.simulateInput(0, 30, 1);
 
             if (_xrMode === 'immersive-ar') {
-                arBtn.classList.add('je-ar-active');
-                arBtn.title = 'Exit AR';
+                if (arBtn) {
+                    arBtn.classList.add('je-ar-active');
+                    arBtn.title = 'Exit AR';
+                }
             } else {
-                vrBtn.classList.add('je-vr-active');
-                vrBtn.title = 'Exit VR';
+                if (vrBtn) {
+                    vrBtn.classList.add('je-vr-active');
+                    vrBtn.title = 'Exit VR';
+                }
             }
+            _notifyXRStatus();
 
             session.addEventListener('end', function () {
                 _xrSession = null;
-                vrBtn.classList.remove('je-vr-active');
-                arBtn.classList.remove('je-ar-active');
-                vrBtn.title = 'Enter VR';
-                arBtn.title = 'Enter AR';
+                _xrMode = null;
+                if (vrBtn) {
+                    vrBtn.classList.remove('je-vr-active');
+                    vrBtn.title = 'Enter VR';
+                }
+                if (arBtn) {
+                    arBtn.classList.remove('je-ar-active');
+                    arBtn.title = 'Enter AR';
+                }
+                _notifyXRStatus();
 
                 window.requestAnimationFrame = origRaf;
                 renderer.dispose();
@@ -389,6 +423,9 @@
 
         }).catch(function (err) {
             console.warn('[JellyEmu XR] Session request failed:', err);
+            _xrSession = null;
+            _xrMode = null;
+            _notifyXRStatus();
         });
     }
 
@@ -398,12 +435,25 @@
     }
 
     /* ── Button toggle ── */
-    vrBtn.addEventListener('click', function () {
-        if (_xrSession) { _exitXR(); } else { _enterXR('immersive-vr'); }
-    });
+    if (vrBtn) {
+        vrBtn.addEventListener('click', function () {
+            if (_xrSession) { _exitXR(); } else { _enterXR('immersive-vr'); }
+        });
+    }
 
-    arBtn.addEventListener('click', function () {
-        if (_xrSession) { _exitXR(); } else { _enterXR('immersive-ar'); }
-    });
+    if (arBtn) {
+        arBtn.addEventListener('click', function () {
+            if (_xrSession) { _exitXR(); } else { _enterXR('immersive-ar'); }
+        });
+    }
+
+    window.JellyEmuXR = {
+        enterVR: function () { if (_xrSession) { _exitXR(); } else { _enterXR('immersive-vr'); } },
+        enterAR: function () { if (_xrSession) { _exitXR(); } else { _enterXR('immersive-ar'); } },
+        exitXR: _exitXR,
+        isVrSupported: function () { return _vrSupported; },
+        isArSupported: function () { return _arSupported; },
+        isSessionActive: function () { return !!_xrSession; }
+    };
 
 })();
