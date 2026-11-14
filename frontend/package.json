@@ -12,7 +12,7 @@
     "@heroui/react": "2.6.14",
     "@heroui/theme": "2.4.6",
     "clsx": "^2.1.1",
-    "framer-motion": "^11.18.2",
+    "framer-motion": "^14.12.0",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",
     "react-dom": "^19.3.1",
