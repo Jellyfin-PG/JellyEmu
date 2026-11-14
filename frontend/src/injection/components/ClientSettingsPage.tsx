@@ -586,7 +586,7 @@ export const ClientSettingsPage: React.FC = () => {
                             onPress={handleResetSystem}
                             className="font-medium text-xs px-4 bg-white/10 hover:bg-white/20 text-white border border-white/15 cursor-pointer"
                           >
-                            Reset {selectedSystem || 'System'} Core
+                            Reset {selectedSystem} Core
                           </Button>
                         </motion.div>
                         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
