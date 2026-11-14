@@ -323,27 +323,28 @@ export const injectionService = {
 
     const query = params.toString();
     const rawUrl = jellyfinApi.getApiUrl(query ? `${path}?${query}` : path);
+    const fullUrl = encodeURI(decodeURI(rawUrl));
 
     try {
-      const parsedUrl = new URL(rawUrl, window.location.origin);
+      const parsedUrl = new URL(fullUrl, window.location.origin);
       if (parsedUrl.origin === window.location.origin && (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:')) {
-        window.location.href = parsedUrl.href;
+        window.location.href = encodeURI(parsedUrl.href);
         return;
       }
     } catch { }
 
-    if (rawUrl.startsWith('/') && !rawUrl.startsWith('//') && !rawUrl.includes('\\')) {
-      window.location.href = rawUrl;
+    if (fullUrl.startsWith('/') && !fullUrl.startsWith('//') && !fullUrl.includes('\\')) {
+      window.location.href = fullUrl;
     }
   },
 
   launchVantage: (itemId: string): void => {
     const safeItemId = encodeURIComponent(itemId || '');
-    const vantageUrl = `vantage://launch?itemId=${safeItemId}`;
+    const vantageUrl = encodeURI(decodeURI(`vantage://launch?itemId=${safeItemId}`));
     try {
       const parsed = new URL(vantageUrl);
       if (parsed.protocol === 'vantage:') {
-        window.location.href = parsed.href;
+        window.location.href = encodeURI(parsed.href);
         return;
       }
     } catch { }
