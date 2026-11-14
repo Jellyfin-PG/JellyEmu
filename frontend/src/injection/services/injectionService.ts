@@ -314,18 +314,39 @@ export const injectionService = {
     document.documentElement.style.overflow = '';
 
     const userId = injectionService.getCurrentUserId();
-    let path = `jellyemu/play/${itemId}`;
+    const safeItemId = encodeURIComponent(itemId || '');
+    let path = `jellyemu/play/${safeItemId}`;
     const params = new URLSearchParams();
-    if (userId) params.append('userId', userId);
-    if (slot && slot > 1) params.append('slot', slot.toString());
-    if (core) params.append('core', core);
+    if (userId) params.append('userId', encodeURIComponent(userId));
+    if (slot && slot > 1) params.append('slot', String(Math.floor(slot)));
+    if (core) params.append('core', encodeURIComponent(core));
 
     const query = params.toString();
-    const fullUrl = jellyfinApi.getApiUrl(query ? `${path}?${query}` : path);
-    window.location.href = fullUrl;
+    const rawUrl = jellyfinApi.getApiUrl(query ? `${path}?${query}` : path);
+
+    try {
+      const parsedUrl = new URL(rawUrl, window.location.origin);
+      if (parsedUrl.origin === window.location.origin && (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:')) {
+        window.location.href = parsedUrl.href;
+        return;
+      }
+    } catch { }
+
+    if (rawUrl.startsWith('/') && !rawUrl.startsWith('//') && !rawUrl.includes('\\')) {
+      window.location.href = rawUrl;
+    }
   },
 
   launchVantage: (itemId: string): void => {
-    window.location.href = `vantage://launch?itemId=${encodeURIComponent(itemId)}`;
+    const safeItemId = encodeURIComponent(itemId || '');
+    const vantageUrl = `vantage://launch?itemId=${safeItemId}`;
+    try {
+      const parsed = new URL(vantageUrl);
+      if (parsed.protocol === 'vantage:') {
+        window.location.href = parsed.href;
+        return;
+      }
+    } catch { }
+    window.location.href = vantageUrl;
   }
 };

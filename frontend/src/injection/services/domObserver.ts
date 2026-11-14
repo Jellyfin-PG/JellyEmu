@@ -138,7 +138,7 @@ function applyGameCardTreatment(card: HTMLElement) {
 
           // Update gamepad icon on card
           const iconSpan = card.querySelector('.cardImageIcon');
-          if (iconSpan) iconSpan.innerHTML = 'sports_esports';
+          if (iconSpan) iconSpan.textContent = 'sports_esports';
 
           const imgCtr = (card.querySelector('.cardImageContainer') || card.querySelector('.cardScalable') || card.querySelector('.cardBox')) as HTMLElement;
           if (!imgCtr) return;
@@ -229,7 +229,7 @@ function processCard(card: HTMLElement) {
     card.setAttribute('data-jellyemu-checked', '1');
     if (cardText.includes('Games') || cardText.includes('Emulators')) {
       const iconSpan = card.querySelector('.cardImageIcon');
-      if (iconSpan) iconSpan.innerHTML = 'sports_esports';
+      if (iconSpan) iconSpan.textContent = 'sports_esports';
     }
     return;
   }
@@ -323,7 +323,7 @@ export const domObserver = {
             const titleStr = el.getAttribute('title') || '';
             if (titleStr.includes('Games')) {
               const iconSpan = el.querySelector('.material-icons');
-              if (iconSpan) iconSpan.innerHTML = 'sports_esports';
+              if (iconSpan) iconSpan.textContent = 'sports_esports';
             }
             return;
           }

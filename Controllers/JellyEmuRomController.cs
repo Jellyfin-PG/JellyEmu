@@ -154,7 +154,8 @@ namespace JellyEmu.Controllers
                 Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Uri.EscapeDataString(zipName)}\"";
 
                 // Open with DeleteOnClose so the temp zip file is cleaned up when the client response finishes streaming
-                var stream = new FileStream(tempZipPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+                var stream = CreateDeleteOnCloseStream(tempZipPath);
+                Response.RegisterForDispose(stream);
                 return File(stream, "application/zip", enableRangeProcessing: true);
             }
             catch (Exception ex)
@@ -166,6 +167,11 @@ namespace JellyEmu.Controllers
                 }
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
+        }
+
+        private static FileStream CreateDeleteOnCloseStream(string path)
+        {
+            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
         }
 
         /// <summary>
