@@ -56,11 +56,25 @@ export async function compressImageFile(file: File): Promise<File | Blob> {
   });
 }
 
+function generateSecureId(prefix = 'id_'): string {
+  if (typeof crypto !== 'undefined') {
+    if (crypto.randomUUID) {
+      return prefix + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    }
+    if (crypto.getRandomValues) {
+      const arr = new Uint8Array(8);
+      crypto.getRandomValues(arr);
+      return prefix + Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+    }
+  }
+  return prefix + Date.now().toString(36) + 'sec';
+}
+
 export const communityService = {
   getInstanceId: (): string => {
     let id = localStorage.getItem('je_instance_id');
     if (!id) {
-      id = 'inst_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      id = generateSecureId('inst_') + Date.now().toString(36);
       localStorage.setItem('je_instance_id', id);
     }
     return id;
@@ -134,7 +148,7 @@ export const communityService = {
           : (parseInt(item.replies_count ?? item.comments_count, 10) || 0);
 
         return {
-          id: item.id?.toString() || item.number?.toString() || Math.random().toString(),
+          id: item.id?.toString() || item.number?.toString() || generateSecureId('gen_'),
           title: item.title || 'Untitled Discussion',
           description: item.description || item.body || item.summary || '',
           category: item.category || 'General',
@@ -191,7 +205,7 @@ export const communityService = {
       const data = await res.json();
       const items: any[] = Array.isArray(data) ? data : (data?.replies || data?.items || []);
       return items.map((r: any) => ({
-        id: r.id?.toString() || Math.random().toString(),
+        id: r.id?.toString() || generateSecureId('rep_'),
         issue_id: r.issue_id || issueId,
         author: r.username || r.author || 'Gamer',
         username: r.username || r.author || 'Gamer',

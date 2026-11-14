@@ -264,7 +264,7 @@ export const InGameNetplayModal: React.FC<InGameNetplayModalProps> = ({
           return [
             ...prev,
             {
-              id: String(Date.now() + Math.random()),
+              id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + '_' + prev.length),
               author: detail.author || 'Player',
               text: detail.text,
               timestamp: detail.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -345,7 +345,7 @@ export const InGameNetplayModal: React.FC<InGameNetplayModalProps> = ({
       setChatMessages((prev) => [
         ...prev,
         {
-          id: String(Date.now() + Math.random()),
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + '_' + prev.length),
           author: nickname,
           text: text,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

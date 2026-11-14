@@ -16,7 +16,10 @@ export class PlayerSessionTracker {
     this.config = config;
     if (!config.itemId || !config.userId) return;
 
-    this.deviceId = 'jellyemu-' + Math.random().toString(36).slice(2, 10);
+    const randomSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+      : Date.now().toString(36).slice(-8);
+    this.deviceId = 'jellyemu-' + randomSuffix;
 
     // If EJS template already started legacy session tracking, note it so we don't duplicate pings
     if ((window as any)._jellyEmuSessionStarted) {
