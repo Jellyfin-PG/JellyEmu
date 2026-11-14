@@ -34,7 +34,7 @@ jobs:
 
       - name: Setup .NET (for C#)
         if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
