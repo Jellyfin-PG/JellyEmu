@@ -6,11 +6,27 @@ import { CommunityIssue, CommunityComment } from '../../../types/community';
 import { communityService } from '../../services/communityService';
 import { CustomSelect } from '../../../shared/CustomSelect';
 
+const sanitizeImageUrl = (url?: string | null): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  // Allow safe web URLs and safe blob / data URLs for image previews
+  if (
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('data:image/')
+  ) {
+    return encodeURI(decodeURI(trimmed));
+  }
+  return '';
+};
+
 const ImagePreview: React.FC<{ src?: string; alt?: string; className?: string; onExpand?: (url: string) => void }> = ({ src, alt = '', className = '', onExpand }) => {
   const [hasError, setHasError] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  if (!src) return null;
+  const safeSrc = sanitizeImageUrl(src);
+  if (!safeSrc) return null;
 
   if (hasError) {
     return (
@@ -20,7 +36,7 @@ const ImagePreview: React.FC<{ src?: string; alt?: string; className?: string; o
           <span className="text-slate-300">Attached Screenshot (Link Expired or Unreachable)</span>
         </div>
         <a
-          href={src}
+          href={safeSrc}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
@@ -37,7 +53,7 @@ const ImagePreview: React.FC<{ src?: string; alt?: string; className?: string; o
       onClick={(e) => {
         if (onExpand) {
           e.stopPropagation();
-          onExpand(src);
+          onExpand(safeSrc);
         }
       }}
       className={`relative group/img rounded-lg overflow-hidden bg-black/40 border border-white/10 ${onExpand ? 'cursor-zoom-in' : ''} ${className}`}
@@ -49,7 +65,7 @@ const ImagePreview: React.FC<{ src?: string; alt?: string; className?: string; o
         </div>
       )}
       <img
-        src={src}
+        src={safeSrc}
         alt={alt}
         onLoad={() => setLoaded(true)}
         onError={() => setHasError(true)}
@@ -647,9 +663,9 @@ export const CommunityTab: React.FC = () => {
                     )}
 
                     {/* Reply Attachment Preview */}
-                    {replyImagePreview && (
+                    {sanitizeImageUrl(replyImagePreview) && (
                       <div className="flex items-center gap-2 p-2 rounded-lg bg-zinc-900 border border-white/10 w-fit">
-                        <img src={replyImagePreview} alt="" className="w-10 h-10 object-cover rounded" />
+                        <img src={sanitizeImageUrl(replyImagePreview)} alt="Reply attachment preview" className="w-10 h-10 object-cover rounded" />
                         <span className="text-xs text-slate-300 truncate max-w-xs">{replyImageFile?.name}</span>
                         <Button
                           size="sm"
@@ -784,9 +800,9 @@ export const CommunityTab: React.FC = () => {
                       {editImageUrl ? 'Replace Image' : 'Attach Image'}
                     </Button>
                   </div>
-                  {editImageUrl && (
+                  {sanitizeImageUrl(editImageUrl) && (
                     <div className="relative rounded-lg overflow-hidden border border-white/10 bg-black/40 p-1 w-fit">
-                      <img src={editImageUrl} alt="" className="max-h-36 rounded object-contain" />
+                      <img src={sanitizeImageUrl(editImageUrl)} alt="Edit attachment preview" className="max-h-36 rounded object-contain" />
                       <Button
                         size="sm"
                         color="danger"
@@ -881,9 +897,9 @@ export const CommunityTab: React.FC = () => {
                       {newImagePreview ? 'Change Image' : 'Select Screenshot'}
                     </Button>
                   </div>
-                  {newImagePreview && (
+                  {sanitizeImageUrl(newImagePreview) && (
                     <div className="relative rounded-lg overflow-hidden border border-white/10 bg-black/40 p-1 w-fit">
-                      <img src={newImagePreview} alt="" className="max-h-36 rounded object-contain" />
+                      <img src={sanitizeImageUrl(newImagePreview)} alt="New attachment preview" className="max-h-36 rounded object-contain" />
                       <Button
                         size="sm"
                         color="danger"
