@@ -124,7 +124,7 @@ namespace JellyEmu.Providers
             if (string.IsNullOrEmpty(directId))
                 directId = TryExtractEmbeddedTheGamesDbId(searchInfo.Path);
 
-            // 1. Direct ID lookup
+            // Direct ID lookup
             if (!string.IsNullOrEmpty(directId))
             {
                 try
@@ -146,7 +146,7 @@ namespace JellyEmu.Providers
                 return results;
             }
 
-            // 2. Fuzzy name search
+            // Fuzzy name search
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             var normalizedName = RomExtensions.NormalizeForSearch(cleanName);
             var candidates = new[] { cleanName, normalizedName }.Distinct(StringComparer.OrdinalIgnoreCase);
@@ -512,7 +512,7 @@ namespace JellyEmu.Providers
             var bannerImages = new List<RemoteImageInfo>();
             var logoImages = new List<RemoteImageInfo>();
 
-            // 1. Fast path: Fetch front and back box art via ByGameID?include=boxart (responds in ~0.5s with the exact cover art)
+            // Fast path: Fetch front and back box art via ByGameID?include=boxart
             try
             {
                 var byGameUrl = $"{BaseUrl}Games/ByGameID?apikey={ApiKey}&id={Uri.EscapeDataString(gameId.Trim())}&include=boxart";
@@ -537,7 +537,7 @@ namespace JellyEmu.Providers
                 Logger.LogDebug(ex, "[JellyEmu] ByGameID boxart lookup failed for TheGamesDB game ID {GameId}", gameId);
             }
 
-            // 2. Fetch backdrops, banners, clearlogos from Games/Images with a 3s timeout so slow CDN queries never block
+            // Fetch backdrops, banners, and logos from Games/Images
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

@@ -210,6 +210,10 @@ namespace JellyEmu.Services
                         { 1,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } }, // SQUARE
                         { 2,  new() { Kb1 = 86, Kb2 = 0, Gp1 = "SELECT", Gp2 = "" } },
                         { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },
+                        { 4,  new() { Kb1 = 38, Kb2 = 0, Gp1 = "DPAD_UP", Gp2 = "" } },
+                        { 5,  new() { Kb1 = 40, Kb2 = 0, Gp1 = "DPAD_DOWN", Gp2 = "" } },
+                        { 6,  new() { Kb1 = 37, Kb2 = 0, Gp1 = "DPAD_LEFT", Gp2 = "" } },
+                        { 7,  new() { Kb1 = 39, Kb2 = 0, Gp1 = "DPAD_RIGHT", Gp2 = "" } },
                         { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } }, // CIRCLE
                         { 9,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } }, // TRIANGLE
                         { 10, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_TOP_SHOULDER", Gp2 = "" } },
@@ -227,6 +231,10 @@ namespace JellyEmu.Services
                         { 1,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } }, // SQUARE
                         { 2,  new() { Kb1 = 86, Kb2 = 0, Gp1 = "SELECT", Gp2 = "" } },
                         { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },
+                        { 4,  new() { Kb1 = 38, Kb2 = 0, Gp1 = "DPAD_UP", Gp2 = "" } },
+                        { 5,  new() { Kb1 = 40, Kb2 = 0, Gp1 = "DPAD_DOWN", Gp2 = "" } },
+                        { 6,  new() { Kb1 = 37, Kb2 = 0, Gp1 = "DPAD_LEFT", Gp2 = "" } },
+                        { 7,  new() { Kb1 = 39, Kb2 = 0, Gp1 = "DPAD_RIGHT", Gp2 = "" } },
                         { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } }, // CIRCLE
                         { 9,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } }, // TRIANGLE
                         { 10, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_TOP_SHOULDER", Gp2 = "" } },
@@ -244,6 +252,10 @@ namespace JellyEmu.Services
                         { 1,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } },
                         { 2,  new() { Kb1 = 86, Kb2 = 0, Gp1 = "SELECT", Gp2 = "" } },
                         { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },
+                        { 4,  new() { Kb1 = 38, Kb2 = 0, Gp1 = "DPAD_UP", Gp2 = "" } },
+                        { 5,  new() { Kb1 = 40, Kb2 = 0, Gp1 = "DPAD_DOWN", Gp2 = "" } },
+                        { 6,  new() { Kb1 = 37, Kb2 = 0, Gp1 = "DPAD_LEFT", Gp2 = "" } },
+                        { 7,  new() { Kb1 = 39, Kb2 = 0, Gp1 = "DPAD_RIGHT", Gp2 = "" } },
                         { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } },
                         { 9,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } },
                         { 10, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_TOP_SHOULDER", Gp2 = "" } },

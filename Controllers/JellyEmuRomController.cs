@@ -2,11 +2,13 @@ using System.Net.Mime;
 using System.Text.Encodings.Web;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Threading.Tasks;
@@ -51,8 +53,7 @@ namespace JellyEmu.Controllers
 
             if (Directory.Exists(item.Path))
             {
-                await DownloadZip(itemId).ConfigureAwait(false);
-                return new EmptyResult();
+                return await ServeDirectoryOrZipAsync(item).ConfigureAwait(false);
             }
 
             var romPath = _fileService.ResolveActiveRomPath(item.Path, userId, itemId);
@@ -78,20 +79,44 @@ namespace JellyEmu.Controllers
 
         [HttpGet("/jellyemu/rom/download-zip/{itemId}")]
         [Authorize]
-        public async Task DownloadZip(string itemId)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DownloadZip(string itemId)
         {
             var item = LibraryManager.GetItemById(itemId);
             if (item == null || string.IsNullOrEmpty(item.Path))
             {
-                Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
+                return NotFound();
             }
 
+            return await ServeDirectoryOrZipAsync(item).ConfigureAwait(false);
+        }
+
+        private async Task<IActionResult> ServeDirectoryOrZipAsync(BaseItem item)
+        {
             var filesToZip = _fileService.ResolveAllRomFiles(item.Path);
             if (filesToZip.Count == 0)
             {
-                Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
+                return NotFound();
+            }
+
+            // If the directory holds a single ROM / archive file, serve it directly without re-zipping
+            if (filesToZip.Count == 1)
+            {
+                var singleFile = filesToZip[0];
+                if (System.IO.File.Exists(singleFile))
+                {
+                    var singleInfo = new FileInfo(singleFile);
+                    Response.Headers["X-Rom-Hash"] = GetFileHash(singleFile);
+                    Response.Headers["X-Rom-Size"] = singleInfo.Length.ToString();
+                    Response.Headers["X-Rom-Extension"] = singleInfo.Extension;
+                    Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(singleFile);
+
+                    var singleStream = System.IO.File.OpenRead(singleFile);
+                    var singleName = Path.GetFileName(singleFile);
+                    Response.Headers["Content-Disposition"] = $"attachment; filename=\"{singleName}\"";
+                    return File(singleStream, "application/octet-stream", enableRangeProcessing: true);
+                }
             }
 
             var isDir = Directory.Exists(item.Path);
@@ -100,24 +125,46 @@ namespace JellyEmu.Controllers
                 ? $"{Path.GetFileName(baseDir)}.zip"
                 : $"{Path.GetFileNameWithoutExtension(item.Path)}.zip";
 
-            Response.ContentType = "application/zip";
-            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Uri.EscapeDataString(zipName)}\"";
+            var tempZipPath = Path.Combine(Path.GetTempPath(), $"jellyemu_{Guid.NewGuid():N}.zip");
 
-            using (var archive = new ZipArchive(Response.Body, ZipArchiveMode.Create, true))
+            try
             {
-                foreach (var filePath in filesToZip)
+                using (var fs = new FileStream(tempZipPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None))
                 {
-                    var entryName = isDir
-                        ? Path.GetRelativePath(baseDir, filePath).Replace('\\', '/')
-                        : Path.GetFileName(filePath);
-
-                    var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
-                    using (var entryStream = entry.Open())
-                    using (var fileStream = System.IO.File.OpenRead(filePath))
+                    using (var archive = new ZipArchive(fs, ZipArchiveMode.Create, leaveOpen: false))
                     {
-                        await fileStream.CopyToAsync(entryStream).ConfigureAwait(false);
+                        foreach (var filePath in filesToZip)
+                        {
+                            var entryName = isDir
+                                ? Path.GetRelativePath(baseDir, filePath).Replace('\\', '/')
+                                : Path.GetFileName(filePath);
+
+                            var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                            using var entryStream = entry.Open();
+                            using var fileStream = System.IO.File.OpenRead(filePath);
+                            await fileStream.CopyToAsync(entryStream).ConfigureAwait(false);
+                        }
                     }
                 }
+
+                var zipFileInfo = new FileInfo(tempZipPath);
+                Response.Headers["X-Rom-Size"] = zipFileInfo.Length.ToString();
+                Response.Headers["X-Rom-Extension"] = ".zip";
+                Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(zipName);
+                Response.Headers["Content-Disposition"] = $"attachment; filename=\"{Uri.EscapeDataString(zipName)}\"";
+
+                // Open with DeleteOnClose so the temp zip file is cleaned up when the client response finishes streaming
+                var stream = new FileStream(tempZipPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+                return File(stream, "application/zip", enableRangeProcessing: true);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[JellyEmu] Failed to package directory into zip for {ItemPath}", item.Path);
+                if (System.IO.File.Exists(tempZipPath))
+                {
+                    try { System.IO.File.Delete(tempZipPath); } catch { }
+                }
+                return StatusCode(StatusCodes.Status500InternalServerError);
             }
         }
 

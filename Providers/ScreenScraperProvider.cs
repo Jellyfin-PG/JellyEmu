@@ -393,7 +393,7 @@ namespace JellyEmu.Providers
             var systemId = ScreenScraperSystemMap.GetSystemId(platform);
             var targetRegion = ResolveEffectiveRegion(searchInfo.Path, RegionPreference);
 
-            // 1. Direct Game ID lookup
+            // Direct Game ID lookup
             if (!string.IsNullOrEmpty(directId))
             {
                 try
@@ -415,7 +415,7 @@ namespace JellyEmu.Providers
                 return results;
             }
 
-            // 2. ROM file checksum / filename lookup via jeuInfos.php
+            // ROM file checksum / filename lookup via jeuInfos.php
             if (!string.IsNullOrEmpty(searchInfo.Path) && File.Exists(searchInfo.Path) && systemId.HasValue)
             {
                 try
@@ -453,7 +453,7 @@ namespace JellyEmu.Providers
                 }
             }
 
-            // 3. Name search fallback via jeuRecherche.php
+            // Name search fallback via jeuRecherche.php
             var cleanName = RomExtensions.CleanName(searchInfo.Name);
             if (string.IsNullOrWhiteSpace(cleanName)) return results;
 
@@ -524,21 +524,21 @@ namespace JellyEmu.Providers
                         var book = new Book();
                         book.SetProviderId("ScreenScraper", screenScraperId);
 
-                        // 1. Localized Title
+                        // Localized title
                         var localizedTitle = ExtractLocalizedTitle(jeu, targetRegion);
                         if (!string.IsNullOrWhiteSpace(localizedTitle))
                         {
                             book.Name = localizedTitle;
                         }
 
-                        // 2. Localized Synopsis
+                        // Localized synopsis
                         var synopsis = ExtractSynopsis(jeu, LanguagePreference);
                         if (!string.IsNullOrWhiteSpace(synopsis))
                         {
                             book.Overview = synopsis;
                         }
 
-                        // 3. Release Date
+                        // Release date
                         var releaseDate = ExtractReleaseDate(jeu, targetRegion);
                         if (releaseDate.HasValue)
                         {
@@ -546,7 +546,7 @@ namespace JellyEmu.Providers
                             book.ProductionYear = releaseDate.Value.Year;
                         }
 
-                        // 4. Developer / Publisher (Studios)
+                        // Developer and publisher
                         if (jeu.TryGetProperty("developpeur", out var devEl) && devEl.TryGetProperty("text", out var devText))
                         {
                             var dev = devText.GetString();
@@ -559,7 +559,7 @@ namespace JellyEmu.Providers
                             if (!string.IsNullOrWhiteSpace(pub)) book.AddStudio(pub);
                         }
 
-                        // 5. Genres
+                        // Genres
                         if (jeu.TryGetProperty("genres", out var genresEl) && genresEl.ValueKind == JsonValueKind.Array)
                         {
                             foreach (var g in genresEl.EnumerateArray())
@@ -583,7 +583,7 @@ namespace JellyEmu.Providers
                             }
                         }
 
-                        // 6. Community Rating (note out of 20 -> convert to 10)
+                        // Community rating
                         if (jeu.TryGetProperty("note", out var noteEl) && noteEl.TryGetProperty("text", out var noteText))
                         {
                             if (float.TryParse(noteText.GetString(), out var noteVal) && noteVal > 0)
@@ -752,7 +752,7 @@ namespace JellyEmu.Providers
                     if (doc.RootElement.TryGetProperty("response", out var resp) &&
                         resp.TryGetProperty("jeu", out var jeu))
                     {
-                        // 1. Primary Image (2D Box, 3D Box, or Mix)
+                        // Primary box art image
                         var box2d = ExtractMediaUrl(jeu, "box-2d", targetRegion);
                         var box3d = ExtractMediaUrl(jeu, "box-3d", targetRegion);
                         if (!string.IsNullOrEmpty(box2d))
@@ -764,7 +764,7 @@ namespace JellyEmu.Providers
                             list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Primary, Url = box3d });
                         }
 
-                        // 2. Backdrop Image (Fanart, Screenshot, or Titlescreen)
+                        // Backdrop image (fanart, screenshot, or titlescreen)
                         var fanart = ExtractMediaUrl(jeu, "fanart", targetRegion);
                         var screenshot = ExtractMediaUrl(jeu, "screen", targetRegion);
                         var titlescreen = ExtractMediaUrl(jeu, "titlescreen", targetRegion);
@@ -782,7 +782,7 @@ namespace JellyEmu.Providers
                             list.Add(new RemoteImageInfo { ProviderName = Name, Type = ImageType.Backdrop, Url = titlescreen });
                         }
 
-                        // 3. ClearLogo / Menu Image (Wheel)
+                        // ClearLogo / wheel image
                         var wheel = ExtractMediaUrl(jeu, "wheel", targetRegion);
                         if (!string.IsNullOrEmpty(wheel))
                         {

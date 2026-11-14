@@ -531,7 +531,7 @@
             var saveBlob = ensureBinary(rawSave);
             if (saveBlob) {
                 var headers = { 'Content-Type': 'application/octet-stream' };
-                // 2. Upload to slot 99
+                // Upload emergency SRAM to slot 99
                 savePromise = jeFetch('/jellyemu/sram/' + itemId + '/' + userId + '?slot=99', {
                     method: 'POST',
                     headers: headers,

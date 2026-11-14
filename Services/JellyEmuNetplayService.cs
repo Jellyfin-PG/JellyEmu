@@ -1170,9 +1170,14 @@ namespace JellyEmu.Services
         private static Dictionary<string, object?> BuildPlayersSnapshot(NetplayRoom room)
         {
             var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            var orderedPlayers = room.Players.Values.OrderBy(p => p.JoinOrder).ToList();
-            foreach (var player in orderedPlayers)
+            var orderedPlayers = room.Players.Values
+                .OrderByDescending(p => p.SocketId == room.OwnerSocketId || p.PlayerId == room.OwnerPlayerId)
+                .ThenBy(p => p.JoinOrder)
+                .ToList();
+
+            for (int i = 0; i < orderedPlayers.Count; i++)
             {
+                var player = orderedPlayers[i];
                 var isOwner = (player.SocketId == room.OwnerSocketId || player.PlayerId == room.OwnerPlayerId);
                 var extra = new Dictionary<string, object?>(player.Extra, StringComparer.OrdinalIgnoreCase)
                 {
@@ -1182,7 +1187,9 @@ namespace JellyEmu.Services
                     ["player_name"] = player.PlayerName,
                     ["isOwner"] = isOwner,
                     ["owner"] = isOwner,
-                    ["joinOrder"] = player.JoinOrder
+                    ["joinOrder"] = player.JoinOrder,
+                    ["playerIndex"] = i,      // 0 for Host (Player 1), 1 for Player 2, 2 for Player 3, 3 for Player 4
+                    ["playerNumber"] = i + 1  // 1 for Host (Player 1), 2 for Player 2, 3 for Player 3, 4 for Player 4
                 };
                 result[player.PlayerId] = extra;
             }

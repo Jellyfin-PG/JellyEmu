@@ -128,10 +128,12 @@ namespace JellyEmu.Controllers
         /// <summary>
         /// Upserts preferences at the specified scope (global, system, or game).
         /// Path: POST /jellyemu/prefs/{userId}
-        /// Body can be either:
-        ///   1. { "scope": "system", "targetId": "SNES", "preferences": { "shader": "crt-easymode", ... } }
-        ///   2. Direct dictionary { "shader": "crt-easymode", ... } (defaults to global scope)
+        /// Accepts scoped payload ({ scope, targetId, preferences }) or direct key-value dictionary (global).
         /// </summary>
+        /// <param name="userId">Target Jellyfin user GUID.</param>
+        /// <param name="scope">Optional query scope override (global, system, game).</param>
+        /// <param name="targetId">Optional target identifier (system name or item GUID).</param>
+        /// <returns>HTTP status indicating upsert result.</returns>
         [HttpPost("/jellyemu/prefs/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]

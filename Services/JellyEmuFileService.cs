@@ -53,12 +53,11 @@ namespace JellyEmu.Services
         }
 
         /// <summary>
-        /// Checks if a local manual file exists alongside the ROM file.
-        /// Priority:
-        /// 1. Same name as the ROM, with .pdf or .PDF extension (e.g. Game.sfc -> Game.pdf)
-        /// 2. Variants like Game-manual.pdf, Game_manual.pdf
-        /// 3. Generic manual.pdf or Manual.pdf in the same directory
+        /// Resolves local game manual path (.pdf) adjacent to the ROM file.
+        /// Priority: exact ROM basename match, hyphen/underscore suffix variant, or directory manual.pdf.
         /// </summary>
+        /// <param name="itemPath">Absolute ROM file path.</param>
+        /// <returns>Resolved local PDF manual path, or null if not found.</returns>
         public static string? TryGetLocalManualPath(string? itemPath)
         {
             if (string.IsNullOrWhiteSpace(itemPath))
@@ -68,7 +67,7 @@ namespace JellyEmu.Services
 
             try
             {
-                // 1. Same base filename with .pdf or .PDF
+                // Exact base filename with .pdf extension
                 var pdfPath = Path.ChangeExtension(itemPath, ".pdf");
                 if (File.Exists(pdfPath)) return pdfPath;
 
@@ -80,14 +79,14 @@ namespace JellyEmu.Services
                 {
                     var baseName = Path.GetFileNameWithoutExtension(itemPath);
 
-                    // 2. BaseName-manual.pdf / BaseName_manual.pdf
+                    // BaseName-manual.pdf or BaseName_manual.pdf variant
                     var dashManual = Path.Combine(dir, $"{baseName}-manual.pdf");
                     if (File.Exists(dashManual)) return dashManual;
 
                     var underscoreManual = Path.Combine(dir, $"{baseName}_manual.pdf");
                     if (File.Exists(underscoreManual)) return underscoreManual;
 
-                    // 3. manual.pdf / Manual.pdf
+                    // Generic directory manual.pdf
                     var manual = Path.Combine(dir, "manual.pdf");
                     if (File.Exists(manual)) return manual;
 

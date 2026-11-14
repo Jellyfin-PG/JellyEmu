@@ -386,7 +386,7 @@
                         <span class="material-icons" style="color:var(--accent, #00a4dc)">devices</span>
                         Platform & Console Settings
                     </h2>
-                    <div class="je-settings-section-desc">Configure emulation core, shader, rotation, performance, audio, and controls for a specific system.</div>
+                    <div class="je-settings-section-desc">Select the Libretro core used to emulate a specific system. All display, control, and performance options are managed globally.</div>
 
                     <div class="je-input-container" style="margin-bottom:2em;">
                         <label class="je-input-label">Select System / Platform</label>

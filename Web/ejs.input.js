@@ -924,7 +924,7 @@
             // Strict 1-to-1 hardware controller assignment for local multiplayer
             var padPlayerIdx = (gp.index >= 0 && gp.index < 4) ? gp.index : 0;
 
-            // 1. Process Buttons
+            // Process buttons
             var buttonsCount = gp.buttons ? gp.buttons.length : 0;
             for (var bi = 0; bi < buttonsCount; bi++) {
                 var btn = gp.buttons[bi];
@@ -971,7 +971,7 @@
                 }
             }
 
-            // 2. Process Axes
+            // Process axes
             var axesCount = gp.axes ? gp.axes.length : 0;
             for (var ai = 0; ai < axesCount; ai++) {
                 var aVal = gp.axes[ai];

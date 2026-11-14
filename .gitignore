@@ -1,10 +1,29 @@
+# Build & Output
 bin/
 obj/
-.vscode/settings.json
+publish/
+
+# IDE & OS
+.vs/
+.vscode/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
 .DS_Store
+Thumbs.db
+
+# Documentation & Scratch Planning
 plans/
+
+# Local backups & test artifacts
+*.backup/
+.backup/
+PadTest/
+
+# Frontend dependencies & build artifacts
 frontend/node_modules/
 frontend/dist/
-Web/dist/
+frontend/.turbo/
+Web/dist/
+
