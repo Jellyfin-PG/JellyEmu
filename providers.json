@@ -6,6 +6,7 @@
     "searchRegex": "<td[^>]*>(?<system>[^<]+)</td>\\s*<td[^>]*>(?:<a href=\"[^\"]*\"[^>]*style=\"display:\\s*none\"[^>]*>.*?</a>\\s*|<a href\\s*=\\s*\"[^\"]*\"></a>\\s*)?<a href\\s*=\\s*\"(?<url>/vault/(?<id>\\d+))\"[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\\s*<td[^>]*>(?<regions>.*?)</td>\\s*<td[^>]*>(?<version>[^<]*)</td>\\s*<td[^>]*>(?<languages>[^<]*)</td>)?",
     "browseUrl": "https://vimm.net/vault/?p=list&system={system}&section={letter}",
     "browseRegex": "<td[^>]*>(?:<a href=\"[^\"]*\"[^>]*style=\"display:\\s*none\"[^>]*>.*?</a>\\s*|<a href\\s*=\\s*\"[^\"]*\"></a>\\s*)?<a href\\s*=\\s*\"(?<url>/vault/(?<id>\\d+))\"[^>]*>(?<title>[^<]+)</a>(?<extra>.*?)</td>(?:\\s*<td[^>]*>(?<regions>.*?)</td>\\s*<td[^>]*>(?<version>[^<]*)</td>\\s*<td[^>]*>(?<languages>[^<]*)</td>)?",
+    "thumbnailUrl": "https://dl.{domain}/image.php?type=box&id={id}",
     "downloadActionRegex": "<form\\s+([^>]*id=\"dl_form\"[^>]*)>",
     "downloadMediaIdRegexes": [
       "<input\\s+[^>]*name=\"mediaId\"[^>]*value=\"(?<mediaId>\\d+)\"",
@@ -14,6 +15,7 @@
     ],
     "downloadMethod": "GET_THEN_POST",
     "downloadParamName": "mediaId",
+    "downloadUrl": "https://dl.{domain}/",
     "systemMap": {
       "NES": "NES",
       "SNES": "SNES",
@@ -37,6 +39,51 @@
       "WonderSwan": "WonderSwan",
       "TurboGrafx-16": "TG16",
       "ColecoVision": "ColecoVision"
+    }
+  },
+  {
+    "name": "CoolROM",
+    "domain": "coolrom.com.au",
+    "searchUrl": "https://coolrom.com.au/search?q={query}",
+    "searchRegex": "<a[^>]+href=\"(?:\\/roms\\/(?<systemSlug>[^\\/]+)\\/|https?:\\/\\/[^\\/]+\\/roms\\/(?<systemSlug>[^\\/]+)\\/)\"[^>]*>(?<system>[^<]+)<\\/a>\\s*(?:&raquo;|»|&raquo)\\s*<a[^>]+href=\"(?<url>(?:\\/roms\\/[^\\/]+\\/(?<id>\\d+)\\/[^\"]+\\.php|https?:\\/\\/[^\\/]+\\/roms\\/[^\\/]+\\/(?<id>\\d+)\\/[^\"]+\\.php))\"[^>]*>(?<title>[^<]+)<\\/a>",
+    "browseUrl": "https://coolrom.com.au/roms/{system}/{letter}/",
+    "browseRegex": "<a[^>]+href=\"(?<url>(?:\\/roms\\/[^\\/]+\\/(?<id>\\d+)\\/[^\"]+\\.php|https?:\\/\\/[^\\/]+\\/roms\\/[^\\/]+\\/(?<id>\\d+)\\/[^\"]+\\.php))\"[^>]*>(?<title>[^<]+)<\\/a>",
+    "thumbnailUrl": "https://{domain}/screenshots/{system}/{title}.jpg",
+    "downloadActionRegex": "<form\\s+([^>]*action=\"[^\"]*downloader\\.php\"[^>]*)>",
+    "downloadMediaIdRegexes": [
+      "<input\\s+[^>]*name=\"id\"[^>]*value=\"(?<id>\\d+)\"",
+      "<input\\s+[^>]*value=\"(?<id>\\d+)\"[^>]*name=\"id\"",
+      "\\/roms\\/[^\\/]+\\/(?<id>\\d+)\\/"
+    ],
+    "downloadMethod": "GET",
+    "downloadParamName": "id",
+    "downloadUrl": "https://{domain}/downloader.php",
+    "systemMap": {
+      "NES": "nes",
+      "SNES": "snes",
+      "N64": "n64",
+      "Game Boy": "gb",
+      "Game Boy Color": "gbc",
+      "Game Boy Advance": "gba",
+      "Nintendo DS": "nds",
+      "Virtual Boy": "vb",
+      "Master System": "mastersystem",
+      "Sega Genesis": "genesis",
+      "Game Gear": "gamegear",
+      "Sega Saturn": "saturn",
+      "Sega CD": "segacd",
+      "Sega 32X": "32x",
+      "PlayStation": "psx",
+      "Atari 2600": "atari2600",
+      "Atari 7800": "atari7800",
+      "Atari Lynx": "atarilynx",
+      "Atari Jaguar": "atarijaguar",
+      "WonderSwan": "wonderswan",
+      "TurboGrafx-16": "tg16",
+      "ColecoVision": "colecovision",
+      "NeoGeo Pocket": "neogeopocket",
+      "MAME": "mame",
+      "Commodore 64": "c64"
     }
   }
 ]

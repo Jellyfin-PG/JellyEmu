@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* JellyEmu custom scrollbars & transitions */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Hide Jellyfin native video/audio playback buttons on game detail pages */
+.jellyemu-game-page button[data-action="resume"],
+.jellyemu-game-page button[data-action="play"],
+.jellyemu-game-page .btnPlay,
+.jellyemu-game-page .btnPlaySimple,
+.jellyemu-game-page .btnPlayTrailer,
+.jellyemu-game-page .playButton {
+  display: none !important;
+}
+
+/* Hide Jellyfin native play overlay buttons on game cards */
+.card[data-jellyemu-game="1"] button[data-action="play"],
+.card[data-jellyemu-game="1"] button[data-action="resume"],
+.card[data-jellyemu-game="1"] .cardOverlayButton[data-action="play"],
+.card[data-jellyemu-game="1"] .cardOverlayButton[data-action="resume"] {
+  display: none !important;
+}
+
+/* ========================================================
+   1. CARD OVERLAYS: Spring Animations & Glow Effects
+   ======================================================== */
+
+@keyframes je-badge-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes je-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 164, 220, 0.5), 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(0, 164, 220, 0.85), 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+}
+
+.jellyemu-card-badge-wrap span {
+  animation: je-badge-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.jellyemu-card-rating-badge {
+  animation: je-badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Centered JellyEmu Card Play Button (Flat Black & White) */
+.jellyemu-card-play {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  transform: translate(-50%, -50%) scale(0.85) !important;
+  transition: transform 0.18s ease, opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+  z-index: 100 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.jellyemu-card-play .material-icons,
+.jellyemu-card-play svg {
+  font-size: 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  line-height: 1 !important;
+  color: inherit !important;
+  fill: currentColor !important;
+  z-index: 101 !important;
+  text-shadow: none !important;
+}
+
+.card:hover .jellyemu-card-play,
+.card:focus-within .jellyemu-card-play,
+.group:hover .jellyemu-card-play {
+  opacity: 1 !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+
+.card:hover .jellyemu-card-play:hover,
+.group:hover .jellyemu-card-play:hover {
+  transform: translate(-50%, -50%) scale(1.12) !important;
+  background: #fff !important;
+  color: #000 !important;
+  border: 2px solid #fff !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+.card:hover .jellyemu-card-play:active,
+.group:hover .jellyemu-card-play:active {
+  transform: translate(-50%, -50%) scale(0.95) !important;
+  transition-duration: 0.1s !important;
+}

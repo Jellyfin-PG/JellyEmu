@@ -189,17 +189,20 @@ namespace JellyEmu.Controllers
         /// <summary>
         /// Finds the best-matching .cht filename for the given ROM name using stripped-paren comparison.
         /// </summary>
+        /// <param name="romName">The base ROM filename.</param>
+        /// <param name="candidates">Candidate .cht file paths.</param>
+        /// <returns>The best matching candidate file path, or null if not found.</returns>
         private static string? FuzzyMatchCht(string romName, List<string> candidates)
         {
             var stripped = StripParens(romName);
             if (string.IsNullOrWhiteSpace(stripped)) return null;
 
-            // 1. Exact match after stripping parens from both sides
+            // Exact match comparison
             foreach (var c in candidates)
                 if (StripParens(Path.GetFileNameWithoutExtension(c)) == stripped)
                     return c;
 
-            // 2. Candidate starts-with — DB entry has extra subtitle tokens
+            // Candidate starts-with match
             var startsWith = candidates
                 .Where(c => StripParens(Path.GetFileNameWithoutExtension(c))
                                 .StartsWith(stripped, StringComparison.OrdinalIgnoreCase))
@@ -207,7 +210,7 @@ namespace JellyEmu.Controllers
                 .FirstOrDefault();
             if (startsWith != null) return startsWith;
 
-            // 3. ROM-name starts-with candidate — ROM has more info than DB entry
+            // ROM name starts-with candidate match
             return candidates
                 .Where(c => stripped.StartsWith(
                     StripParens(Path.GetFileNameWithoutExtension(c)),

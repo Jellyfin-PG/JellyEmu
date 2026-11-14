@@ -15,7 +15,15 @@
             currentInstanceId = cached;
             return cached;
         }
-        var newId = 'inst_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+        var randomSegment = '';
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            var buf = new Uint8Array(8);
+            crypto.getRandomValues(buf);
+            randomSegment = Array.from(buf, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+        } else {
+            randomSegment = Date.now().toString(36) + 'sec';
+        }
+        var newId = 'inst_' + randomSegment + Date.now().toString(36);
         localStorage.setItem('je_instance_id', newId);
         currentInstanceId = newId;
         return newId;

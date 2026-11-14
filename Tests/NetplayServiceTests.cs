@@ -779,6 +779,58 @@ namespace JellyEmu.Tests
         }
 
         [Fact]
+        public async Task Netplay_PlayerIndex_RelayedCorrectlyInJoinOrder()
+        {
+            var service = new JellyEmuNetplayService(NullLogger<JellyEmuNetplayService>.Instance);
+
+            // 1. Host connects and opens room
+            var hostWs = new TestWebSocket();
+            var hostTask = Task.Run(() => service.HandleWebSocketSessionAsync(hostWs, CancellationToken.None));
+            await hostWs.WaitForMessageAsync(m => m.StartsWith("0{"));
+            hostWs.EnqueueClientMessage("40");
+            hostWs.EnqueueClientMessage("421[\"open-room\",{\"password\":\"\",\"maxPlayers\":4,\"extra\":{\"sessionid\":\"orderedRoom\",\"userid\":\"hostUser\",\"player_name\":\"HostP1\",\"game_id\":\"50\"}}]");
+
+            var hostUsersMsg = await hostWs.WaitForMessageAsync(m => m.Contains("users-updated") && m.Contains("hostUser"));
+            Assert.Contains("\"playerIndex\":0", hostUsersMsg);
+            Assert.Contains("\"playerNumber\":1", hostUsersMsg);
+
+            // 2. Guest 1 joins room -> assigned Player 2 (playerIndex 1)
+            var g1Ws = new TestWebSocket();
+            var g1Task = Task.Run(() => service.HandleWebSocketSessionAsync(g1Ws, CancellationToken.None));
+            await g1Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
+            g1Ws.EnqueueClientMessage("40");
+            g1Ws.EnqueueClientMessage("422[\"join-room\",{\"password\":\"\",\"extra\":{\"sessionid\":\"orderedRoom\",\"userid\":\"g1User\",\"player_name\":\"GuestP2\",\"game_id\":\"50\"}}]");
+
+            var g1UsersMsg = await g1Ws.WaitForMessageAsync(m => m.Contains("users-updated") && m.Contains("g1User"));
+            Assert.Contains("\"playerIndex\":1", g1UsersMsg);
+            Assert.Contains("\"playerNumber\":2", g1UsersMsg);
+
+            // 3. Guest 2 joins room -> assigned Player 3 (playerIndex 2)
+            var g2Ws = new TestWebSocket();
+            var g2Task = Task.Run(() => service.HandleWebSocketSessionAsync(g2Ws, CancellationToken.None));
+            await g2Ws.WaitForMessageAsync(m => m.StartsWith("0{"));
+            g2Ws.EnqueueClientMessage("40");
+            g2Ws.EnqueueClientMessage("423[\"join-room\",{\"password\":\"\",\"extra\":{\"sessionid\":\"orderedRoom\",\"userid\":\"g2User\",\"player_name\":\"GuestP3\",\"game_id\":\"50\"}}]");
+
+            var g2UsersMsg = await g2Ws.WaitForMessageAsync(m => m.Contains("users-updated") && m.Contains("g2User"));
+            Assert.Contains("\"playerIndex\":2", g2UsersMsg);
+            Assert.Contains("\"playerNumber\":3", g2UsersMsg);
+
+            // Verify host also received updated roster with all 3 players in order
+            var hostUpdatedMsg = await hostWs.WaitForMessageAsync(m => m.Contains("g2User"));
+            Assert.Contains("\"playerIndex\":0", hostUpdatedMsg);
+            Assert.Contains("\"playerIndex\":1", hostUpdatedMsg);
+            Assert.Contains("\"playerIndex\":2", hostUpdatedMsg);
+
+            hostWs.CompleteClient();
+            g1Ws.CompleteClient();
+            g2Ws.CompleteClient();
+            await Task.WhenAll(hostTask, g1Task, g2Task);
+
+            service.Dispose();
+        }
+
+        [Fact]
         public void Netplay_Dispose_SafelyCleansUpWithoutThrowing()
         {
             var service = new JellyEmuNetplayService(NullLogger<JellyEmuNetplayService>.Instance);

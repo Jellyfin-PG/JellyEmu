@@ -312,7 +312,7 @@ namespace JellyEmu.Providers
 
             try
             {
-                // 1. Primary: Use pageimages with pilicense=any to fetch the lead infobox cover art
+                // Primary: Use pageimages with pilicense=any to fetch the lead infobox cover art
                 var url = $"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&pithumbsize=1000&pilicense=any&pageids={pageId}&format=json";
                 var response = await GetHttpClient().GetAsync(url, cancellationToken).ConfigureAwait(false);
 
@@ -334,7 +334,7 @@ namespace JellyEmu.Providers
                     }
                 }
 
-                // 2. Strict Fallback: Only accept images that explicitly indicate game cover art (never arbitrary jpg/png!)
+                // Fallback: Inspect page images collection for cover art
                 var imagesUrl = $"https://en.wikipedia.org/w/api.php?action=query&prop=images&pageids={pageId}&format=json&imlimit=20";
                 var imagesResponse = await GetHttpClient().GetAsync(imagesUrl, cancellationToken).ConfigureAwait(false);
 

@@ -15,10 +15,10 @@
         TRIANGLE: 'KeyS',
 
         L1: 'Key1',
-        R1: 'Key2',
-        L2: 'Key3',
-        R2: 'Key8',
-        L3: 'Key9',
+        L2: 'Key2',
+        L3: 'Key3',
+        R1: 'Key8',
+        R2: 'Key9',
         R3: 'Key0',
 
         L_STICK_UP: 'KeyT',
@@ -31,7 +31,7 @@
         R_STICK_LEFT: 'KeyJ',
         R_STICK_RIGHT: 'KeyL',
 
-        SELECT: 'ShiftRight',
+        SELECT: 'Backspace',
         START: 'Enter'
     };
 
@@ -114,11 +114,27 @@
         'DPAD_RIGHT': 15
     };
 
+    function splitCombo(str) {
+        if (!str) return [];
+        const parts = [];
+        let current = '';
+        for (let i = 0; i < str.length; i++) {
+            if (str[i] === '+' && (i === 0 || str[i - 1] !== ':')) {
+                if (current) parts.push(current);
+                current = '';
+            } else {
+                current += str[i];
+            }
+        }
+        if (current) parts.push(current);
+        return parts;
+    }
+
     function isGpDescriptorActive(gp, desc) {
         if (!gp || !desc) return false;
-        if (desc.includes('+')) {
-            const parts = desc.split('+');
-            return parts.every(part => isGpDescriptorActive(gp, part.trim()));
+        const comboParts = splitCombo(desc);
+        if (comboParts.length > 1) {
+            return comboParts.every(part => isGpDescriptorActive(gp, part.trim()));
         }
 
         const trimmed = desc.trim();
@@ -131,14 +147,31 @@
 
         // Check analog axes
         const deadzone = 0.28;
-        if (trimmed === 'LEFT_STICK_X:-1') return (gp.axes && gp.axes[0] < -deadzone);
-        if (trimmed === 'LEFT_STICK_X:+1') return (gp.axes && gp.axes[0] > deadzone);
-        if (trimmed === 'LEFT_STICK_Y:-1') return (gp.axes && gp.axes[1] < -deadzone);
-        if (trimmed === 'LEFT_STICK_Y:+1') return (gp.axes && gp.axes[1] > deadzone);
-        if (trimmed === 'RIGHT_STICK_X:-1') return (gp.axes && gp.axes[2] < -deadzone);
-        if (trimmed === 'RIGHT_STICK_X:+1') return (gp.axes && gp.axes[2] > deadzone);
-        if (trimmed === 'RIGHT_STICK_Y:-1') return (gp.axes && gp.axes[3] < -deadzone);
-        if (trimmed === 'RIGHT_STICK_Y:+1') return (gp.axes && gp.axes[3] > deadzone);
+        if (trimmed === 'LEFT_STICK_X:-1') return Boolean(gp.axes && gp.axes[0] < -deadzone);
+        if (trimmed === 'LEFT_STICK_X:+1') return Boolean(gp.axes && gp.axes[0] > deadzone);
+        if (trimmed === 'LEFT_STICK_Y:-1') return Boolean(gp.axes && gp.axes[1] < -deadzone);
+        if (trimmed === 'LEFT_STICK_Y:+1') return Boolean(gp.axes && gp.axes[1] > deadzone);
+        if (trimmed === 'RIGHT_STICK_X:-1') return Boolean(gp.axes && gp.axes[2] < -deadzone);
+        if (trimmed === 'RIGHT_STICK_X:+1') return Boolean(gp.axes && gp.axes[2] > deadzone);
+        if (trimmed === 'RIGHT_STICK_Y:-1') return Boolean(gp.axes && gp.axes[3] < -deadzone);
+        if (trimmed === 'RIGHT_STICK_Y:+1') return Boolean(gp.axes && gp.axes[3] > deadzone);
+
+        // Dynamic check for EXTRA_STICK or non-standard indices
+        const axisMatch = trimmed.match(/^(?:(LEFT_STICK|RIGHT_STICK)|EXTRA_STICK_(\d+))_([XY]):([+-]1)$/);
+        if (axisMatch) {
+            let axisIdx = -1;
+            if (axisMatch[1] === 'LEFT_STICK') {
+                axisIdx = axisMatch[3] === 'X' ? 0 : 1;
+            } else if (axisMatch[1] === 'RIGHT_STICK') {
+                axisIdx = axisMatch[3] === 'X' ? 2 : 3;
+            } else if (axisMatch[2] !== undefined) {
+                axisIdx = parseInt(axisMatch[2], 10);
+            }
+            if (axisIdx >= 0 && gp.axes && gp.axes[axisIdx] !== undefined) {
+                const dir = axisMatch[4] === '+1' ? 1 : -1;
+                return dir > 0 ? gp.axes[axisIdx] > deadzone : gp.axes[axisIdx] < -deadzone;
+            }
+        }
 
         return false;
     }
@@ -181,6 +214,7 @@
             }
 
             const canvas = document.getElementById('outputCanvas');
+            if (!canvas) return;
             const eventType = isPressed ? 'keydown' : 'keyup';
             const info = KEY_INFO[code] || { keyCode: 0, key: code };
 
@@ -190,7 +224,7 @@
                 keyCode: info.keyCode,
                 which: info.keyCode,
                 charCode: info.keyCode,
-                bubbles: true,
+                bubbles: false,
                 cancelable: true
             });
 
@@ -201,9 +235,7 @@
                 Object.defineProperty(evt, 'charCode', { get: () => info.keyCode, configurable: true });
             } catch (e) {}
 
-            if (canvas) canvas.dispatchEvent(evt);
-            window.dispatchEvent(evt);
-            document.dispatchEvent(evt);
+            canvas.dispatchEvent(evt);
         }
 
         setupKeyboardPassthrough() {
@@ -218,13 +250,13 @@
                 'Tab': PS2_KEYS.L2,              // Tab -> L2
                 'KeyR': PS2_KEYS.R2,             // R -> R2
                 'Digit1': PS2_KEYS.L1,           // 1 -> L1
-                'Digit2': PS2_KEYS.R1,           // 2 -> R1
-                'Digit3': PS2_KEYS.L2,           // 3 -> L2
-                'Digit4': PS2_KEYS.R2,           // 4 -> R2
-                'Digit8': PS2_KEYS.R2,           // 8 -> R2
-                'Digit9': PS2_KEYS.L3,           // 9 -> L3
+                'Digit2': PS2_KEYS.L2,           // 2 -> L2
+                'Digit3': PS2_KEYS.L3,           // 3 -> L3
+                'Digit8': PS2_KEYS.R1,           // 8 -> R1
+                'Digit9': PS2_KEYS.R2,           // 9 -> R2
                 'Digit0': PS2_KEYS.R3,           // 0 -> R3
                 'KeyV': PS2_KEYS.SELECT,         // V -> Select
+                'Backspace': PS2_KEYS.SELECT,    // Backspace -> Select
                 'Enter': PS2_KEYS.START,         // Enter -> Start
                 'ArrowUp': PS2_KEYS.DPAD_UP,
                 'ArrowDown': PS2_KEYS.DPAD_DOWN,
@@ -241,6 +273,7 @@
             };
 
             const handleKeyEvent = (e, isDown) => {
+                if (!e.isTrusted) return;
                 if (e.repeat) return;
                 const activeBindings = this.getActiveBindings();
                 let handled = false;
@@ -265,12 +298,18 @@
                     const mapped = defaultKeyMap[e.code] || defaultKeyMap[e.key];
                     if (mapped) {
                         this.simulateKey(mapped, isDown);
+                        handled = true;
                     }
+                }
+
+                if (handled) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 }
             };
 
-            window.addEventListener('keydown', (e) => handleKeyEvent(e, true));
-            window.addEventListener('keyup', (e) => handleKeyEvent(e, false));
+            window.addEventListener('keydown', (e) => handleKeyEvent(e, true), true);
+            window.addEventListener('keyup', (e) => handleKeyEvent(e, false), true);
         }
 
         startGamepadPolling() {
@@ -310,12 +349,38 @@
                             for (const [idStr, bind] of Object.entries(activeBindings)) {
                                 const btnId = parseInt(idStr, 10);
                                 const gp1 = bind && (bind.gp1 || bind.Gp1);
-                                const gp2 = bind && (bind.gp2 || bind.Gp2);
+                                let gp2 = bind && (bind.gp2 || bind.Gp2);
+                                if (btnId >= 4 && btnId <= 7 && gp2 && gp2.startsWith('LEFT_STICK_')) {
+                                    gp2 = '';
+                                }
                                 const isDown = (gp1 && isGpDescriptorActive(gp, gp1)) || (gp2 && isGpDescriptorActive(gp, gp2));
 
                                 const psKey = BUTTON_ID_TO_PS2_KEY[btnId];
                                 if (!psKey) continue;
                                 this.simulateKey(psKey, Boolean(isDown));
+                            }
+
+                            // Fallback analog stick axes if not explicitly bound in activeBindings
+                            const hasCustomLeftStick = [16, 17, 18, 19].some(id => activeBindings[id] && (activeBindings[id].gp1 || activeBindings[id].gp2));
+                            if (!hasCustomLeftStick && gp.axes && gp.axes.length >= 2) {
+                                const deadzone = 0.28;
+                                const lx = gp.axes[0] || 0;
+                                const ly = gp.axes[1] || 0;
+                                this.simulateKey(PS2_KEYS.L_STICK_LEFT, lx < -deadzone);
+                                this.simulateKey(PS2_KEYS.L_STICK_RIGHT, lx > deadzone);
+                                this.simulateKey(PS2_KEYS.L_STICK_UP, ly < -deadzone);
+                                this.simulateKey(PS2_KEYS.L_STICK_DOWN, ly > deadzone);
+                            }
+
+                            const hasCustomRightStick = [20, 21, 22, 23].some(id => activeBindings[id] && (activeBindings[id].gp1 || activeBindings[id].gp2));
+                            if (!hasCustomRightStick && gp.axes && gp.axes.length >= 4) {
+                                const deadzone = 0.28;
+                                const rx = gp.axes[2] || 0;
+                                const ry = gp.axes[3] || 0;
+                                this.simulateKey(PS2_KEYS.R_STICK_LEFT, rx < -deadzone);
+                                this.simulateKey(PS2_KEYS.R_STICK_RIGHT, rx > deadzone);
+                                this.simulateKey(PS2_KEYS.R_STICK_UP, ry < -deadzone);
+                                this.simulateKey(PS2_KEYS.R_STICK_DOWN, ry > deadzone);
                             }
                         } else {
                             // Digital Buttons & Triggers default mapping

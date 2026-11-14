@@ -902,16 +902,61 @@
         }
     }
 
-    function sendGuestNetplayInput(buttonId, value) {
+    function getPlayerIndexForSocketOrId(socketId, playerId) {
+        if (!state.inRoom) return -1;
+        var playersMap = state.players || {};
+        var playersList = Object.keys(playersMap).map(function (k) { return playersMap[k]; }).filter(Boolean);
+
+        playersList.sort(function (a, b) {
+            var aOwner = !!(a.isOwner || a.owner);
+            var bOwner = !!(b.isOwner || b.owner);
+            if (aOwner !== bOwner) return aOwner ? -1 : 1;
+            var aOrder = (typeof a.joinOrder === 'number') ? a.joinOrder : 999;
+            var bOrder = (typeof b.joinOrder === 'number') ? b.joinOrder : 999;
+            return aOrder - bOrder;
+        });
+
+        for (var i = 0; i < playersList.length; i++) {
+            var p = playersList[i];
+            if ((socketId && p.socketId === socketId) ||
+                (playerId && (p.playerId === playerId || p.userid === playerId))) {
+                if (typeof p.playerIndex === 'number' && p.playerIndex >= 0) {
+                    return p.playerIndex;
+                }
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function getMyPlayerIndex() {
+        var e = emu();
+        if (!state.inRoom || !e || !e.netplay) return 0;
+        if (state.isHost || e.netplay.owner) return 0; // Host is always Player 1 (index 0)
+
+        var myId = e.netplay.playerID || '';
+        var mySocketId = (e.netplay.socket && e.netplay.socket.id) || '';
+
+        var idx = getPlayerIndexForSocketOrId(mySocketId, myId);
+        if (idx >= 0) return idx;
+
+        // Fallback to EmulatorJS native getUserIndex if available
+        if (typeof e.netplay.getUserIndex === 'function' && myId) {
+            var ejsIdx = e.netplay.getUserIndex(myId);
+            if (ejsIdx >= 0) return ejsIdx;
+        }
+
+        return 1; // Default first guest to Player 2 (index 1)
+    }
+
+    function sendGuestNetplayInput(buttonId, value, localPlayerIdx) {
         if (_isLeavingRoom || !state.inRoom) return false;
         var e = emu();
         if (!e || !e.isNetplay || !e.netplay || e.netplay.owner) return false;
 
-        var userIdx = 1;
-        if (typeof e.netplay.getUserIndex === 'function' && e.netplay.playerID) {
-            var idx = e.netplay.getUserIndex(e.netplay.playerID);
-            if (idx >= 0) userIdx = idx;
-        }
+        var baseIdx = getMyPlayerIndex();
+        var userIdx = baseIdx + (localPlayerIdx && localPlayerIdx > 0 ? localPlayerIdx : 0);
+        if (userIdx <= 0) userIdx = 1; // Remote guests are never player index 0 (host is 0)
 
         // Send via ultra low-latency WebRTC DataChannel (compact 6-byte binary payload)
         if (guestInputDataChannel && guestInputDataChannel.readyState === 'open') {
@@ -926,7 +971,9 @@
         if (e.netplay && typeof e.netplay.sendMessage === 'function') {
             try {
                 e.netplay.sendMessage({
-                    jeRemoteInput: [userIdx, buttonId, value]
+                    jeRemoteInput: [userIdx, buttonId, value],
+                    senderSocketId: (e.netplay.socket && e.netplay.socket.id) || '',
+                    senderPlayerId: e.netplay.playerID || ''
                 });
                 return true;
             } catch (err) { }
@@ -964,7 +1011,7 @@
             dc.binaryType = 'arraybuffer';
             dc.onmessage = function (evt) {
                 try {
-                    var pidx = 1, btn = 0, val = 0;
+                    var pidx = -1, btn = 0, val = 0;
                     if (evt.data instanceof ArrayBuffer) {
                         var inp = new Int16Array(evt.data);
                         if (inp.length >= 3) {
@@ -980,6 +1027,15 @@
                             val = msg.input[2];
                         }
                     }
+
+                    // Enforce the correct player index assigned to this guest socket
+                    var assignedIdx = getPlayerIndexForSocketOrId(guestSocketId, null);
+                    if (assignedIdx > 0) {
+                        pidx = assignedIdx;
+                    } else if (pidx <= 0) {
+                        pidx = 1; // Guests are never Player 1 (index 0)
+                    }
+
                     if (e.gameManager) {
                         if (e.gameManager.functions && typeof e.gameManager.functions.simulateInput === 'function') {
                             e.gameManager.functions.simulateInput(pidx, btn, val);
@@ -1525,12 +1581,19 @@
 
                         if (t.connected_input && Array.isArray(t.connected_input) && t.connected_input[0] >= 0) {
                             if (e.netplay.owner) {
-                                // Host receives guest input and immediately simulates it
+                                // Host receives guest input and immediately simulates it for the assigned player
+                                var pidx = t.connected_input[0];
+                                if (t.socketID || t.playerID) {
+                                    var assignedIdx = getPlayerIndexForSocketOrId(t.socketID, t.playerID);
+                                    if (assignedIdx > 0) pidx = assignedIdx;
+                                }
+                                if (pidx <= 0) pidx = 1;
+
                                 if (!e.netplay.inputsData[cur]) e.netplay.inputsData[cur] = [];
                                 e.netplay.inputsData[cur].push(t);
                                 if (e.gameManager && e.gameManager.functions && typeof e.gameManager.functions.simulateInput === 'function') {
                                     try {
-                                        e.gameManager.functions.simulateInput(t.connected_input[0], t.connected_input[1], t.connected_input[2]);
+                                        e.gameManager.functions.simulateInput(pidx, t.connected_input[1], t.connected_input[2]);
                                     } catch (err) { }
                                 }
                             } else {
@@ -1545,10 +1608,26 @@
                 // Handle remote guest input
                 if (data.jeRemoteInput && e.netplay && e.netplay.owner) {
                     var inp = data.jeRemoteInput;
-                    if (Array.isArray(inp) && e.gameManager && e.gameManager.functions && typeof e.gameManager.functions.simulateInput === 'function') {
-                        try {
-                            e.gameManager.functions.simulateInput(inp[0], inp[1], inp[2]);
-                        } catch (err) { }
+                    if (Array.isArray(inp)) {
+                        var pidx = inp[0];
+                        var btn = inp[1];
+                        var val = inp[2];
+                        var assignedIdx = getPlayerIndexForSocketOrId(data.senderSocketId, data.senderPlayerId);
+                        if (assignedIdx > 0) {
+                            pidx = assignedIdx;
+                        } else if (pidx <= 0) {
+                            pidx = 1;
+                        }
+
+                        if (e.gameManager && e.gameManager.functions && typeof e.gameManager.functions.simulateInput === 'function') {
+                            try {
+                                e.gameManager.functions.simulateInput(pidx, btn, val);
+                            } catch (err) { }
+                        } else if (e.gameManager && typeof e.gameManager.simulateInput === 'function') {
+                            try {
+                                e.gameManager.simulateInput(pidx, btn, val);
+                            } catch (err) { }
+                        }
                     }
                     return;
                 }
@@ -1603,7 +1682,7 @@
                         origSimulateInput.apply(this, arguments);
                     }
                 } else {
-                    sendGuestNetplayInput(buttonId, value);
+                    sendGuestNetplayInput(buttonId, value, playerIndex);
                 }
             };
         }
@@ -1614,7 +1693,7 @@
             var origGmSim = e.gameManager.functions.simulateInput;
             e.gameManager.functions.simulateInput = function (playerIndex, buttonId, value) {
                 if (e.isNetplay && e.netplay && !e.netplay.owner) {
-                    if (sendGuestNetplayInput(buttonId, value)) {
+                    if (sendGuestNetplayInput(buttonId, value, playerIndex)) {
                         return;
                     }
                 }
@@ -1628,7 +1707,7 @@
             var origGmDirectSim = e.gameManager.simulateInput;
             e.gameManager.simulateInput = function (playerIndex, buttonId, value) {
                 if (e.isNetplay && e.netplay && !e.netplay.owner) {
-                    if (sendGuestNetplayInput(buttonId, value)) {
+                    if (sendGuestNetplayInput(buttonId, value, playerIndex)) {
                         return;
                     }
                 }
