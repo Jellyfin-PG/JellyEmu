@@ -554,16 +554,8 @@
         if (video) {
             try {
                 video.pause();
-                if (video.srcObject) {
-                    if (typeof video.srcObject.getTracks === 'function') {
-                        video.srcObject.getTracks().forEach(function (t) {
-                            try { t.stop(); } catch (e) { }
-                        });
-                    }
-                    video.srcObject = null;
-                }
+                video.srcObject = null;
                 video.removeAttribute('src');
-                try { video.load(); } catch (e) { }
             } catch (ex) { }
             try {
                 if (video.parentNode) {
@@ -585,41 +577,29 @@
             } catch (err) { }
         }
 
-        // Unfreeze guest state inside EmulatorJS engine
+        // Clean guest video/frozen state safely without triggering native track.stop()
         if (e.netplay) {
-            if (typeof e.netplay.unfreezeGuest === 'function') {
-                try { e.netplay.unfreezeGuest(); } catch (err) { }
-            }
             e.netplay.frozen = null;
-            if (typeof e.netplay.stopDrawLoop === 'function') {
-                try { e.netplay.stopDrawLoop(); } catch (err) { }
-            }
             if (e.netplay.video) {
                 try {
                     e.netplay.video.pause();
-                    if (e.netplay.video.srcObject && typeof e.netplay.video.srcObject.getTracks === 'function') {
-                        e.netplay.video.srcObject.getTracks().forEach(function (t) { try { t.stop(); } catch (err) { } });
-                    }
                     e.netplay.video.srcObject = null;
-                    e.netplay.video.remove();
+                    if (e.netplay.video.parentNode) e.netplay.video.parentNode.removeChild(e.netplay.video);
                 } catch (err) { }
                 e.netplay.video = null;
             }
         }
 
-        // Remove ALL WebRTC video overlays from DOM
+        // Remove Netplay guest video overlays from DOM
         removeGuestVideoOverlay();
         try {
-            var allVideos = document.querySelectorAll('#je-netplay-video, video[id^="je-"], video');
+            var allVideos = document.querySelectorAll('#je-netplay-video, video[id^="je-np-"]');
             allVideos.forEach(function (v) {
                 try {
                     v.pause();
-                    if (v.srcObject && typeof v.srcObject.getTracks === 'function') {
-                        v.srcObject.getTracks().forEach(function (t) { try { t.stop(); } catch (err) { } });
-                    }
                     v.srcObject = null;
                     v.removeAttribute('src');
-                    v.remove();
+                    if (v.parentNode) v.parentNode.removeChild(v);
                 } catch (err) { }
             });
         } catch (err) { }
@@ -628,7 +608,7 @@
         try {
             var remoteAudios = document.querySelectorAll('audio[id^="ejs-remote-audio-"]');
             remoteAudios.forEach(function (a) {
-                try { a.pause(); a.srcObject = null; a.remove(); } catch (err) { }
+                try { a.pause(); a.srcObject = null; if (a.parentNode) a.parentNode.removeChild(a); } catch (err) { }
             });
         } catch (err) { }
 
@@ -670,16 +650,6 @@
             }
             e.netplay.emu.netplayCanvas = null;
         }
-        // Restore audio nodes and context safely
-        if (e.gameManager && e.gameManager.audioNode && e.gameManager.audioContext) {
-            try { e.gameManager.audioNode.connect(e.gameManager.audioContext.destination); } catch (err) { }
-        }
-        if (e.gameManager && e.gameManager.audioContext && typeof e.gameManager.audioContext.resume === 'function') {
-            try { e.gameManager.audioContext.resume().catch(function () { }); } catch (err) { }
-        }
-        if (e.Module && e.Module.AL && e.Module.AL.currentCtx && e.Module.AL.currentCtx.audioCtx) {
-            try { e.Module.AL.currentCtx.audioCtx.resume().catch(function () { }); } catch (err) { }
-        }
 
         // Ensure main loop is running unconditionally
         e.isNetplay = false;
@@ -690,19 +660,13 @@
             e.netplay.frozen = null;
         }
         if (e.gameManager) {
-            try { e.gameManager.toggleMainLoop(1); } catch (err) { }
+            e.gameManager.paused = false;
             if (typeof e.gameManager.resume === 'function') {
                 try { e.gameManager.resume(); } catch (err) { }
             }
         }
-        if (e.gameManager && e.gameManager.functions && typeof e.gameManager.functions.toggleMainLoop === 'function') {
-            try { e.gameManager.functions.toggleMainLoop(1); } catch (err) { }
-        }
-        if (e.Module && typeof e.Module.resumeMainLoop === 'function') {
-            try { e.Module.resumeMainLoop(); } catch (err) { }
-        }
-        if (typeof e.play === 'function') {
-            try { e.play(true); } catch (err) { }
+        if (e.gameManager && e.gameManager.functions && typeof e.gameManager.functions.resume === 'function') {
+            try { e.gameManager.functions.resume(); } catch (err) { }
         }
 
         // Defer handleResize to avoid synchronous layout reflow during teardown
@@ -763,32 +727,11 @@
         // Safe disposal of host media stream without calling tr.stop() on canvas capture track
         // Calling stop() on an HTMLCanvasElement.captureStream track freezes the source canvas in Chromium
         localHostStream = null;
-
-        if (hostAudioDestNode) {
-            try {
-                var e = emu();
-                if (e && e.Module && e.Module.AL && e.Module.AL.currentCtx && e.Module.AL.currentCtx.sources) {
-                    var sources = e.Module.AL.currentCtx.sources;
-                    for (var s in sources) {
-                        if (sources[s] && sources[s].gain) {
-                            try { sources[s].gain.disconnect(hostAudioDestNode); } catch (e) { }
-                        }
-                    }
-                }
-            } catch (ex) { }
-            hostAudioDestNode = null;
-        }
+        hostAudioDestNode = null;
 
         var e = emu();
         if (e && e.netplay) {
-            if (e.netplay.localStream) {
-                try {
-                    e.netplay.localStream.getTracks().forEach(function (tr) {
-                        try { tr.stop(); } catch (err) { }
-                    });
-                } catch (err) { }
-                e.netplay.localStream = null;
-            }
+            e.netplay.localStream = null;
             if (e.netplay.peerConnections) {
                 Object.keys(e.netplay.peerConnections).forEach(function (sid) {
                     var conn = e.netplay.peerConnections[sid];
@@ -1358,12 +1301,6 @@
         e.netplay.inputsData = {};
         e.netplay.wait = false;
         e.netplay.syncing = false;
-        if (typeof e.netplay.reset === 'function') {
-            try { e.netplay.reset(); } catch (err) { }
-        }
-        e.netplay.init_frame = fn;
-        e.netplay.currentFrame = 0;
-        e.netplay.inputsData = {};
     }
 
     function hookPostMainLoop(e) {
@@ -1376,7 +1313,7 @@
             if (typeof prevPostMainLoop === 'function') {
                 try { prevPostMainLoop(); } catch (err) { }
             }
-            if (!e.isNetplay || !e.netplay) return;
+            if (!state.inRoom || !e.isNetplay || !e.netplay) return;
 
             var frameNum = 0;
             if (e.gameManager && typeof e.gameManager.getFrameNum === 'function') {
@@ -1474,8 +1411,9 @@
             };
         }
 
+        var activeGid = gameId || (cfg && cfg.gameId) || (cfg && cfg.itemId) || window.EJS_gameID || '1';
         e.config.netplayUrl = netplayServer;
-        e.config.gameId = typeof gameId === 'number' ? gameId : parseInt(gameId, 10) || 1;
+        e.config.gameId = activeGid;
         e.netplay.name = getPlayerName();
         e.netplay.url = netplayServer;
 
@@ -1511,25 +1449,19 @@
                 attachChatListener(e);
             };
 
-            var origLeaveRoom = e.netplay.leaveRoom;
             e.netplay.leaveRoom = function () {
-                try {
-                    if (typeof origLeaveRoom === 'function') origLeaveRoom.apply(this, arguments);
-                } catch (err) {
-                    console.warn('[JellyEmu] EmulatorJS origLeaveRoom caught:', err);
-                }
                 performRoomLeftCleanup();
             };
 
-            var origRoomLeft = e.netplay.roomLeft;
             e.netplay.roomLeft = function () {
-                try {
-                    if (typeof origRoomLeft === 'function') origRoomLeft.apply(this, arguments);
-                } catch (err) {
-                    console.warn('[JellyEmu] EmulatorJS origRoomLeft caught:', err);
-                }
                 performRoomLeftCleanup();
             };
+
+            // Neutralize native EmulatorJS methods that cause canvas track stopping or loops
+            e.netplay.unfreezeGuest = function () { };
+            e.netplay.freezeGuest = function () { };
+            e.netplay.stopDrawLoop = function () { };
+            e.netplay.reset = function () { };
 
             var origUpdatePlayers = e.netplay.updatePlayersTable;
             e.netplay.updatePlayersTable = function () {
@@ -1876,7 +1808,7 @@
                 'Scanning for open rooms…</div>';
         }
 
-        var url = netplayServer + '/list?domain=' + encodeURIComponent(window.location.host) + '&game_id=' + encodeURIComponent(gameId);
+        var url = netplayServer + '/list?game_id=' + encodeURIComponent(gameId);
 
         fetch(url)
             .then(function (res) {
@@ -1981,63 +1913,94 @@
     }
 
     // Join room action
-    function joinRoom(sessionId, roomName, isLocked, maxPlayers) {
+    function joinRoomBySessionId(sessionId, roomName, password, maxPlayers) {
         var e = emu();
         if (!e) {
             alert('Emulator is still initializing. Please wait a moment.');
-            return;
+            return false;
         }
 
         if (state.inRoom) {
             if (state.isHost && (!state.roomId || state.roomId === sessionId)) {
                 alert('You are already hosting this room.');
-                return;
+                return false;
             }
             if (!state.roomId || state.roomId === sessionId) {
                 alert('You are already in this room.');
-                return;
+                return false;
             }
-            alert('You are already in a netplay session. Please leave your current room before joining another.');
-            return;
+            performRoomLeftCleanup();
         }
 
         ensureNetplaySubsystem(e);
-
-        var password = '';
-        if (isLocked) {
-            password = prompt('Enter password for room "' + roomName + '":') || '';
-            if (password === null) return; // User cancelled
-        }
 
         setPlayerName(getPlayerName());
 
         try {
             if (typeof e.netplay.joinRoom === 'function') {
                 if (e.netplay.joinRoom.length >= 4) {
-                    e.netplay.joinRoom(sessionId, roomName, maxPlayers || 4, password);
+                    e.netplay.joinRoom(sessionId, roomName || 'Room', maxPlayers || 4, password || '');
                 } else {
-                    e.netplay.joinRoom(sessionId, roomName, password);
+                    e.netplay.joinRoom(sessionId, roomName || 'Room', password || '');
                 }
+                return true;
             } else {
                 alert('EmulatorJS Netplay engine is not ready yet.');
+                return false;
             }
         } catch (err) {
             console.error('[JellyEmu] joinRoom failed:', err);
             alert('Failed to join room: ' + (err.message || 'Unknown error'));
+            return false;
+        }
+    }
+
+    function joinRoom(sessionId, roomName, isLocked, maxPlayers) {
+        var password = '';
+        if (isLocked) {
+            password = prompt('Enter password for room "' + roomName + '":') || '';
+            if (password === null) return;
+        }
+        joinRoomBySessionId(sessionId, roomName, password, maxPlayers);
+    }
+
+    // Host room action
+    function hostRoom(roomName, maxPlayers, password, customGameId) {
+        var e = emu();
+        if (!e) {
+            alert('Emulator is still initializing. Please wait a moment.');
+            return false;
+        }
+
+        var activeGid = customGameId || gameId || (cfg && cfg.gameId) || (cfg && cfg.itemId) || window.EJS_gameID || '1';
+        if (e.config) e.config.gameId = activeGid;
+        if (e.netplay) e.netplay.gameId = activeGid;
+        ensureNetplaySubsystem(e);
+
+        roomName = (roomName && typeof roomName === 'string' && roomName.trim()) ? roomName.trim() : (getPlayerName() + "'s Room");
+        maxPlayers = maxPlayers ? parseInt(maxPlayers, 10) : 2;
+        password = (password && typeof password === 'string') ? password.trim() : '';
+
+        setPlayerName(getPlayerName());
+
+        try {
+            if (typeof e.netplay.openRoom === 'function') {
+                e.netplay.openRoom(roomName, maxPlayers, password);
+                return true;
+            } else {
+                alert('EmulatorJS Netplay engine is not ready yet.');
+                return false;
+            }
+        } catch (err) {
+            console.error('[JellyEmu] openRoom failed:', err);
+            alert('Failed to create room: ' + (err.message || 'Unknown error'));
+            return false;
         }
     }
 
     // Create room action
     if (createRoomBtn) {
         createRoomBtn.addEventListener('click', function () {
-            var e = emu();
-            if (!e) {
-                alert('Emulator is still initializing. Please wait a moment.');
-                return;
-            }
-
-            ensureNetplaySubsystem(e);
-
             var nameInput = document.getElementById('je-np-host-roomname');
             var maxSelect = document.getElementById('je-np-host-max');
             var pwInput = document.getElementById('je-np-host-password');
@@ -2046,18 +2009,7 @@
             var maxPlayers = (maxSelect && maxSelect.value) ? parseInt(maxSelect.value, 10) : 2;
             var password = (pwInput && pwInput.value.trim()) ? pwInput.value.trim() : '';
 
-            setPlayerName(getPlayerName());
-
-            try {
-                if (typeof e.netplay.openRoom === 'function') {
-                    e.netplay.openRoom(roomName, maxPlayers, password);
-                } else {
-                    alert('EmulatorJS Netplay engine is not ready yet.');
-                }
-            } catch (err) {
-                console.error('[JellyEmu] openRoom failed:', err);
-                alert('Failed to create room: ' + (err.message || 'Unknown error'));
-            }
+            hostRoom(roomName, maxPlayers, password);
         });
     }
 
@@ -2078,7 +2030,6 @@
             if (!isOwner) {
                 // If re-joining as guest after having been host, clean up prior local stream
                 if (e.netplay.localStream) {
-                    try { e.netplay.localStream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (err) { }
                     e.netplay.localStream = null;
                 }
                 armGuestVideoWatchdog(e);
@@ -2103,93 +2054,102 @@
         if (tabSession) tabSession.style.display = 'block';
         switchTab('session');
         startPingMeasurement();
+
+        // Dispatch React-compatible event
+        window.dispatchEvent(new CustomEvent('jellyemu:netplay-joined', {
+            detail: {
+                isOwner: !!isOwner,
+                roomName: state.roomName,
+                roomId: state.roomId,
+                password: state.password,
+                players: (e && e.netplay && e.netplay.players) || state.players || {}
+            }
+        }));
     }
 
     function performRoomLeftCleanup() {
         if (_isLeavingRoom) return;
         _isLeavingRoom = true;
 
-        var wasHost = state.isHost;
-        var wasGuest = !wasHost;
+        try {
+            var wasHost = state.isHost;
 
-        // Immediately reset state so no subsequent socket or WebRTC callbacks treat us as in-room
-        state.inRoom = false;
-        state.isHost = false;
-        state.roomName = '';
-        state.roomId = '';
-        state.password = '';
-        state.players = {};
+            // Immediately reset state so no subsequent socket or WebRTC callbacks treat us as in-room
+            state.inRoom = false;
+            state.isHost = false;
+            state.roomName = '';
+            state.roomId = '';
+            state.password = '';
+            state.players = {};
 
-        // Clear any active watchdogs or timers
-        if (guestVideoWatchdogTimer) {
-            clearTimeout(guestVideoWatchdogTimer);
-            guestVideoWatchdogTimer = null;
-        }
-        stopPingMeasurement();
+            // Clear any active watchdogs or timers
+            if (guestVideoWatchdogTimer) {
+                clearTimeout(guestVideoWatchdogTimer);
+                guestVideoWatchdogTimer = null;
+            }
+            stopPingMeasurement();
 
-        // Notify all peers over WebRTC data channel before closing connections
-        if (wasHost) {
-            Object.keys(hostPeerConnections).forEach(function (id) {
-                var pc = hostPeerConnections[id];
-                if (pc && pc._inputDc && pc._inputDc.readyState === 'open') {
-                    try {
-                        pc._inputDc.send(JSON.stringify({ type: 'host-left', reason: 'Host left the game' }));
-                    } catch (ex) { }
-                }
-            });
-        }
-
-        // Cleanly close all WebRTC connections, media overlays, and streams
-        closeAllWebRtc();
-
-        // Restore local emulator state
-        var e = emu();
-        if (e) {
-            resetNetplayFrames(e);
-
-            if (e.netplay) {
-                var sock = e.netplay.socket;
-                if (sock && typeof sock.emit === 'function') {
-                    try {
-                        sock.emit('leave-room', {});
-                    } catch (err) { }
-                }
-                e.netplay.owner = false;
-                e.netplay.isNetplay = false;
-                e.netplay.room = null;
-                e.netplay.localStream = null;
+            // Notify all peers over WebRTC data channel before closing connections
+            if (wasHost) {
+                Object.keys(hostPeerConnections).forEach(function (id) {
+                    var pc = hostPeerConnections[id];
+                    if (pc && pc._inputDc && pc._inputDc.readyState === 'open') {
+                        try {
+                            pc._inputDc.send(JSON.stringify({ type: 'host-left', reason: 'Host left the game' }));
+                        } catch (ex) { }
+                    }
+                });
             }
 
-            // Unconditionally unfreeze and restore single player emulator state completely
-            unfreezeGuestCompletely(e);
+            // Cleanly close all WebRTC connections, media overlays, and streams
+            closeAllWebRtc();
 
-            // Restore user configured volume
-            if (typeof e.setVolume === 'function') {
-                var origVol = (window.JellyEmuConfig && window.JellyEmuConfig.volume) || 1.0;
-                try { e.setVolume(parseFloat(origVol)); } catch (err) { }
+            // Restore local emulator state
+            var e = emu();
+            if (e) {
+                resetNetplayFrames(e);
+
+                if (e.netplay) {
+                    var sock = e.netplay.socket;
+                    if (sock && typeof sock.emit === 'function') {
+                        try {
+                            sock.emit('leave-room', {});
+                        } catch (err) { }
+                    }
+                    e.netplay.owner = false;
+                    e.netplay.isNetplay = false;
+                    e.netplay.room = null;
+                    e.netplay.localStream = null;
+                }
+
+                // Restore single player emulator state completely
+                unfreezeGuestCompletely(e);
+
+                // Restore user configured volume
+                if (typeof e.setVolume === 'function') {
+                    var origVol = (window.JellyEmuConfig && window.JellyEmuConfig.volume) || 1.0;
+                    try { e.setVolume(parseFloat(origVol)); } catch (err) { }
+                }
             }
+
+            // Reset legacy UI elements if present
+            if (topbtnNetplay) topbtnNetplay.style.display = 'none';
+            if (dockBtn) dockBtn.classList.remove('je-active');
+            if (hdrStatus) hdrStatus.style.display = 'none';
+            if (tabSession) tabSession.style.display = 'none';
+        } catch (cleanupErr) {
+            console.warn('[JellyEmu Netplay] Cleanup error caught:', cleanupErr);
+        } finally {
+            // Reset leaving flag after disconnection events settle
+            setTimeout(function () {
+                _isLeavingRoom = false;
+            }, 500);
+
+            // Dispatch React-compatible event
+            try {
+                window.dispatchEvent(new CustomEvent('jellyemu:netplay-left'));
+            } catch (ex) { }
         }
-
-        // Reset UI
-        var chatContainer = document.getElementById('je-np-chat-messages');
-        if (chatContainer) {
-            chatContainer.innerHTML = '<div style="color:#777; font-style:italic; font-size:11px;">Say hello to the room!</div>';
-        }
-
-        if (topbtnNetplay) topbtnNetplay.style.display = 'none';
-        if (dockBtn) dockBtn.classList.remove('je-active');
-        if (hdrStatus) hdrStatus.style.display = 'none';
-
-        if (tabSession) tabSession.style.display = 'none';
-        switchTab('rooms');
-
-        // Immediately fetch the fresh room list so departing user sees updated slots/rooms
-        fetchRooms(false);
-
-        // Reset leaving flag after disconnection events settle
-        setTimeout(function () {
-            _isLeavingRoom = false;
-        }, 500);
     }
 
     function onEjsRoomLeft() {
@@ -2303,37 +2263,55 @@
         if (state.inRoom) {
             renderSessionInfo();
         }
+
+        // Dispatch React-compatible event
+        window.dispatchEvent(new CustomEvent('jellyemu:netplay-players-changed', {
+            detail: {
+                players: state.players || {}
+            }
+        }));
     }
 
     // In-Game Chat Functions
-    function appendChatMessage(senderName, message, isSelf) {
+    function appendChatMessage(senderName, message, isSelf, timestamp) {
+        var timeStr = timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         var msgContainer = document.getElementById('je-np-chat-messages');
-        if (!msgContainer) return;
+        if (msgContainer) {
+            var placeholder = msgContainer.querySelector('div[style*="italic"]');
+            if (placeholder) placeholder.remove();
 
-        var placeholder = msgContainer.querySelector('div[style*="italic"]');
-        if (placeholder) placeholder.remove();
+            var row = document.createElement('div');
+            row.style.lineHeight = '1.3';
+            row.style.wordBreak = 'break-word';
 
-        var row = document.createElement('div');
-        row.style.lineHeight = '1.3';
-        row.style.wordBreak = 'break-word';
+            var author = document.createElement('strong');
+            author.style.color = isSelf ? '#81c784' : '#64b5f6';
+            author.style.marginRight = '6px';
+            author.textContent = (senderName || 'Player') + ':';
 
-        var author = document.createElement('strong');
-        author.style.color = isSelf ? '#81c784' : '#64b5f6';
-        author.style.marginRight = '6px';
-        author.textContent = (senderName || 'Player') + ':';
+            var body = document.createElement('span');
+            body.style.color = '#eee';
+            body.textContent = message;
 
-        var body = document.createElement('span');
-        body.style.color = '#eee';
-        body.textContent = message;
-
-        row.appendChild(author);
-        row.appendChild(body);
-        msgContainer.appendChild(row);
-        msgContainer.scrollTop = msgContainer.scrollHeight;
+            row.appendChild(author);
+            row.appendChild(body);
+            msgContainer.appendChild(row);
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
 
         if (!isSelf) {
             showNetplayToast((senderName || 'Player') + ': ' + message, 'chat');
         }
+
+        // Dispatch React-compatible event
+        window.dispatchEvent(new CustomEvent('jellyemu:netplay-chat', {
+            detail: {
+                author: senderName || 'Player',
+                text: message,
+                isSelf: !!isSelf,
+                timestamp: timeStr
+            }
+        }));
     }
 
     function sendChatMessage() {
@@ -2342,15 +2320,16 @@
         var text = (input.value || '').trim();
         if (!text) return;
 
+        var myName = getPlayerName();
         var e = emu();
         if (e && e.netplay && e.netplay.socket && typeof e.netplay.socket.emit === 'function') {
             attachChatListener(e);
-            var myName = getPlayerName();
             e.netplay.socket.emit('chat-message', {
                 message: text,
                 to: 'all',
                 player_name: myName
             });
+            appendChatMessage(myName, text, true);
             input.value = '';
             input.focus();
         } else {
@@ -2367,8 +2346,15 @@
         e.netplay.socket.on('chat-message', function (data) {
             if (data && data.message) {
                 var myId = (e.netplay && e.netplay.playerID) || '';
-                var isSelf = (data.userid && data.userid === myId);
-                appendChatMessage(data.player_name, data.message, isSelf);
+                var mySocketId = (e.netplay && e.netplay.socket && e.netplay.socket.id) || '';
+                var myName = getPlayerName();
+                var isSelf = (data.userid && data.userid === myId) ||
+                             (data.from && data.from === myId) ||
+                             (data.socketId && data.socketId === mySocketId) ||
+                             (data.player_name && data.player_name === myName);
+                if (!isSelf) {
+                    appendChatMessage(data.player_name, data.message, false);
+                }
             }
         });
 
@@ -2377,8 +2363,14 @@
                 var cm = data['chat-message'];
                 if (cm && cm.message) {
                     var myId = (e.netplay && e.netplay.playerID) || '';
-                    var isSelf = (cm.from && cm.from === myId);
-                    appendChatMessage(cm.player_name, cm.message, isSelf);
+                    var mySocketId = (e.netplay && e.netplay.socket && e.netplay.socket.id) || '';
+                    var myName = getPlayerName();
+                    var isSelf = (cm.from && cm.from === myId) ||
+                                 (cm.socketId && cm.socketId === mySocketId) ||
+                                 (cm.player_name && cm.player_name === myName);
+                    if (!isSelf) {
+                        appendChatMessage(cm.player_name, cm.message, false);
+                    }
                 }
             }
         });
@@ -2707,7 +2699,37 @@
         get isHost() { return state.isHost; },
         get roomName() { return state.roomName; },
         get roomId() { return state.roomId; },
+        get password() { return state.password; },
+        get players() { return state.players; },
+        get currentPing() { return state.currentPing; },
         isHosting: function () { return state.inRoom && state.isHost; },
+        createRoom: function (opts) {
+            opts = opts || {};
+            return hostRoom(opts.name, opts.maxPlayers, opts.password, opts.gameId);
+        },
+        hostRoom: hostRoom,
+        joinRoom: function (sessionId, pwd, name, max) {
+            return joinRoomBySessionId(sessionId, name, pwd, max);
+        },
+        leaveRoom: function () {
+            performRoomLeftCleanup();
+        },
+        sendChat: function (msg) {
+            if (!msg || !msg.trim()) return;
+            var e = emu();
+            var myName = getPlayerName();
+            var text = msg.trim();
+            if (e && e.netplay && e.netplay.socket && typeof e.netplay.socket.emit === 'function') {
+                attachChatListener(e);
+                e.netplay.socket.emit('chat-message', {
+                    message: text,
+                    player_name: myName
+                });
+            }
+            appendChatMessage(myName, text, true);
+        },
+        getPlayerName: getPlayerName,
+        setPlayerName: setPlayerName,
         unfreeze: function () { unfreezeGuestCompletely(emu()); },
         dispose: function () { disposeNetplayCompletely(); }
     };

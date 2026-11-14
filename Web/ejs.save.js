@@ -56,19 +56,19 @@
 
     function setActiveTab(tab) {
         if (tab === 'states') {
-            tabBtnStates.classList.add('je-tab-active');
-            tabBtnSram.classList.remove('je-tab-active');
-            panelStates.style.display = 'flex';
-            panelSram.style.display = 'none';
+            if (tabBtnStates) tabBtnStates.classList.add('je-tab-active');
+            if (tabBtnSram) tabBtnSram.classList.remove('je-tab-active');
+            if (panelStates) panelStates.style.display = 'flex';
+            if (panelSram) panelSram.style.display = 'none';
             if (!statesBuilt) {
                 statesBuilt = true;
                 buildSaveSlots();
             }
         } else {
-            tabBtnSram.classList.add('je-tab-active');
-            tabBtnStates.classList.remove('je-tab-active');
-            panelSram.style.display = 'flex';
-            panelStates.style.display = 'none';
+            if (tabBtnSram) tabBtnSram.classList.add('je-tab-active');
+            if (tabBtnStates) tabBtnStates.classList.remove('je-tab-active');
+            if (panelSram) panelSram.style.display = 'flex';
+            if (panelStates) panelStates.style.display = 'none';
             if (!sramBuilt) {
                 sramBuilt = true;
                 buildSramSlots();
@@ -306,46 +306,55 @@
     }
 
     // Dock Save States button triggers our unified modal
-    document.getElementById('je-btn-saves').addEventListener('click', function () {
-        statesBuilt = false;
-        sramBuilt = false;
-        setActiveTab('states');
-        window._jeOpenPopup('je-pop-saves');
-    });
+    var btnSaves = document.getElementById('je-btn-saves');
+    if (btnSaves) {
+        btnSaves.addEventListener('click', function () {
+            statesBuilt = false;
+            sramBuilt = false;
+            setActiveTab('states');
+            window._jeOpenPopup('je-pop-saves');
+        });
+    }
 
     // Local Import / Export
 
     // Export Save State (.state)
-    document.getElementById('je-io-exp-state').addEventListener('click', function () {
-        var g = gm(); if (!g) return;
-        Promise.resolve(g.getState()).then(function (rawState) {
-            var stateBlob = ensureBinary(rawState);
-            if (!stateBlob || stateBlob.size === 0) return alert('No state data available.');
+    var btnExpState = document.getElementById('je-io-exp-state');
+    if (btnExpState) {
+        btnExpState.addEventListener('click', function () {
+            var g = gm(); if (!g) return;
+            Promise.resolve(g.getState()).then(function (rawState) {
+                var stateBlob = ensureBinary(rawState);
+                if (!stateBlob || stateBlob.size === 0) return alert('No state data available.');
 
-            var url = URL.createObjectURL(stateBlob);
+                var url = URL.createObjectURL(stateBlob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = (window.EJS_gameName || 'game').replace(/[^a-z0-9]/gi, '_') + '.state';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
+    }
+
+    // Export SRAM (.sav)
+    var btnExpSram = document.getElementById('je-io-exp-sram');
+    if (btnExpSram) {
+        btnExpSram.addEventListener('click', function () {
+            var g = gm(); if (!g) return;
+
+            var rawSave = g.getSaveFile();
+            if (!rawSave) return alert('No in-game SRAM data available. Make sure you saved in-game first!');
+
+            var saveBlob = ensureBinary(rawSave);
+            var url = URL.createObjectURL(saveBlob);
             var a = document.createElement('a');
             a.href = url;
-            a.download = (window.EJS_gameName || 'game').replace(/[^a-z0-9]/gi, '_') + '.state';
+            a.download = (window.EJS_gameName || 'game').replace(/[^a-z0-9]/gi, '_') + '.sav';
             a.click();
             URL.revokeObjectURL(url);
         });
-    });
-
-    // Export SRAM (.sav)
-    document.getElementById('je-io-exp-sram').addEventListener('click', function () {
-        var g = gm(); if (!g) return;
-
-        var rawSave = g.getSaveFile();
-        if (!rawSave) return alert('No in-game SRAM data available. Make sure you saved in-game first!');
-
-        var saveBlob = ensureBinary(rawSave);
-        var url = URL.createObjectURL(saveBlob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = (window.EJS_gameName || 'game').replace(/[^a-z0-9]/gi, '_') + '.sav';
-        a.click();
-        URL.revokeObjectURL(url);
-    });
+    }
 
     // Wire up State drag/drop and file click
     setupDropzone('je-state-dropzone', 'je-state-file', false);

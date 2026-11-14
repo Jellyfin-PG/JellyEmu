@@ -30,6 +30,11 @@ namespace JellyEmu.Controllers
             _inputService = inputService;
         }
 
+        private static readonly System.Text.Json.JsonSerializerOptions JsonCamelCase = new()
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        };
+
         /// <summary>
         /// Returns all supported platform control schemes, button definitions, and default bindings.
         /// Path: GET /jellyemu/input/schemes

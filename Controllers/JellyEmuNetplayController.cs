@@ -41,11 +41,39 @@ namespace JellyEmu.Controllers
         /// </summary>
         [HttpGet("/jellyemu/netplay/list")]
         [HttpGet("/list")]
-        public IActionResult GetRooms([FromQuery] string? domain, [FromQuery] string? game_id)
+        public IActionResult GetRooms([FromQuery] string? domain, [FromQuery] string? game_id, [FromQuery] string? gameId)
         {
             ApplyCorsHeaders();
-            var rooms = _netplayService.GetRoomList(domain, game_id);
+            var gid = !string.IsNullOrEmpty(game_id) ? game_id : gameId;
+            var rooms = _netplayService.GetRoomList(domain, gid);
             return Ok(rooms);
+        }
+
+        /// <summary>
+        /// Detailed room list discovery endpoint returning array of room models for JellyEmu React UI.
+        /// </summary>
+        [HttpGet("/jellyemu/netplay/rooms")]
+        public IActionResult GetRoomsDetailed([FromQuery] string? domain, [FromQuery] string? game_id, [FromQuery] string? gameId)
+        {
+            ApplyCorsHeaders();
+            var gid = !string.IsNullOrEmpty(game_id) ? game_id : gameId;
+            var roomsDict = _netplayService.GetRoomList(domain, gid);
+            var list = new System.Collections.Generic.List<object>();
+            foreach (var kvp in roomsDict)
+            {
+                list.Add(new
+                {
+                    id = kvp.Key,
+                    name = kvp.Value.room_name,
+                    gameId = kvp.Value.gameId,
+                    hostPlayer = kvp.Value.player_name,
+                    currentPlayers = kvp.Value.current,
+                    maxPlayers = kvp.Value.max,
+                    isPasswordProtected = kvp.Value.hasPassword,
+                    pingMs = kvp.Value.host_ping ?? kvp.Value.ping
+                });
+            }
+            return Ok(list);
         }
 
         /// <summary>

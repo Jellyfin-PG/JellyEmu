@@ -283,5 +283,15 @@ namespace JellyEmu.Tests
             Assert.Contains("inputScheme: {\"id\":\"gba\"}", rendered);
             Assert.Contains("customBindings: {\"0\":{\"gp1\":\"BUTTON_1\"}}", rendered);
         }
+
+        [Fact]
+        public void GetScheme_AllSchemes_MaxPlayersShouldBeAtMostTwo()
+        {
+            var all = _inputService.GetAllSchemes();
+            foreach (var kvp in all)
+            {
+                Assert.InRange(kvp.Value.MaxPlayers, 1, 2);
+            }
+        }
     }
 }

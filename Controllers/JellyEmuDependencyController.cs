@@ -292,6 +292,92 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
+        /// Returns the complete database of systems and BIOS requirements matched against installed files on disk.
+        /// Path: GET /jellyemu/bios/status
+        /// </summary>
+        [HttpGet("/jellyemu/bios/status")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult GetBiosStatus()
+        {
+            var biosFolder = _biosService.GetBiosDirectory();
+            var installed = _biosService.ListInstalledBios();
+            var installedByMd5 = installed
+                .Where(i => !string.IsNullOrEmpty(i.Md5))
+                .GroupBy(i => i.Md5, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            var installedByName = installed
+                .Where(i => !string.IsNullOrEmpty(i.FileName))
+                .GroupBy(i => i.FileName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            var activeBios = Plugin.Instance?.Configuration.ActiveBios ?? new(StringComparer.OrdinalIgnoreCase);
+
+            var entries = LibretroSystemDatabase.Instance.Entries;
+            var groups = entries
+                .GroupBy(e => !string.IsNullOrWhiteSpace(e.PlatformTag) ? e.PlatformTag : e.RawSystem)
+                .OrderBy(g => g.Key)
+                .Select(g =>
+                {
+                    var systemName = g.Key;
+                    activeBios.TryGetValue(systemName, out var currentActive);
+
+                    var files = g
+                        .GroupBy(f => f.FileNameOnly, StringComparer.OrdinalIgnoreCase)
+                        .Select(fg =>
+                        {
+                            var f = fg.First();
+                            bool isFound = false;
+                            string status = "Missing";
+                            string? activePath = null;
+
+                            if (!string.IsNullOrEmpty(f.Md5) && installedByMd5.TryGetValue(f.Md5, out var instByMd5))
+                            {
+                                isFound = true;
+                                status = instByMd5.Status;
+                                activePath = instByMd5.RelativePath;
+                            }
+                            else if (installedByName.TryGetValue(f.FileNameOnly, out var instByName))
+                            {
+                                isFound = true;
+                                status = instByName.Status;
+                                activePath = instByName.RelativePath;
+                            }
+
+                            return new
+                            {
+                                filename = f.FileNameOnly,
+                                description = !string.IsNullOrWhiteSpace(f.Name) && f.Name != f.FileNameOnly ? f.Name : f.RawSystem,
+                                md5 = f.Md5,
+                                sha1 = f.Sha1,
+                                size = f.Size,
+                                found = isFound,
+                                status = status,
+                                activePath = activePath
+                            };
+                        })
+                        .OrderBy(f => f.filename)
+                        .ToList();
+
+                    return new
+                    {
+                        system = systemName,
+                        rawSystem = g.FirstOrDefault()?.RawSystem ?? systemName,
+                        activeAssignment = currentActive,
+                        files = files
+                    };
+                })
+                .ToList();
+
+            return Ok(new
+            {
+                directory = biosFolder,
+                installedCount = installed.Count,
+                systems = groups
+            });
+        }
+
+        /// <summary>
         /// Sets the active BIOS file for a given system platform tag.
         /// Path: POST /jellyemu/bios/active
         /// </summary>

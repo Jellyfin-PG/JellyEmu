@@ -300,5 +300,42 @@ namespace JellyEmu.Tests
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
+
+        [Fact]
+        public async Task GetEffectivePreferences_Controls_ShouldPersistPerSystemAndUserInSqliteWithActivationTypes()
+        {
+            var (service, tempDir) = CreateTestService();
+            try
+            {
+                var userId = "user456";
+                var controlsJson = "{\"0\":{\"8\":{\"kb1\":90,\"gp1\":\"BUTTON_1\",\"activation\":\"press\"},\"24\":{\"kb1\":49,\"gp1\":\"\",\"activation\":\"hold\",\"holdDuration\":5}},\"1\":{\"8\":{\"kb1\":87,\"gp1\":\"BUTTON_1\",\"activation\":\"combo\"}}}";
+
+                await service.SetPreferencesAsync(userId, "system", "snes", new Dictionary<string, string?>
+                {
+                    ["controls"] = controlsJson
+                });
+
+                var effSnes = await service.GetEffectivePreferencesAsync(userId, "SNES");
+                Assert.Equal(controlsJson, effSnes.Controls);
+
+                // Unconfigured system should return empty default (per-system isolation)
+                var effNes = await service.GetEffectivePreferencesAsync(userId, "NES");
+                Assert.Equal(string.Empty, effNes.Controls);
+
+                // Backwards compatibility: fallback to legacy playerBindings if controls is empty
+                var legacyPbJson = "{\"0\":{\"8\":{\"kb1\":90}}}";
+                await service.SetPreferencesAsync(userId, "system", "genesis", new Dictionary<string, string?>
+                {
+                    ["playerBindings"] = legacyPbJson
+                });
+                var effGenesis = await service.GetEffectivePreferencesAsync(userId, "genesis");
+                Assert.Equal(legacyPbJson, effGenesis.Controls);
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

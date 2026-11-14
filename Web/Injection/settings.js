@@ -323,22 +323,6 @@
                                 </select>
                                 <div class="je-field-desc">Physical gamepad rumble vibration feedback.</div>
                             </div>
-
-                            <div class="je-input-container">
-                                <label class="je-input-label">On-Screen Mobile Gamepad</label>
-                                <select id="je-pref-vg" class="je-select">
-                                    ${renderOptions(_settingOptions.virtualGamepad, p.virtualGamepad || '0')}
-                                </select>
-                                <div class="je-field-desc">Touchscreen controls overlay for mobile devices.</div>
-                            </div>
-
-                            <div class="je-input-container">
-                                <label class="je-input-label">Mobile Gamepad Layout</label>
-                                <select id="je-pref-vg-lefty" class="je-select">
-                                    ${renderOptions(_settingOptions.virtualGamepadLefty, p.virtualGamepadLefty || '0')}
-                                </select>
-                                <div class="je-field-desc">D-pad and action button orientation on mobile.</div>
-                            </div>
                         </div>
 
                         <div class="je-actions">
@@ -367,9 +351,7 @@
                             ffrate: container.querySelector('#je-pref-ffrate').value,
                             smrate: container.querySelector('#je-pref-smrate').value,
                             autosave: container.querySelector('#je-pref-autosave').value,
-                            haptics: container.querySelector('#je-pref-haptics').value,
-                            virtualGamepad: container.querySelector('#je-pref-vg').value,
-                            virtualGamepadLefty: container.querySelector('#je-pref-vg-lefty').value
+                            haptics: container.querySelector('#je-pref-haptics').value
                         }
                     };
 

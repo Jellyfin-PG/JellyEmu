@@ -1,0 +1,54 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escaped: true
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'minor'
+      - 'enhancement'
+      - 'feature'
+  patch:
+    labels:
+      - 'patch'
+      - 'bug'
+      - 'fix'
+      - 'dependencies'
+  default: patch
+
+categories:
+  - title: '🚀 Features & Enhancements'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bug'
+  - title: '📦 Dependency Updates'
+    labels:
+      - 'dependencies'
+  - title: '🎨 Frontend'
+    labels:
+      - 'frontend'
+  - title: '🧰 Maintenance & CI'
+    labels:
+      - 'chore'
+      - 'ci'
+      - 'github-actions'
+
+exclude-labels:
+  - 'skip-changelog'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  ### Installation
+  Download `JellyEmu_$RESOLVED_VERSION.zip`, extract, and copy both DLLs to your Jellyfin plugins folder.

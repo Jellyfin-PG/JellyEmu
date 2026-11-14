@@ -252,19 +252,21 @@ namespace JellyEmu.Services
                     continue;
                 }
 
-                if (!string.IsNullOrEmpty(normalizedGid) && !room.GameId.Equals(normalizedGid, StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(normalizedGid) && !normalizedGid.Equals("0", StringComparison.OrdinalIgnoreCase) && !normalizedGid.Equals("all", StringComparison.OrdinalIgnoreCase))
                 {
-                    continue;
-                }
-
-                if (!string.IsNullOrEmpty(normalizedDom) && !room.Domain.Equals(normalizedDom, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Allow match if either room or query is empty or equal
-                    if (!string.IsNullOrEmpty(room.Domain) && !room.Domain.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrEmpty(room.GameId) && !room.GameId.Equals("default", StringComparison.OrdinalIgnoreCase))
                     {
-                        continue;
+                        if (!room.GameId.Equals(normalizedGid, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
                     }
                 }
+
+                // Netplay rooms are scoped to this Jellyfin instance and partitioned by GameId.
+                // Clients may connect via reverse proxy (e.g. jellyfin.mydomain.com), local IP (e.g. 192.168.1.100:8096),
+                // VPN, or localhost. Domain filtering is intentionally agnostic on this embedded server so all users
+                // on this instance can discover and join each other's rooms.
 
                 if (room.Players.Count >= room.MaxPlayers)
                 {
@@ -641,7 +643,7 @@ namespace JellyEmu.Services
             }
 
             var roomName = GetString(extraDict, "room_name") ?? $"Room {sessionId}";
-            var gameId = GetString(extraDict, "game_id") ?? "default";
+            var gameId = GetString(extraDict, "game_id") ?? GetString(extraDict, "gameId") ?? "default";
             var domain = GetString(extraDict, "domain") ?? "unknown";
             var playerName = GetString(extraDict, "player_name") ?? "Player";
 

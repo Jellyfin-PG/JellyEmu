@@ -150,17 +150,23 @@
                         </button>
                     </div>`;
 
-                body.querySelector('.je-save-btn-play').addEventListener('click', () => {
-                    JE.launchEmulator(s.itemId, s.slot);
-                });
+                var playBtn = body.querySelector('.je-save-btn-play');
+                if (playBtn) {
+                    playBtn.addEventListener('click', () => {
+                        JE.launchEmulator(s.itemId, s.slot);
+                    });
+                }
 
-                body.querySelector('.je-save-btn-delete').addEventListener('click', async () => {
-                    if (confirm(`Are you sure you want to delete save slot ${s.slot}?`)) {
-                        JE.deleteSave(s.itemId, s.slot);
-                        await JE.delay(100);
-                        reloadGrid();
-                    }
-                });
+                var delBtn = body.querySelector('.je-save-btn-delete');
+                if (delBtn) {
+                    delBtn.addEventListener('click', async () => {
+                        if (confirm(`Are you sure you want to delete save slot ${s.slot}?`)) {
+                            JE.deleteSave(s.itemId, s.slot);
+                            await JE.delay(100);
+                            reloadGrid();
+                        }
+                    });
+                }
 
                 // Romm sync status + push/pull buttons
                 (function(itemId, slot, bodyEl) {
@@ -223,9 +229,8 @@
         function reloadGrid() {
             JE.json('/jellyemu/saves/' + userId)
             .then(saves => {
-                allSaves = saves || [];
-
-                const platforms = [...new Set(allSaves.map(s => s.platform).filter(Boolean))].sort();
+                const genericNonPlatformTags = new Set(['game', 'jellyemu', 'unsupported', 'unknown']);
+                const platforms = [...new Set(allSaves.map(s => s.platform).filter(p => p && !genericNonPlatformTags.has(String(p).trim().toLowerCase())))].sort();
                 const platformSelect = activePage.querySelector('#je-filter-platform');
                 if (platformSelect) {
                     platformSelect.innerHTML = '<option value="">All platforms</option>';

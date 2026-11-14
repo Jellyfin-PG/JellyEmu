@@ -367,13 +367,25 @@ namespace JellyEmu.Controllers
                         {
                             gameName = item.Name;
                             hasArt   = item.HasImage(MediaBrowser.Model.Entities.ImageType.Primary);
+                            
+                            var resolvedPlatform = ResolvePlatformTag(item);
+                            if (!string.IsNullOrEmpty(resolvedPlatform) && !resolvedPlatform.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                            {
+                                platform = resolvedPlatform;
+                            }
+
                             if (item.Tags != null)
                             {
                                 foreach (var tag in item.Tags)
                                 {
-                                    if (tag == "JellyEmu") continue;
-                                    if (knownRegions.Contains(tag)) { if (string.IsNullOrEmpty(region)) region = tag; }
-                                    else                             { if (string.IsNullOrEmpty(platform)) platform = tag; }
+                                    if (tag.Equals("JellyEmu", StringComparison.OrdinalIgnoreCase) ||
+                                        tag.Equals("Game", StringComparison.OrdinalIgnoreCase) ||
+                                        tag.Equals("Unsupported", StringComparison.OrdinalIgnoreCase)) continue;
+
+                                    if (knownRegions.Contains(tag))
+                                    {
+                                        if (string.IsNullOrEmpty(region)) region = tag;
+                                    }
                                 }
                             }
                         }

@@ -5,3 +5,6 @@ obj/
 *.suo
 .DS_Store
 plans/
+frontend/node_modules/
+frontend/dist/
+Web/dist/

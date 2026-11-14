@@ -302,7 +302,7 @@ namespace JellyEmu.Controllers
         }
 
         /// <summary>
-        /// Serves the combined injection CSS bundle generated in-memory from distinct module files.
+        /// Serves the combined injection CSS bundle generated in-memory or from Vite dist.
         /// Path: GET /jellyemu/assets/injection/bundle.css
         /// </summary>
         [HttpGet("/jellyemu/assets/injection/bundle.css")]
@@ -311,11 +311,13 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult InjectionBundleCss()
         {
+            var res = ServeEmbeddedFile("Web.dist.jellyemu.index.bundle.css", "text/css; charset=utf-8");
+            if (res is not NotFoundResult) return res;
             return CombineAndServe("Web.Injection.", InjectionCssModules, "text/css; charset=utf-8", ref _cachedCssBundle);
         }
 
         /// <summary>
-        /// Serves the combined injection JS bundle generated in-memory from distinct module files.
+        /// Serves the injection loader or legacy combined JS bundle.
         /// Path: GET /jellyemu/assets/injection/bundle.js
         /// </summary>
         [HttpGet("/jellyemu/assets/injection/bundle.js")]
@@ -324,6 +326,52 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult InjectionBundleJs()
         {
+            var assembly = typeof(JellyEmuResourceController).Assembly;
+            var hasDist = assembly.GetManifestResourceNames()
+                .Any(n => n.EndsWith("Web.dist.jellyemu.injection.bundle.js", StringComparison.OrdinalIgnoreCase));
+
+            if (hasDist)
+            {
+                string version = JellyEmuVersion.Value;
+                string loaderScript = $$"""
+                (function () {
+                    var getUrl = function (path) {
+                        var cleanPath = (path || '').replace(/^\/+/, '');
+                        if (window.ApiClient && typeof window.ApiClient.getUrl === 'function' && cleanPath) {
+                            try {
+                                return window.ApiClient.getUrl(cleanPath);
+                            } catch (e) {}
+                        }
+                        var base = '';
+                        if (window.location && window.location.pathname) {
+                            var idx = window.location.pathname.indexOf('/web');
+                            if (idx > 0) base = window.location.pathname.substring(0, idx);
+                        }
+                        return (base || '').replace(/\/+$/, '') + '/' + cleanPath;
+                    };
+
+                    var cssId = 'je-injection-bundle-css';
+                    if (!document.getElementById(cssId)) {
+                        var link = document.createElement('link');
+                        link.id = cssId;
+                        link.rel = 'stylesheet';
+                        link.href = getUrl('jellyemu/assets/dist/jellyemu.index.bundle.css?v={{version}}');
+                        link.setAttribute('data-jellyemu-mods', '1');
+                        document.head.appendChild(link);
+                    }
+
+                    var scriptUrl = getUrl('jellyemu/assets/dist/jellyemu.injection.bundle.js?v={{version}}');
+                    import(scriptUrl).catch(function (err) {
+                        console.error('[JellyEmu] Failed to load injection module:', err);
+                    });
+                })();
+                """;
+
+                Response.ContentType = "application/javascript; charset=utf-8";
+                Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
+                return Content(loaderScript, "application/javascript; charset=utf-8", Encoding.UTF8);
+            }
+
             return CombineAndServe("Web.Injection.", InjectionJsModules, "application/javascript; charset=utf-8", ref _cachedJsBundle);
         }
 
@@ -346,6 +394,30 @@ namespace JellyEmu.Controllers
                 : "application/javascript; charset=utf-8";
 
             return ServeEmbeddedFile($"Web.Injection.{filename}", contentType);
+        }
+
+        /// <summary>
+        /// Serves compiled React / HeroUI Vite bundles and chunks.
+        /// Path: GET /jellyemu/assets/dist/{**filename}
+        /// </summary>
+        [HttpGet("/jellyemu/assets/dist/{**filename}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult DistAsset(string filename)
+        {
+            if (string.IsNullOrWhiteSpace(filename) || filename.Contains(".."))
+            {
+                return NotFound();
+            }
+
+            string contentType = filename.EndsWith(".css", StringComparison.OrdinalIgnoreCase)
+                ? "text/css; charset=utf-8"
+                : filename.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+                    ? "application/javascript; charset=utf-8"
+                    : "application/octet-stream";
+
+            var normalized = filename.Replace('/', '.').Replace('\\', '.');
+            return ServeEmbeddedFile($"Web.dist.{normalized}", contentType);
         }
 
         /// <summary>

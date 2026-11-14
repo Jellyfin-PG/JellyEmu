@@ -164,5 +164,88 @@ namespace JellyEmu.Tests
             Assert.Equal("583", matches[0].Groups["id"].Value);
             Assert.Equal("Monster Party", matches[0].Groups["title"].Value.Trim());
         }
+
+        [Fact]
+        public void SearchScraperRegex_ShouldMatchCoolRomSearchResults()
+        {
+            // Sample snippet from https://coolrom.com.au/search?q=sonic
+            var html = @"
+            <div class=""main"">
+                <a href=""/roms/genesis/"">Sega Genesis</a> &raquo; <a href=""/roms/genesis/1234/Sonic_The_Hedgehog.php"">Sonic The Hedgehog</a><br>
+                <a href=""https://coolrom.com.au/roms/snes/"">SNES</a> » <a href=""https://coolrom.com.au/roms/snes/5678/Sonic_Blast_Man.php"">Sonic Blast Man</a><br>
+            </div>";
+
+            var pattern = @"<a[^>]+href=""(?:\/roms\/(?<systemSlug>[^\/]+)\/|https?:\/\/[^\/]+\/roms\/(?<systemSlug>[^\/]+)\/)""[^>]*>(?<system>[^<]+)<\/a>\s*(?:&raquo;|»|&raquo)\s*<a[^>]+href=""(?<url>(?:\/roms\/[^\/]+\/(?<id>\d+)\/[^""]+\.php|https?:\/\/[^\/]+\/roms\/[^\/]+\/(?<id>\d+)\/[^""]+\.php))""[^>]*>(?<title>[^<]+)<\/a>";
+
+            var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            Assert.Equal(2, matches.Count);
+            Assert.Equal("Sega Genesis", matches[0].Groups["system"].Value);
+            Assert.Equal("genesis", matches[0].Groups["systemSlug"].Value);
+            Assert.Equal("1234", matches[0].Groups["id"].Value);
+            Assert.Equal("Sonic The Hedgehog", matches[0].Groups["title"].Value);
+
+            Assert.Equal("SNES", matches[1].Groups["system"].Value);
+            Assert.Equal("snes", matches[1].Groups["systemSlug"].Value);
+            Assert.Equal("5678", matches[1].Groups["id"].Value);
+            Assert.Equal("Sonic Blast Man", matches[1].Groups["title"].Value);
+        }
+
+        [Fact]
+        public void BrowseScraperRegex_ShouldMatchCoolRomBrowseResults()
+        {
+            // Sample snippet from https://coolrom.com.au/roms/genesis/S/
+            var html = @"
+            <div class=""main"">
+                <a href=""/roms/genesis/6013/Sagaia.php"">Sagaia</a><br>
+                <a href=""/roms/genesis/1057/Sonic_and_Knuckles.php"">Sonic & Knuckles</a><br>
+            </div>";
+
+            var pattern = @"<a[^>]+href=""(?<url>(?:\/roms\/[^\/]+\/(?<id>\d+)\/[^""]+\.php|https?:\/\/[^\/]+\/roms\/[^\/]+\/(?<id>\d+)\/[^""]+\.php))""[^>]*>(?<title>[^<]+)<\/a>";
+
+            var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            Assert.Equal(2, matches.Count);
+            Assert.Equal("/roms/genesis/6013/Sagaia.php", matches[0].Groups["url"].Value);
+            Assert.Equal("6013", matches[0].Groups["id"].Value);
+            Assert.Equal("Sagaia", matches[0].Groups["title"].Value);
+
+            Assert.Equal("/roms/genesis/1057/Sonic_and_Knuckles.php", matches[1].Groups["url"].Value);
+            Assert.Equal("1057", matches[1].Groups["id"].Value);
+            Assert.Equal("Sonic & Knuckles", matches[1].Groups["title"].Value);
+        }
+
+        [Fact]
+        public void DownloaderRegex_ShouldMatchFormActionAndMediaId()
+        {
+            var html = @"<form action=""downloader.php"" method=""POST""><input type=""hidden"" name=""id"" value=""6013"" /></form>";
+            var actionRegex = @"<form\s+([^>]*action=""[^""]*downloader\.php""[^>]*)>";
+            var idRegex = @"<input\s+[^>]*name=""id""[^>]*value=""(?<id>\d+)""";
+
+            var formMatch = Regex.Match(html, actionRegex, RegexOptions.IgnoreCase);
+            var idMatch = Regex.Match(html, idRegex, RegexOptions.IgnoreCase);
+
+            Assert.True(formMatch.Success);
+            Assert.True(idMatch.Success);
+            Assert.Equal("6013", idMatch.Groups["id"].Value);
+        }
+
+        [Theory]
+        [InlineData("NES", "NES")]
+        [InlineData("SNES", "SNES")]
+        [InlineData("Sega Genesis", "Sega Genesis")]
+        [InlineData("genesis", "Sega Genesis")]
+        [InlineData("GBA", "Game Boy Advance")]
+        [InlineData("PS1", "PlayStation")]
+        [InlineData("N64", "N64")]
+        [InlineData("Nintendo DS", "Nintendo DS")]
+        [InlineData("Game Gear", "Game Gear")]
+        [InlineData("Atari 2600", "Atari 2600")]
+        public void GetSystemFolderName_ShouldReturnCanonicalFolderNames(string inputSystem, string expectedFolder)
+        {
+            var service = new JellyEmu.Services.MarketplaceService(null!, null!, null!);
+            var folder = service.GetSystemFolderName(inputSystem);
+            Assert.Equal(expectedFolder, folder);
+        }
     }
 }

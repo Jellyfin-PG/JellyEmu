@@ -40,7 +40,7 @@ namespace JellyEmu.Controllers
 
             return resolvedCore switch
             {
-                "pico8" => PlayPico8(itemId),
+                "pico8" => PlayPico8(itemId, userId),
                 "play"  => await PlayPlay(itemId, userId, slot),
                 _       => await PlayEjs(itemId, userId, slot, core, httpClientFactory)
             };
@@ -94,6 +94,12 @@ namespace JellyEmu.Controllers
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
 
+            var inputService = HttpContext.RequestServices.GetService(typeof(JellyEmuInputService)) as JellyEmuInputService;
+            var inputScheme = inputService?.GetScheme("ps2");
+            var inputSchemeJson = inputScheme != null
+                ? System.Text.Json.JsonSerializer.Serialize(inputScheme, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase })
+                : "null";
+
             var assembly = typeof(JellyEmuPlayController).Assembly;
             var resourceName = "JellyEmu.Templates.play.html";
 
@@ -121,6 +127,8 @@ namespace JellyEmu.Controllers
                 item_id = itemId,
                 user_id = userId ?? string.Empty,
                 base_url = GetPathBase(),
+                platform_tag = platformTag,
+                input_scheme_json = inputSchemeJson,
                 rom_url = romUrl,
                 save_get_url = saveGetUrl,
                 save_post_url = savePostUrl,
@@ -151,10 +159,10 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult PlayPico8(string itemId)
+        public IActionResult PlayPico8(string itemId, [FromQuery] string? userId = null)
         {
-            if (!IsValidId(itemId))
-                return BadRequest("Invalid item ID.");
+            if (!IsValidId(itemId) || (!string.IsNullOrEmpty(userId) && !IsValidId(userId)))
+                return BadRequest("Invalid item or user ID.");
 
             var item = LibraryManager.GetItemById(itemId);
             if (item == null)
@@ -199,6 +207,8 @@ namespace JellyEmu.Controllers
                 base_url = GetPathBase(),
                 cart_url = cartUrl,
                 item_id = itemId,
+                user_id = userId ?? string.Empty,
+                version = JellyEmuVersion.Value,
                 screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder)
             });
 

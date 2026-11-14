@@ -17,14 +17,18 @@ namespace JellyEmu.Services
         public int Kb2 { get; set; }
         public string Gp1 { get; set; } = string.Empty;
         public string Gp2 { get; set; } = string.Empty;
+        public string Activation { get; set; } = "press";
+        public int HoldDuration { get; set; } = 5;
     }
 
     public class PlatformControlScheme
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public int MaxPlayers { get; set; } = 2;
         public List<InputButtonDefinition> Buttons { get; set; } = new();
         public Dictionary<int, InputBindingDefault> DefaultBindings { get; set; } = new();
+        public Dictionary<int, Dictionary<int, InputBindingDefault>> PlayerDefaultBindings { get; set; } = new();
         public List<int> AnalogAxes { get; set; } = new();
     }
 
@@ -38,7 +42,12 @@ namespace JellyEmu.Services
             new() { Id = 27, Label = "FAST FORWARD", Description = "Toggle fast forward emulation" },
             new() { Id = 28, Label = "REWIND", Description = "Rewind gameplay in real time" },
             new() { Id = 29, Label = "SLOW MOTION", Description = "Toggle slow motion gameplay" },
-            new() { Id = 30, Label = "EXIT GAME", Description = "Exit emulation and return to Jellyfin" }
+            new() { Id = 30, Label = "EXIT GAME", Description = "Exit emulation and return to Jellyfin" },
+            new() { Id = 31, Label = "PAUSE / RESUME", Description = "Pause or resume emulation" },
+            new() { Id = 32, Label = "RESTART GAME", Description = "Restart / reset current game" },
+            new() { Id = 33, Label = "MUTE AUDIO", Description = "Toggle audio mute on/off" },
+            new() { Id = 34, Label = "SCREENSHOT", Description = "Capture in-game screenshot" },
+            new() { Id = 35, Label = "FULLSCREEN", Description = "Toggle fullscreen display" }
         };
 
         private static readonly Dictionary<int, InputBindingDefault> BaseDefaultBindings = new()
@@ -70,10 +79,15 @@ namespace JellyEmu.Services
             { 24, new() { Kb1 = 49,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
             { 25, new() { Kb1 = 50,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
             { 26, new() { Kb1 = 51,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
-            { 27, new() { Kb1 = 107, Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
-            { 28, new() { Kb1 = 32,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
+            { 27, new() { Kb1 = 107, Kb2 = 9, Gp1 = "",                      Gp2 = "" } },
+            { 28, new() { Kb1 = 8,   Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
             { 29, new() { Kb1 = 109, Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
-            { 30, new() { Kb1 = 27,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } }
+            { 30, new() { Kb1 = 27,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
+            { 31, new() { Kb1 = 32,  Kb2 = 80, Gp1 = "",                     Gp2 = "" } },
+            { 32, new() { Kb1 = 115, Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
+            { 33, new() { Kb1 = 77,  Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
+            { 34, new() { Kb1 = 123, Kb2 = 0, Gp1 = "",                      Gp2 = "" } },
+            { 35, new() { Kb1 = 70,  Kb2 = 122, Gp1 = "",                    Gp2 = "" } }
         };
 
         private static readonly Dictionary<string, Dictionary<int, InputBindingDefault>> SchemeDefaultOverrides =
@@ -861,6 +875,131 @@ namespace JellyEmu.Services
             return "default";
         }
 
+        private static readonly Dictionary<string, int> SchemeMaxPlayers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "gb", 2 },
+            { "gba", 2 },
+            { "nds", 2 },
+            { "vb", 1 },
+            { "psp", 1 },
+            { "lynx", 2 },
+            { "ngp", 2 },
+            { "ws", 2 },
+            { "segaGG", 2 },
+            { "segaMS", 2 },
+            { "atari2600", 2 },
+            { "atari7800", 2 },
+            { "jaguar", 2 },
+            { "coleco", 2 },
+            { "pcfx", 2 },
+            { "pce", 2 },
+            { "nes", 2 },
+            { "snes", 2 },
+            { "n64", 2 },
+            { "psx", 2 },
+            { "ps2", 1 },
+            { "segaMD", 2 },
+            { "segaSaturn", 2 },
+            { "3do", 2 },
+            { "arcade", 2 },
+            { "default", 2 }
+        };
+
+        private static Dictionary<int, InputBindingDefault> GeneratePlayerDefaults(
+            int playerIndex,
+            List<InputButtonDefinition> allButtons,
+            Dictionary<int, InputBindingDefault> p1Defaults)
+        {
+            var pBinds = new Dictionary<int, InputBindingDefault>();
+            foreach (var btn in allButtons)
+            {
+                var p1 = p1Defaults.TryGetValue(btn.Id, out var b) ? b : null;
+                var kb1 = 0;
+                if (playerIndex == 1) // Player 2
+                {
+                    kb1 = btn.Id switch
+                    {
+                        4 => 87,  // UP -> W
+                        5 => 83,  // DOWN -> S
+                        6 => 65,  // LEFT -> A
+                        7 => 68,  // RIGHT -> D
+                        8 => 70,  // A -> F
+                        0 => 71,  // B -> G
+                        9 => 82,  // X -> R
+                        1 => 84,  // Y -> T
+                        2 => 89,  // SELECT -> Y
+                        3 => 85,  // START -> U
+                        10 => 81, // L1 -> Q
+                        11 => 69, // R1 -> E
+                        12 => 49, // L2 -> 1
+                        13 => 50, // R2 -> 2
+                        14 => 67, // L3 -> C
+                        15 => 86, // R3 -> V
+                        _ => 0
+                    };
+                }
+                else if (playerIndex == 2) // Player 3
+                {
+                    kb1 = btn.Id switch
+                    {
+                        4 => 104, // UP -> Num 8
+                        5 => 98,  // DOWN -> Num 2
+                        6 => 100, // LEFT -> Num 4
+                        7 => 102, // RIGHT -> Num 6
+                        8 => 97,  // A -> Num 1
+                        0 => 99,  // B -> Num 3
+                        9 => 103, // X -> Num 7
+                        1 => 105, // Y -> Num 9
+                        2 => 96,  // SELECT -> Num 0
+                        3 => 110, // START -> Num .
+                        10 => 111, // L1 -> Num /
+                        11 => 106, // R1 -> Num *
+                        _ => 0
+                    };
+                }
+                else if (playerIndex == 3) // Player 4
+                {
+                    kb1 = btn.Id switch
+                    {
+                        4 => 73, // UP -> I
+                        5 => 75, // DOWN -> K
+                        6 => 74, // LEFT -> J
+                        7 => 76, // RIGHT -> L
+                        8 => 79, // A -> O
+                        0 => 80, // B -> P
+                        2 => 78, // SELECT -> N
+                        3 => 77, // START -> M
+                        _ => 0
+                    };
+                }
+
+                // If hotkey (id >= 24), no default gamepad/keyboard for secondary players
+                if (btn.Id >= 24)
+                {
+                    pBinds[btn.Id] = new InputBindingDefault
+                    {
+                        Kb1 = 0,
+                        Kb2 = 0,
+                        Gp1 = string.Empty,
+                        Gp2 = string.Empty
+                    };
+                }
+                else
+                {
+                    pBinds[btn.Id] = new InputBindingDefault
+                    {
+                        Kb1 = kb1,
+                        Kb2 = 0,
+                        Gp1 = p1?.Gp1 ?? string.Empty,
+                        Gp2 = p1?.Gp2 ?? string.Empty,
+                        Activation = p1?.Activation ?? "press",
+                        HoldDuration = p1?.HoldDuration ?? 5
+                    };
+                }
+            }
+            return pBinds;
+        }
+
         public PlatformControlScheme GetScheme(string? platformOrCoreOrScheme)
         {
             var key = ResolveSchemeKey(platformOrCoreOrScheme);
@@ -870,7 +1009,8 @@ namespace JellyEmu.Services
                 def = SchemeDefinitions["default"];
             }
 
-            var allButtons = def.Buttons.Concat(Hotkeys).ToList();
+            var isPs2 = string.Equals(key, "ps2", StringComparison.OrdinalIgnoreCase);
+            var allButtons = isPs2 ? def.Buttons.ToList() : def.Buttons.Concat(Hotkeys).ToList();
             var overrides = SchemeDefaultOverrides.TryGetValue(key, out var ovr) ? ovr : null;
 
             var defaultBindings = new Dictionary<int, InputBindingDefault>();
@@ -908,12 +1048,25 @@ namespace JellyEmu.Services
                 }
             }
 
+            var maxPlayers = SchemeMaxPlayers.TryGetValue(key, out var mp) ? Math.Min(2, mp) : 2;
+            var playerDefaults = new Dictionary<int, Dictionary<int, InputBindingDefault>>
+            {
+                { 0, defaultBindings }
+            };
+
+            for (var p = 1; p < maxPlayers; p++)
+            {
+                playerDefaults[p] = GeneratePlayerDefaults(p, allButtons, defaultBindings);
+            }
+
             return new PlatformControlScheme
             {
                 Id = key,
                 Name = def.Name,
+                MaxPlayers = maxPlayers,
                 Buttons = allButtons,
                 DefaultBindings = defaultBindings,
+                PlayerDefaultBindings = playerDefaults,
                 AnalogAxes = new List<int>(def.AnalogAxes)
             };
         }
