@@ -7,7 +7,10 @@ import { ClientSettingsPage } from './components/ClientSettingsPage';
 import { GlobalSaveBrowserPage } from './components/GlobalSaveBrowserPage';
 import { injectionService } from './services/injectionService';
 import { playbackInterceptor } from './services/playbackInterceptor';
+import { initSafeWakeLock } from '../shared/wakeLock';
 import '../index.css';
+
+initSafeWakeLock();
 
 console.log('[JellyEmu] Modern React + HeroUI Web Injection Active');
 
@@ -240,6 +243,14 @@ export function initInjection() {
   });
 }
 
+function startWhenReady() {
+  if (typeof document !== 'undefined' && document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initInjection());
+  } else {
+    initInjection();
+  }
+}
+
 if (typeof window !== 'undefined') {
-  initInjection();
+  startWhenReady();
 }

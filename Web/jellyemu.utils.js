@@ -10,6 +10,62 @@
     var JE = global.JellyEmu;
 
     /**
+     * Safely wraps navigator.wakeLock.request to prevent uncaught NotAllowedError exceptions
+     * (e.g. "The requesting page is not visible at PlatformEmscriptenDoSetWakeLock")
+     * from crashing Emscripten / WebAssembly runtimes or freezing the player UI.
+     */
+    try {
+        if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+            var _origWakeLockRequest = navigator.wakeLock.request.bind(navigator.wakeLock);
+            var _createDummySentinel = function (type) {
+                var target = typeof EventTarget !== 'undefined' ? new EventTarget() : {};
+                var sentinel = Object.assign(target, {
+                    released: false,
+                    type: type || 'screen',
+                    onrelease: null,
+                    release: function () {
+                        sentinel.released = true;
+                        if (typeof sentinel.dispatchEvent === 'function') {
+                            try { sentinel.dispatchEvent(new Event('release')); } catch (e) { }
+                        }
+                        if (typeof sentinel.onrelease === 'function') {
+                            try { sentinel.onrelease(new Event('release')); } catch (e) { }
+                        }
+                        return Promise.resolve();
+                    }
+                });
+                return sentinel;
+            };
+
+            navigator.wakeLock.request = async function (type) {
+                if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+                    return _createDummySentinel(type);
+                }
+                try {
+                    return await _origWakeLockRequest(type);
+                } catch (err) {
+                    console.warn('[JellyEmu] Screen WakeLock request suppressed:', err && err.message ? err.message : err);
+                    return _createDummySentinel(type);
+                }
+            };
+        }
+
+        if (typeof global.addEventListener === 'function') {
+            global.addEventListener('unhandledrejection', function (ev) {
+                if (ev && ev.reason && (
+                    ev.reason.name === 'NotAllowedError' ||
+                    (typeof ev.reason.message === 'string' && ev.reason.message.toLowerCase().indexOf('wakelock') !== -1)
+                )) {
+                    ev.preventDefault();
+                    console.warn('[JellyEmu] Caught unhandled WakeLock rejection:', ev.reason);
+                }
+            });
+        }
+    } catch (e) {
+        // Ignore initialization errors
+    }
+
+    /**
      * Resolves the active base URL (e.g. "/jellyfin" or "") from any available runtime source.
      * @returns {string}
      */

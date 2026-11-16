@@ -1,36 +1,48 @@
 version: 2
 updates:
-  # Keep NuGet dependencies up to date
+  # Keep NuGet dependencies up to date (grouped into a single PR)
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "deps"
     labels:
       - "dependencies"
+    groups:
+      nuget-dependencies:
+        patterns:
+          - "*"
 
-  # Keep frontend npm dependencies up to date
+  # Keep frontend npm dependencies up to date (grouped into a single PR)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "deps(frontend)"
     labels:
       - "dependencies"
       - "frontend"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
 
-  # Keep GitHub Actions workflows up to date
+  # Keep GitHub Actions workflows up to date (grouped into a single PR)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "ci"
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      actions:
+        patterns:
+          - "*"

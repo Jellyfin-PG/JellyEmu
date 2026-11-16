@@ -12,6 +12,7 @@ jobs:
   analyze:
     name: Analyze Code Security
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
     permissions:
       security-events: write
       actions: read

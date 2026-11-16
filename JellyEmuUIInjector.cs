@@ -45,6 +45,7 @@ namespace JellyEmu.Services
                         window.__JELLYEMU_CONFIG__ = { vantageEnabled: {{vantageStr}} };
 
                         var link = document.createElement('link');
+                        link.id = 'je-injection-bundle-css';
                         link.rel = 'stylesheet';
                         link.href = (base ? base : '') + '/jellyemu/assets/injection/bundle.css?v={{versionStr}}';
                         link.setAttribute('data-jellyemu-mods', '1');
@@ -52,7 +53,7 @@ namespace JellyEmu.Services
 
                         var script = document.createElement('script');
                         script.src = (base ? base : '') + '/jellyemu/assets/injection/bundle.js?v={{versionStr}}';
-                        script.defer = true;
+                        script.async = false;
                         script.setAttribute('data-jellyemu-mods', '1');
                         document.body.appendChild(script);
                     })();

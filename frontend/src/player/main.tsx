@@ -1,7 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import { PlayerApp } from './PlayerApp';
 import { PlayerInitialData } from '../types/player';
+import { initSafeWakeLock } from '../shared/wakeLock';
 import '../index.css';
+
+initSafeWakeLock();
 
 console.log('[JellyEmu] Modern React + HeroUI Player Overlay Active');
 

@@ -20,7 +20,7 @@ export const AboutTab: React.FC = () => {
             <div className="space-y-2 text-xs text-slate-200">
               <div className="flex justify-between py-1.5 border-b border-white/10">
                 <span className="text-slate-400 font-medium">Plugin Version</span>
-                <span className="font-mono font-semibold text-white">0.9.2.4</span>
+                <span className="font-mono font-semibold text-white">0.9.3.0</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-white/10">
                 <span className="text-slate-400 font-medium">Core Runtime</span>
