@@ -91,7 +91,13 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
     <>
       {/* Minimized Expand FAB */}
       {isMinimized && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 pointer-events-auto">
+        <div
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out ${
+            visible
+              ? 'translate-y-0 opacity-100 pointer-events-auto'
+              : 'translate-y-16 opacity-0 pointer-events-none'
+          }`}
+        >
           <Button
             isIconOnly
             size="sm"
@@ -106,9 +112,9 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
 
       {/* Floating Bottom Dock */}
       <div
-        className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out pointer-events-auto ${
+        className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out ${
           visible && !isMinimized
-            ? 'translate-y-0 opacity-100'
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
             : 'translate-y-16 opacity-0 pointer-events-none'
         }`}
       >

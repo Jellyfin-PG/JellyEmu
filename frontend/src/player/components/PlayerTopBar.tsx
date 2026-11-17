@@ -28,8 +28,10 @@ export const PlayerTopBar: React.FC<PlayerTopBarProps> = ({
 }) => {
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out px-4 py-2 flex items-center justify-between pointer-events-auto bg-black/90 backdrop-blur-md border-b border-white/10 text-white ${
-        visible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
+      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out px-4 py-2 flex items-center justify-between bg-black/90 backdrop-blur-md border-b border-white/10 text-white ${
+        visible
+          ? 'translate-y-0 opacity-100 pointer-events-auto'
+          : '-translate-y-full opacity-0 pointer-events-none'
       }`}
     >
       {/* Title & Platform Tag */}
