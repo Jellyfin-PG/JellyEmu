@@ -165,7 +165,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         <PlayerTopBar
           title={initialData.gameName}
           systemName={initialData.systemName || initialData.platformTag}
-          visible={visible}
+          visible={visible && !anyModalOpen}
           isPlay={isPlay}
           isPico8={isPico8}
           isNetplayActive={isPlay || isPico8 ? false : isNetplayActive}
@@ -176,7 +176,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
 
         {/* Bottom Dock */}
         <PlayerBottomDock
-          visible={visible}
+          visible={visible && !anyModalOpen}
           isMinimized={isMinimized}
           onToggleMinimize={() => setIsMinimized(!isMinimized)}
           volume={volume}
@@ -208,7 +208,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         />
 
         {/* Saves & States Modal (Only on systems supporting save states) */}
-        {!isPlay && !isPico8 && (
+        {!isPlay && !isPico8 && savesDisclosure.isOpen && (
           <InGameSavesModal
             itemId={initialData.itemId}
             userId={initialData.userId}
@@ -219,14 +219,16 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         )}
 
         {/* Settings Modal */}
-        <InGameSettingsModal
-          config={initialData}
-          isOpen={settingsDisclosure.isOpen}
-          onOpenChange={settingsDisclosure.onOpenChange}
-        />
+        {settingsDisclosure.isOpen && (
+          <InGameSettingsModal
+            config={initialData}
+            isOpen={settingsDisclosure.isOpen}
+            onOpenChange={settingsDisclosure.onOpenChange}
+          />
+        )}
 
         {/* Cheats Modal (Not supported on PS2 or PICO-8) */}
-        {!isPlay && !isPico8 && (
+        {!isPlay && !isPico8 && cheatsDisclosure.isOpen && (
           <InGameCheatsModal
             itemId={initialData.itemId}
             isOpen={cheatsDisclosure.isOpen}
@@ -235,15 +237,17 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         )}
 
         {/* Input Mapping Modal */}
-        <InGameInputMapModal
-          config={initialData}
-          isOpen={inputMapDisclosure.isOpen}
-          onOpenChange={inputMapDisclosure.onOpenChange}
-          initialTab={inputMapTab}
-        />
+        {inputMapDisclosure.isOpen && (
+          <InGameInputMapModal
+            config={initialData}
+            isOpen={inputMapDisclosure.isOpen}
+            onOpenChange={inputMapDisclosure.onOpenChange}
+            initialTab={inputMapTab}
+          />
+        )}
 
         {/* Netplay Modal (Not supported on PS2 or PICO-8) */}
-        {!isPlay && !isPico8 && (
+        {!isPlay && !isPico8 && netplayDisclosure.isOpen && (
           <InGameNetplayModal
             config={initialData}
             isOpen={netplayDisclosure.isOpen}
@@ -252,7 +256,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         )}
 
         {/* Core Options Modal (Not supported on PS2 or PICO-8) */}
-        {!isPlay && !isPico8 && (
+        {!isPlay && !isPico8 && coreOptsDisclosure.isOpen && (
           <InGameCoreOptionsModal
             isOpen={coreOptsDisclosure.isOpen}
             onOpenChange={coreOptsDisclosure.onOpenChange}
@@ -260,10 +264,12 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         )}
 
         {/* Multi-Disc Modal */}
-        <InGameDiscSelectModal
-          isOpen={discSelectDisclosure.isOpen}
-          onOpenChange={discSelectDisclosure.onOpenChange}
-        />
+        {discSelectDisclosure.isOpen && (
+          <InGameDiscSelectModal
+            isOpen={discSelectDisclosure.isOpen}
+            onOpenChange={discSelectDisclosure.onOpenChange}
+          />
+        )}
       </div>
     </HeroUIProvider>
   );

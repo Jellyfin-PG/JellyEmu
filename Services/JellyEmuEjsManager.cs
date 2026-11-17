@@ -67,6 +67,7 @@ namespace JellyEmu.Services
             if (LocalAssetsValid())
             {
                 _isReady = true;
+                PatchEjsAssets(EjsRoot);
                 _logger.LogInformation("[JellyEmu] EmulatorJS assets present at {Root} (channel: {Channel})", EjsRoot, CurrentChannel);
                 return;
             }
@@ -139,6 +140,8 @@ namespace JellyEmu.Services
 
                 await Task.WhenAll(tasks);
 
+                PatchEjsAssets(EjsRoot);
+
                 await File.WriteAllTextAsync(StampFile, $"cdn-{CurrentChannel}");
 
                 _isReady = true;
@@ -147,6 +150,72 @@ namespace JellyEmu.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[JellyEmu] Fatal error downloading from CDN — falling back to live proxy.");
+            }
+        }
+
+        public void PatchEjsAssets(string root)
+        {
+            try
+            {
+                var minJs = Path.Combine(root, "emulator.min.js");
+                if (File.Exists(minJs))
+                {
+                    var content = File.ReadAllText(minJs);
+                    const string target1 = "this.gamepadSelection[e]=this.gamepad.gamepads[t.gamepadIndex].id+\"_\"+this.gamepad.gamepads[t.gamepadIndex].index";
+                    const string repl1 = "const _gp=this.gamepad.gamepads.find(g=>g&&g.index==t.gamepadIndex)||this.gamepad.gamepads[t.gamepadIndex]||this.gamepad.gamepads[0]||{id:\"Gamepad\",index:t.gamepadIndex};this.gamepadSelection[e]=_gp.id+\"_\"+_gp.index";
+
+                    const string target2 = "const e=this.gamepadSelection.indexOf(this.gamepad.gamepads[t.gamepadIndex].id+\"_\"+this.gamepad.gamepads[t.gamepadIndex].index)";
+                    const string repl2 = "const _evGp=this.gamepad.gamepads.find(g=>g&&g.index==t.gamepadIndex)||this.gamepad.gamepads[t.gamepadIndex]||this.gamepad.gamepads[0]||{id:\"Gamepad\",index:t.gamepadIndex};const e=this.gamepadSelection.indexOf(_evGp.id+\"_\"+_evGp.index)";
+
+                    bool modified = false;
+                    if (content.Contains(target1))
+                    {
+                        content = content.Replace(target1, repl1);
+                        modified = true;
+                    }
+                    if (content.Contains(target2))
+                    {
+                        content = content.Replace(target2, repl2);
+                        modified = true;
+                    }
+                    if (modified)
+                    {
+                        File.WriteAllText(minJs, content);
+                        _logger.LogInformation("[JellyEmu] Successfully patched gamepad index bug in emulator.min.js");
+                    }
+                }
+
+                var srcJs = Path.Combine(root, "src", "emulator.js");
+                if (File.Exists(srcJs))
+                {
+                    var content = File.ReadAllText(srcJs);
+                    const string srcTarget1 = "this.gamepadSelection[i] = this.gamepad.gamepads[e.gamepadIndex].id + \"_\" + this.gamepad.gamepads[e.gamepadIndex].index;";
+                    const string srcRepl1 = "const _gp = this.gamepad.gamepads.find(g => g && g.index == e.gamepadIndex) || this.gamepad.gamepads[e.gamepadIndex] || this.gamepad.gamepads[0] || { id: \"Gamepad\", index: e.gamepadIndex };\n                    this.gamepadSelection[i] = _gp.id + \"_\" + _gp.index;";
+
+                    const string srcTarget2 = "const gamepadIndex = this.gamepadSelection.indexOf(this.gamepad.gamepads[e.gamepadIndex].id + \"_\" + this.gamepad.gamepads[e.gamepadIndex].index);";
+                    const string srcRepl2 = "const _evGp = this.gamepad.gamepads.find(g => g && g.index == e.gamepadIndex) || this.gamepad.gamepads[e.gamepadIndex] || this.gamepad.gamepads[0] || { id: \"Gamepad\", index: e.gamepadIndex };\n        const gamepadIndex = this.gamepadSelection.indexOf(_evGp.id + \"_\" + _evGp.index);";
+
+                    bool modified = false;
+                    if (content.Contains(srcTarget1))
+                    {
+                        content = content.Replace(srcTarget1, srcRepl1);
+                        modified = true;
+                    }
+                    if (content.Contains(srcTarget2))
+                    {
+                        content = content.Replace(srcTarget2, srcRepl2);
+                        modified = true;
+                    }
+                    if (modified)
+                    {
+                        File.WriteAllText(srcJs, content);
+                        _logger.LogInformation("[JellyEmu] Successfully patched gamepad index bug in src/emulator.js");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Failed to patch gamepad bug in EJS assets");
             }
         }
 

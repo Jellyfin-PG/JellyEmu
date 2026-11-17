@@ -297,6 +297,15 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
 
   const targetPlatform = resolveTargetPlatform(config);
 
+  const isPlay =
+    config.core === 'play' ||
+    config.platformTag?.toLowerCase() === 'ps2' ||
+    scheme?.id?.toLowerCase() === 'ps2' ||
+    config.isPlay === true;
+
+  // Determine current active player index from tab
+  const activePlayerIdx = isPlay ? 0 : (activeTab.startsWith('p') ? parseInt(activeTab.slice(1), 10) : 0);
+
   // Fetch system scheme and effective player bindings on modal open
   useEffect(() => {
     if (!isOpen) {
@@ -356,21 +365,15 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
         initialPlayerMap[p] = {};
         allButtons.forEach((btn) => {
           const btnId = btn.id;
-          const defBind = pDefs[btnId] || safeDefs[btnId] || HOTKEY_METADATA_MAP[btnId] || {
-            kb1: 0,
-            kb2: 0,
-            gp1: '',
-            gp2: '',
-            activation: 'press',
-            holdDuration: 5
-          };
+          const explicitBind = pDefs[btnId];
+          const baseDef = safeDefs[btnId] || HOTKEY_METADATA_MAP[btnId];
           initialPlayerMap[p][btnId] = {
-            kb1: defBind.kb1 || 0,
-            kb2: defBind.kb2 || 0,
-            gp1: defBind.gp1 || '',
-            gp2: defBind.gp2 || '',
-            activation: defBind.activation || 'press',
-            holdDuration: defBind.holdDuration || 5
+            kb1: explicitBind ? (explicitBind.kb1 || 0) : (p === 0 ? (baseDef?.kb1 || 0) : 0),
+            kb2: explicitBind ? (explicitBind.kb2 || 0) : (p === 0 ? (baseDef?.kb2 || 0) : 0),
+            gp1: explicitBind ? (explicitBind.gp1 || '') : (baseDef?.gp1 || ''),
+            gp2: explicitBind ? (explicitBind.gp2 || '') : (baseDef?.gp2 || ''),
+            activation: explicitBind?.activation || baseDef?.activation || 'press',
+            holdDuration: explicitBind?.holdDuration || baseDef?.holdDuration || 5
           };
         });
       }
@@ -446,7 +449,8 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
 
     const pollGamepads = () => {
       const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-      const gp = Array.from(gps).find((g) => g !== null && g.connected !== false) || null;
+      const activePads = Array.from(gps).filter((g): g is Gamepad => g !== null && g.connected !== false);
+      const gp = activePads[activePlayerIdx] || null;
       setGamepadDetails(PlayerBridge.parseGamepadDetails(gp));
     };
 
@@ -460,7 +464,7 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
       window.removeEventListener('gamepadconnected', pollGamepads);
       window.removeEventListener('gamepaddisconnected', pollGamepads);
     };
-  }, [isOpen]);
+  }, [isOpen, activePlayerIdx]);
 
   // Persist multi-player bindings to controls preference
   const handleSavePlayerBindings = useCallback(
@@ -611,42 +615,44 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
 
     const pollGamepadInput = () => {
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const activePads = Array.from(pads).filter((p): p is Gamepad => !!p && p.connected !== false);
+      const targetPad = activePads[listeningGp.playerIdx];
+      if (!targetPad) {
+        animFrame = requestAnimationFrame(pollGamepadInput);
+        return;
+      }
+
       const currentlyHeld: string[] = [];
 
-      for (let g = 0; g < pads.length; g++) {
-        const p = pads[g];
-        if (!p || !p.connected) continue;
+      // Check Buttons on targetPad
+      const bCount = targetPad.buttons ? targetPad.buttons.length : 0;
+      for (let bIdx = 0; bIdx < bCount; bIdx++) {
+        const btn = targetPad.buttons[bIdx];
+        const isPressed = typeof btn === 'object' && btn !== null
+          ? (!!btn.pressed || btn.value > 0.4)
+          : (btn > 0.4);
 
-        // Check Buttons
-        const bCount = p.buttons ? p.buttons.length : 0;
-        for (let bIdx = 0; bIdx < bCount; bIdx++) {
-          const btn = p.buttons[bIdx];
-          const isPressed = typeof btn === 'object' && btn !== null
-            ? (!!btn.pressed || btn.value > 0.4)
-            : (btn > 0.4);
-
-          if (isPressed) {
-            const label = bIdx < BUTTON_INDEX_TO_LABEL.length
-              ? BUTTON_INDEX_TO_LABEL[bIdx]
-              : `GAMEPAD_${bIdx}`;
-            if (!currentlyHeld.includes(label)) {
-              currentlyHeld.push(label);
-            }
+        if (isPressed) {
+          const label = bIdx < BUTTON_INDEX_TO_LABEL.length
+            ? BUTTON_INDEX_TO_LABEL[bIdx]
+            : `GAMEPAD_${bIdx}`;
+          if (!currentlyHeld.includes(label)) {
+            currentlyHeld.push(label);
           }
         }
+      }
 
-        // Check Axes
-        const aCount = p.axes ? p.axes.length : 0;
-        const initAxes = listeningGp.initialAxes?.[p.index];
-        for (let aIdx = 0; aIdx < aCount; aIdx++) {
-          const aVal = p.axes[aIdx];
-          const baseA = initAxes?.[aIdx] !== undefined ? initAxes[aIdx] : 0;
-          if (Math.abs(aVal - baseA) > 0.5) {
-            const axisName = aIdx < AXIS_NAMES.length ? AXIS_NAMES[aIdx] : `EXTRA_STICK_${aIdx}`;
-            const directionLabel = `${axisName}:${aVal - baseA > 0 ? '+1' : '-1'}`;
-            if (!currentlyHeld.includes(directionLabel)) {
-              currentlyHeld.push(directionLabel);
-            }
+      // Check Axes on targetPad
+      const aCount = targetPad.axes ? targetPad.axes.length : 0;
+      const initAxes = listeningGp.initialAxes?.[targetPad.index];
+      for (let aIdx = 0; aIdx < aCount; aIdx++) {
+        const aVal = targetPad.axes[aIdx];
+        const baseA = initAxes?.[aIdx] !== undefined ? initAxes[aIdx] : 0;
+        if (Math.abs(aVal - baseA) > 0.5) {
+          const axisName = aIdx < AXIS_NAMES.length ? AXIS_NAMES[aIdx] : `EXTRA_STICK_${aIdx}`;
+          const directionLabel = `${axisName}:${aVal - baseA > 0 ? '+1' : '-1'}`;
+          if (!currentlyHeld.includes(directionLabel)) {
+            currentlyHeld.push(directionLabel);
           }
         }
       }
@@ -733,21 +739,15 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
       resetPlayerMap[p] = {};
       allButtons.forEach((btn) => {
         const btnId = btn.id;
-        const defBind = pDefs[btnId] || safeDefs[btnId] || HOTKEY_METADATA_MAP[btnId] || {
-          kb1: 0,
-          kb2: 0,
-          gp1: '',
-          gp2: '',
-          activation: 'press',
-          holdDuration: 5
-        };
+        const explicitBind = pDefs[btnId];
+        const baseDef = safeDefs[btnId] || HOTKEY_METADATA_MAP[btnId];
         resetPlayerMap[p][btnId] = {
-          kb1: defBind.kb1 || 0,
-          kb2: defBind.kb2 || 0,
-          gp1: defBind.gp1 || '',
-          gp2: defBind.gp2 || '',
-          activation: defBind.activation || 'press',
-          holdDuration: defBind.holdDuration || 5
+          kb1: explicitBind ? (explicitBind.kb1 || 0) : (p === 0 ? (baseDef?.kb1 || 0) : 0),
+          kb2: explicitBind ? (explicitBind.kb2 || 0) : (p === 0 ? (baseDef?.kb2 || 0) : 0),
+          gp1: explicitBind ? (explicitBind.gp1 || '') : (baseDef?.gp1 || ''),
+          gp2: explicitBind ? (explicitBind.gp2 || '') : (baseDef?.gp2 || ''),
+          activation: explicitBind?.activation || baseDef?.activation || 'press',
+          holdDuration: explicitBind?.holdDuration || baseDef?.holdDuration || 5
         };
       });
     }
@@ -771,18 +771,10 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
     }
   };
 
-  const isPlay =
-    config.core === 'play' ||
-    config.platformTag?.toLowerCase() === 'ps2' ||
-    scheme?.id?.toLowerCase() === 'ps2' ||
-    config.isPlay === true;
-
   const nativeButtons = getNativeButtons(scheme);
   const hotkeyButtonsList = isPlay ? [] : getHotkeyButtons(hotkeys, scheme);
   const maxPlayers = isPlay ? 1 : Math.max(1, Math.min(2, scheme.maxPlayers || 2));
 
-  // Determine current active player index from tab
-  const activePlayerIdx = isPlay ? 0 : (activeTab.startsWith('p') ? parseInt(activeTab.slice(1), 10) : 0);
   const isPlayerTab = isPlay || (activeTab.startsWith('p') && !isNaN(activePlayerIdx));
   const isHotkeysTab = !isPlay && activeTab === 'hotkeys';
   const isVirtualTab = !isPlay && activeTab === 'vg';
@@ -975,7 +967,7 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                               <span className="text-xs font-bold text-white">{gamepadDetails.deviceName}</span>
                             </div>
                             <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              Controller #{activePlayerIdx} Ready
+                              Controller P{activePlayerIdx + 1} Ready
                             </span>
                           </div>
                           <div className="text-[11px] text-neutral-400 font-mono break-all">
@@ -992,7 +984,11 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                       ) : (
                         <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-xs text-neutral-400 text-center flex items-center justify-center gap-2">
                           <Gamepad2 className="w-4 h-4 text-neutral-500" />
-                          <span>No controller detected. Connect a gamepad or press any button to map Player {activePlayerIdx + 1}.</span>
+                          <span>
+                            {activePlayerIdx === 0
+                              ? 'No controller detected. Connect a gamepad or press any button to map Player 1.'
+                              : 'No controller detected for Player 2. Connect a second gamepad or press any button to map Player 2.'}
+                          </span>
                         </div>
                       )}
                     </>

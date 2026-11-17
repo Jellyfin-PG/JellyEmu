@@ -1,4 +1,86 @@
 (function () {
+    // ==========================================
+    // - EMULATORJS GAMEPAD BUG DEFENSIVE SHIELD -
+    // Protects against: TypeError: Cannot read properties of undefined (reading 'id') at connected
+    // Occurs when GamepadHandler dispatches connected with gamepadIndex (hardware device index)
+    // while emulator.min.js erroneously indexes the dense gamepads array directly.
+    // ==========================================
+    function _jeWrapGamepadHandler(gpHandler) {
+        if (!gpHandler || gpHandler.__jePatched) return;
+        gpHandler.__jePatched = true;
+
+        if (Array.isArray(gpHandler.gamepads) && !gpHandler.gamepads.__jePatched) {
+            var rawArr = gpHandler.gamepads;
+            try {
+                gpHandler.gamepads = new Proxy(rawArr, {
+                    get: function (target, prop, receiver) {
+                        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+                            var idx = parseInt(prop, 10);
+                            if (idx in target && target[idx] !== undefined) {
+                                return target[idx];
+                            }
+                            var found = target.find(function (g) {
+                                return g && (g.index === idx || g.gamepadIndex === idx);
+                            });
+                            if (found) return found;
+                            if (target.length > 0 && target[0]) return target[0];
+                            return { id: 'Gamepad', index: idx, axes: [], buttons: {} };
+                        }
+                        if (prop === '__jePatched') return true;
+                        return Reflect.get(target, prop, receiver);
+                    }
+                });
+            } catch (_) { }
+        }
+
+        if (typeof gpHandler.dispatchEvent === 'function' && !gpHandler.dispatchEvent.__jeGuarded) {
+            var origDispatch = gpHandler.dispatchEvent.bind(gpHandler);
+            var guardedDispatch = function (name, arg) {
+                try {
+                    return origDispatch(name, arg);
+                } catch (err) {
+                    console.warn('[JellyEmu] Guarded GamepadHandler dispatchEvent error on ' + name + ':', err);
+                }
+            };
+            guardedDispatch.__jeGuarded = true;
+            gpHandler.dispatchEvent = guardedDispatch;
+        }
+    }
+    window._jeWrapGamepadHandler = _jeWrapGamepadHandler;
+
+    try {
+        var _realEmulatorJS = window.EmulatorJS;
+        Object.defineProperty(window, 'EmulatorJS', {
+            configurable: true,
+            enumerable: true,
+            get: function () {
+                return _realEmulatorJS;
+            },
+            set: function (Original) {
+                if (typeof Original === 'function') {
+                    _realEmulatorJS = function PatchedEmulatorJS() {
+                        var inst = Reflect.construct(Original, arguments, PatchedEmulatorJS);
+                        if (inst && inst.gamepad) {
+                            _jeWrapGamepadHandler(inst.gamepad);
+                        }
+                        return inst;
+                    };
+                    _realEmulatorJS.prototype = Original.prototype;
+                    try { Object.setPrototypeOf(_realEmulatorJS, Original); } catch (_) { }
+                } else {
+                    _realEmulatorJS = Original;
+                }
+            }
+        });
+    } catch (_) { }
+
+    var _jeGpWatchTimer = setInterval(function () {
+        if (window.EJS_emulator && window.EJS_emulator.gamepad) {
+            _jeWrapGamepadHandler(window.EJS_emulator.gamepad);
+        }
+    }, 100);
+    setTimeout(function () { clearInterval(_jeGpWatchTimer); }, 30000);
+
     var cfg = window.JellyEmuConfig || {};
     var itemId      = cfg.itemId      || '';
     var userId      = cfg.userId      || '';
@@ -434,6 +516,23 @@
             result = JSON.parse(JSON.stringify(schemeDef.playerDefaultBindings[playerIdx]));
         } else if (playerIdx === 0 && schemeDef && schemeDef.defaultBindings && Object.keys(schemeDef.defaultBindings).length > 0) {
             result = JSON.parse(JSON.stringify(schemeDef.defaultBindings));
+        } else if (playerIdx > 0 && schemeDef && schemeDef.defaultBindings && Object.keys(schemeDef.defaultBindings).length > 0) {
+            // For Player 2+, default gamepad buttons mirror scheme defaults so Controller 2 works out of the box,
+            // while keyboard bindings default to 0 to prevent Player 1 keyboard inputs from clashing with Player 2.
+            var baseDefs = schemeDef.defaultBindings;
+            for (var bKey in baseDefs) {
+                if (baseDefs.hasOwnProperty(bKey)) {
+                    var bVal = baseDefs[bKey];
+                    result[bKey] = {
+                        kb1: 0,
+                        kb2: 0,
+                        gp1: bVal.gp1 || '',
+                        gp2: bVal.gp2 || '',
+                        activation: bVal.activation || 'press',
+                        holdDuration: bVal.holdDuration || 5
+                    };
+                }
+            }
         }
         var buttons = getActiveInputButtons();
         for (var i = 0; i < buttons.length; i++) {
@@ -843,35 +942,42 @@
         listen.bk.classList.remove('je-listening');
 
         var finalComboStr = (listen.maxCombo && listen.maxCombo.length > 0) ? listen.maxCombo.join('+') : '';
+        var playerIdx = (typeof listen.playerIdx === 'number') ? listen.playerIdx : 0;
         if (finalComboStr) {
-            var bind = _jeEnsureBinding(listen.idx);
+            var bind = _jeEnsureBinding(listen.idx, playerIdx);
             bind[listen.field] = finalComboStr;
             listen.bk.textContent = _jeGpName(finalComboStr);
             _jeSyncBindingsToServer();
         } else {
-            var currBind = _jeEnsureBinding(listen.idx);
+            var currBind = _jeEnsureBinding(listen.idx, playerIdx);
             listen.bk.textContent = _jeGpName(currBind[listen.field]);
         }
     }
 
     function _jePollRawGamepads() {
-        var pads = [];
+        var rawPads = [];
         if (navigator.getGamepads) {
-            try { pads = navigator.getGamepads() || []; } catch (e) {}
+            try { rawPads = navigator.getGamepads() || []; } catch (e) {}
         } else if (navigator.webkitGetGamepads) {
-            try { pads = navigator.webkitGetGamepads() || []; } catch (e) {}
+            try { rawPads = navigator.webkitGetGamepads() || []; } catch (e) {}
+        }
+
+        var activePads = [];
+        for (var pi = 0; pi < rawPads.length; pi++) {
+            if (rawPads[pi] && rawPads[pi].connected) {
+                activePads.push(rawPads[pi]);
+            }
         }
 
         // Active Gamepad Remap Listener (Supports single button, stick axis, & multi-button combos)
         if (_jeActiveGpListen) {
-            var currentlyHeld = [];
-            for (var g = 0; g < pads.length; g++) {
-                var p = pads[g];
-                if (!p || !p.connected) continue;
-
-                var bCount = p.buttons ? p.buttons.length : 0;
+            var listen = _jeActiveGpListen;
+            var targetPad = activePads[listen.playerIdx];
+            if (targetPad) {
+                var currentlyHeld = [];
+                var bCount = targetPad.buttons ? targetPad.buttons.length : 0;
                 for (var bIdx = 0; bIdx < bCount; bIdx++) {
-                    var bObj = p.buttons[bIdx];
+                    var bObj = targetPad.buttons[bIdx];
                     var isP = (typeof bObj === 'object' && bObj !== null) ? (!!bObj.pressed || bObj.value > 0.4) : (bObj > 0.4);
                     if (isP) {
                         var bLabel = _jeButtonLabel(bIdx);
@@ -881,10 +987,10 @@
                     }
                 }
 
-                var aCount = p.axes ? p.axes.length : 0;
-                var initAArr = _jeActiveGpListen.initialAxes && _jeActiveGpListen.initialAxes[p.index];
+                var aCount = targetPad.axes ? targetPad.axes.length : 0;
+                var initAArr = listen.initialAxes && listen.initialAxes[targetPad.index];
                 for (var aIdx = 0; aIdx < aCount; aIdx++) {
-                    var aVal = p.axes[aIdx];
+                    var aVal = targetPad.axes[aIdx];
                     var baseA = (initAArr && initAArr[aIdx] !== undefined) ? initAArr[aIdx] : 0;
                     if (Math.abs(aVal - baseA) > 0.45) {
                         var aName = _jeAxisLabel(aIdx, aVal - baseA);
@@ -893,36 +999,38 @@
                         }
                     }
                 }
-            }
 
-            var listen = _jeActiveGpListen;
-            if (currentlyHeld.length > 0) {
-                if (currentlyHeld.length > (listen.maxCombo ? listen.maxCombo.length : 0)) {
-                    listen.maxCombo = currentlyHeld.slice();
-                    listen.bk.textContent = _jeGpName(listen.maxCombo.join('+'));
+                if (currentlyHeld.length > 0) {
+                    if (currentlyHeld.length > (listen.maxCombo ? listen.maxCombo.length : 0)) {
+                        listen.maxCombo = currentlyHeld.slice();
+                        listen.bk.textContent = _jeGpName(listen.maxCombo.join('+'));
+                    }
+                    if (listen.commitTimer) {
+                        clearTimeout(listen.commitTimer);
+                        listen.commitTimer = null;
+                    }
+                } else if (listen.maxCombo && listen.maxCombo.length > 0 && !listen.commitTimer) {
+                    listen.commitTimer = setTimeout(function () {
+                        _jeCommitGpListen();
+                    }, 150);
                 }
-                if (listen.commitTimer) {
-                    clearTimeout(listen.commitTimer);
-                    listen.commitTimer = null;
-                }
-            } else if (listen.maxCombo && listen.maxCombo.length > 0 && !listen.commitTimer) {
-                listen.commitTimer = setTimeout(function () {
-                    _jeCommitGpListen();
-                }, 150);
             }
         }
 
-        var activePads = pads.filter(function (p) { return p && p.connected; });
-
-        for (var gi = 0; gi < pads.length; gi++) {
-            var gp = pads[gi];
+        for (var gi = 0; gi < activePads.length; gi++) {
+            var gp = activePads[gi];
             if (!gp || !gp.connected) continue;
 
             if (!_jeRawGpPrevButtons[gp.index]) _jeRawGpPrevButtons[gp.index] = {};
             if (!_jeRawGpPrevAxes[gp.index]) _jeRawGpPrevAxes[gp.index] = {};
 
-            // Strict 1-to-1 hardware controller assignment for local multiplayer
-            var padPlayerIdx = (gp.index >= 0 && gp.index < 4) ? gp.index : 0;
+            // Strict 1-to-1 physical controller assignment for local multiplayer
+            // activePads[0] is Player 1 (padPlayerIdx = 0), activePads[1] is Player 2 (padPlayerIdx = 1)
+            var padPlayerIdx = gi;
+            if (padPlayerIdx >= 2) {
+                // JellyEmu currently supports 2 local players
+                continue;
+            }
 
             // Process buttons
             var buttonsCount = gp.buttons ? gp.buttons.length : 0;
@@ -1008,8 +1116,8 @@
                     }
                 }
             }
-            // Check Hotkey combos (e.g. EXIT GAME combos like SELECT+START or single hotkey button)
-            if (!_jeActiveGpListen) {
+            // Check Hotkey combos (e.g. EXIT GAME combos like SELECT+START or single hotkey button) on primary controller
+            if (!_jeActiveGpListen && padPlayerIdx === 0) {
                 for (var hIdx in _jeBindings) {
                     var numIdx = parseInt(hIdx, 10);
                     if (numIdx < 24) continue;
@@ -1048,14 +1156,16 @@
 
         function _jeDisableEjsControls() {
             var e = window.EJS_emulator;
-            if (!e) return;
-            var ejsControls = e.controls && e.controls[0];
-            if (ejsControls) {
-                Object.keys(ejsControls).forEach(function (k) {
-                    if (ejsControls[k] && ejsControls[k].value2 !== undefined) {
-                        ejsControls[k].value2 = '';
-                    }
-                });
+            if (!e || !e.controls) return;
+            for (var p = 0; p < 4; p++) {
+                var ejsControls = e.controls[p];
+                if (ejsControls) {
+                    Object.keys(ejsControls).forEach(function (k) {
+                        if (ejsControls[k] && ejsControls[k].value2 !== undefined) {
+                            ejsControls[k].value2 = '';
+                        }
+                    });
+                }
             }
         }
         _jeDisableEjsControls();
@@ -1366,7 +1476,8 @@
     }
 
     // - Keyboard listen -
-    function _jeListenKeyboard(idx, field, row) {
+    function _jeListenKeyboard(idx, field, row, playerIdx) {
+        playerIdx = (typeof playerIdx === 'number') ? playerIdx : 0;
         var col = field === 'kb1' ? 1 : 2;
         var bk  = row.children[col];
         if (!bk || bk.classList.contains('je-listening')) return;
@@ -1376,7 +1487,7 @@
             ev.preventDefault(); ev.stopPropagation();
             document.removeEventListener('keydown', onKey, true);
             bk.classList.remove('je-listening');
-            var bind = _jeEnsureBinding(idx);
+            var bind = _jeEnsureBinding(idx, playerIdx);
             if (ev.keyCode === 27) { bk.textContent = _jeKeyName(bind[field]); return; }
             bind[field] = ev.keyCode;
             bk.textContent = _jeKeyName(ev.keyCode);
@@ -1386,7 +1497,8 @@
     }
 
     // - Gamepad listen (Uses direct raw Gamepad poller) -
-    function _jeListenGamepad(idx, field, row) {
+    function _jeListenGamepad(idx, field, row, playerIdx) {
+        playerIdx = (typeof playerIdx === 'number') ? playerIdx : 0;
         var col = field === 'gp1' ? 1 : 2;
         var bk  = row.children[col];
         if (!bk || bk.classList.contains('je-listening')) return;
@@ -1396,7 +1508,7 @@
             if (_jeActiveGpListen.commitTimer) clearTimeout(_jeActiveGpListen.commitTimer);
             clearTimeout(_jeActiveGpListen.timeoutId);
             _jeActiveGpListen.bk.classList.remove('je-listening');
-            var prevBind = _jeEnsureBinding(_jeActiveGpListen.idx);
+            var prevBind = _jeEnsureBinding(_jeActiveGpListen.idx, _jeActiveGpListen.playerIdx);
             _jeActiveGpListen.bk.textContent = _jeGpName(prevBind[_jeActiveGpListen.field]);
             _jeActiveGpListen = null;
         }
@@ -1421,6 +1533,7 @@
 
         _jeActiveGpListen = {
             idx: idx,
+            playerIdx: playerIdx,
             field: field,
             row: row,
             bk: bk,
@@ -1429,7 +1542,7 @@
             maxCombo: [],
             commitTimer: null
         };
-        console.log('[JellyEmu Gamepad] Listening for raw input / combinations on Action ID ' + idx + ' (' + field + ')...');
+        console.log('[JellyEmu Gamepad] Listening for raw input / combinations on Action ID ' + idx + ' (' + field + ') for Player ' + (playerIdx + 1) + '...');
     }
 
     // - Virtual gamepad toggles -
