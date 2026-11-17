@@ -185,7 +185,7 @@ namespace JellyEmu.Services
                     }
                 }
 
-                var srcJs = Path.Combine(root, "src", "emulator.js");
+                var srcJs = Path.Join(root, "src", "emulator.js");
                 if (File.Exists(srcJs))
                 {
                     var content = File.ReadAllText(srcJs);
