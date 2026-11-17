@@ -213,7 +213,19 @@ namespace JellyEmu.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Failed to patch gamepad bug in EJS assets");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Failed to patch gamepad bug in EJS assets");
+            }
+            catch (System.Security.SecurityException ex)
+            {
+                _logger.LogWarning(ex, "[JellyEmu] Failed to patch gamepad bug in EJS assets");
+            }
+            catch (NotSupportedException ex)
             {
                 _logger.LogWarning(ex, "[JellyEmu] Failed to patch gamepad bug in EJS assets");
             }
