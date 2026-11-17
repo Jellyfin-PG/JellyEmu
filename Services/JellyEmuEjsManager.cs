@@ -157,7 +157,7 @@ namespace JellyEmu.Services
         {
             try
             {
-                var minJs = Path.Combine(root, "emulator.min.js");
+                var minJs = Path.Join(root, "emulator.min.js");
                 if (File.Exists(minJs))
                 {
                     var content = File.ReadAllText(minJs);
