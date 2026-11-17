@@ -659,6 +659,49 @@
     }
     _jeLoadBindings(null);
 
+    // Apply live dynamic bindings into running engine without page reload
+    function _jeApplyNewBindings(newPlayerMap) {
+        if (!newPlayerMap || typeof newPlayerMap !== 'object') return;
+        try {
+            var isMulti = newPlayerMap['0'] && typeof newPlayerMap['0'] === 'object' && newPlayerMap['0'].kb1 === undefined && newPlayerMap['0'].gp1 === undefined;
+            if (isMulti) {
+                _jePlayerBindings = JSON.parse(JSON.stringify(newPlayerMap));
+            } else {
+                _jePlayerBindings = {
+                    0: JSON.parse(JSON.stringify(newPlayerMap)),
+                    1: _jeGetDefaultBindingsForPlayer(1)
+                };
+            }
+            _jeBindings = _jePlayerBindings[0] || {};
+            window._jePlayerBindings = _jePlayerBindings;
+            window._jeBindings = _jeBindings;
+
+            var buttons = getActiveInputButtons();
+            for (var p = 0; p < 2; p++) {
+                for (var i = 0; i < buttons.length; i++) {
+                    _jeEnsureBinding(buttons[i].id, p);
+                }
+            }
+
+            // Clear debounce simulation states on rebind
+            _jeGpActiveState = {};
+            _jeSimulatedState = {};
+            _jeComboTriggered = {};
+            console.log('[JellyEmu Input] Live bindings updated in running engine:', _jePlayerBindings);
+        } catch (e) {
+            console.error('[JellyEmu Input] Error applying live bindings:', e);
+        }
+    }
+    window._jeApplyNewBindings = _jeApplyNewBindings;
+
+    window.addEventListener('jellyemu:bindings-changed', function (ev) {
+        if (ev && ev.detail) {
+            _jeApplyNewBindings(ev.detail);
+        } else if (window._jePlayerBindings) {
+            _jeApplyNewBindings(window._jePlayerBindings);
+        }
+    });
+
     if (userId) {
         var prefHeaders = {};
         if (token) prefHeaders['Authorization'] = 'MediaBrowser Token="' + token + '"';
@@ -759,7 +802,8 @@
     // - simulateInput bridge with Multi-Player, Hold (duration), and Combo support -
     function _jeSimulate(idx, pressed, playerIdx) {
         playerIdx = (typeof playerIdx === 'number') ? playerIdx : 0;
-        var pBinds = _jePlayerBindings[playerIdx] || _jeBindings;
+        var allBinds = window._jePlayerBindings || _jePlayerBindings;
+        var pBinds = (allBinds && allBinds[playerIdx]) ? allBinds[playerIdx] : (window._jeBindings || _jeBindings);
         var bind = pBinds ? pBinds[idx] : null;
         var actType = (bind && bind.activation) ? bind.activation : 'press';
         var holdSec = (bind && bind.holdDuration) ? bind.holdDuration : 5;
@@ -810,16 +854,23 @@
         playerIdx = (typeof playerIdx === 'number') ? playerIdx : 0;
         var results = [];
         if (gpStr === undefined || gpStr === null || gpStr === '') return results;
-        var str = String(gpStr);
-        var pBinds = _jePlayerBindings[playerIdx] || _jeBindings;
+        var str = String(gpStr).toUpperCase();
+        var allBinds = window._jePlayerBindings || _jePlayerBindings;
+        var pBinds = (allBinds && allBinds[playerIdx]) ? allBinds[playerIdx] : (window._jeBindings || _jeBindings);
 
         for (var idx in pBinds) {
             var b = pBinds[idx];
             if (!b) continue;
-            if (b.gp1 === str || b.gp2 === str) {
-                results.push(parseInt(idx, 10));
-            } else if (typeof gpStr === 'number' && (b.gp1 === _jeButtonLabel(gpStr) || b.gp2 === _jeButtonLabel(gpStr))) {
-                results.push(parseInt(idx, 10));
+            var numIdx = parseInt(idx, 10);
+            var g1 = b.gp1 ? String(b.gp1).toUpperCase() : '';
+            var g2 = b.gp2 ? String(b.gp2).toUpperCase() : '';
+            if (g1 === str || g2 === str) {
+                results.push(numIdx);
+            } else if (typeof gpStr === 'number') {
+                var btnLbl = _jeButtonLabel(gpStr).toUpperCase();
+                if (g1 === btnLbl || g2 === btnLbl) {
+                    results.push(numIdx);
+                }
             }
         }
         return results;
@@ -835,9 +886,10 @@
         if (_jeKbDown[kc]) return;
         _jeKbDown[kc] = true;
 
-        for (var pIdx in _jePlayerBindings) {
+        var allBinds = window._jePlayerBindings || _jePlayerBindings;
+        for (var pIdx in allBinds) {
             var numP = parseInt(pIdx, 10);
-            var pBinds = _jePlayerBindings[numP];
+            var pBinds = allBinds[numP];
             if (!pBinds) continue;
             for (var idx in pBinds) {
                 var b = pBinds[idx];
@@ -857,9 +909,10 @@
         var kc = ev.keyCode;
         _jeKbDown[kc] = false;
 
-        for (var pIdx in _jePlayerBindings) {
+        var allBinds = window._jePlayerBindings || _jePlayerBindings;
+        for (var pIdx in allBinds) {
             var numP = parseInt(pIdx, 10);
-            var pBinds = _jePlayerBindings[numP];
+            var pBinds = allBinds[numP];
             if (!pBinds) continue;
             for (var idx in pBinds) {
                 var b = pBinds[idx];
@@ -1118,10 +1171,11 @@
             }
             // Check Hotkey combos (e.g. EXIT GAME combos like SELECT+START or single hotkey button) on primary controller
             if (!_jeActiveGpListen && padPlayerIdx === 0) {
-                for (var hIdx in _jeBindings) {
+                var hotkeyBinds = window._jeBindings || _jeBindings;
+                for (var hIdx in hotkeyBinds) {
                     var numIdx = parseInt(hIdx, 10);
                     if (numIdx < 24) continue;
-                    var hBind = _jeBindings[numIdx];
+                    var hBind = hotkeyBinds[numIdx];
                     if (!hBind) continue;
 
                     ['gp1', 'gp2'].forEach(function (gField) {

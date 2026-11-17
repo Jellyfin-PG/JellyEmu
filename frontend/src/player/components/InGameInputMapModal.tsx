@@ -473,6 +473,16 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
       (window as any)._jePlayerBindings = updatedPlayerMap;
       (window as any)._jeBindings = updatedPlayerMap[0] || {};
 
+      // Immediately propagate to running emulator input engine
+      if (typeof (window as any)._jeApplyNewBindings === 'function') {
+        (window as any)._jeApplyNewBindings(updatedPlayerMap);
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('jellyemu:bindings-changed', { detail: updatedPlayerMap }));
+      } catch (e) {
+        console.error('Failed to dispatch jellyemu:bindings-changed event', e);
+      }
+
       if (config.userId) {
         await PlayerBridge.saveBindings(
           config.userId,
