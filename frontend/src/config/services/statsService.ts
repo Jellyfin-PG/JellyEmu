@@ -63,7 +63,11 @@ const CONSOLE_COLORS: Record<string, string> = {
   'Sega CD': '#8e44ad',
   'Sega 32X': '#d35400',
   'WonderSwan': '#1abc9c',
-  'ColecoVision': '#7f8c8d'
+  'ColecoVision': '#7f8c8d',
+  'Nintendo Switch': '#00d2ff',
+  'Nintendo Switch 2': '#e60012',
+  'Flash': '#ff1300',
+  'Adobe Flash': '#ff1300'
 };
 
 export function getConsoleColor(platformName: string): string {
@@ -83,6 +87,7 @@ export function getConsoleColor(platformName: string): string {
   if (c.includes('atari')) return '#e21b22';
   if (c.includes('turbografx') || c.includes('pc engine')) return '#ff5722';
   if (c.includes('neogeo') || c.includes('neo geo')) return '#00bcd4';
+  if (c.includes('flash')) return '#ff1300';
 
   let hash = 0;
   for (let i = 0; i < platformName.length; i++) {
@@ -107,6 +112,9 @@ const EJS_UNSUPPORTED_PLATFORMS = new Set([
   'Wii',
   'Wii U',
   'Nintendo Switch',
+  'Nintendo Switch 2',
+  'Flash',
+  'Adobe Flash',
   'Nintendo 3DS',
   'PlayStation Vita',
   'Windows',

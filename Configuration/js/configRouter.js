@@ -234,7 +234,7 @@
             var ejsUnsupportedPlatforms = new Set([
                 "Dreamcast","PlayStation 2","PlayStation 3",
                 "Xbox","Xbox 360",
-                "GameCube","Wii","Wii U","Nintendo Switch","Nintendo 3DS",
+                "GameCube","Wii","Wii U","Nintendo Switch","Nintendo Switch 2","Flash","Adobe Flash","Nintendo 3DS",
                 "PlayStation Vita","Windows","Linux","MacOS","Android","Unsupported"
             ]);
             

@@ -158,8 +158,19 @@ namespace JellyEmu.Services
 
                 object? jObjectPayload = BuildJObjectPayload(payloadDefinition);
 
-                pluginInterface.GetMethod("RegisterTransformation")?.Invoke(null, new object?[] { jObjectPayload });
-                _logger.LogInformation("[JellyEmu] Successfully registered with {PluginName} plugin.", pluginName);
+                MethodInfo? registerMethod = (jObjectPayload != null ? pluginInterface.GetMethod("RegisterTransformation", new[] { jObjectPayload.GetType() }) : null)
+                    ?? pluginInterface.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .FirstOrDefault(m => m.Name == "RegisterTransformation" && m.GetParameters().Length == 1);
+
+                if (registerMethod != null)
+                {
+                    registerMethod.Invoke(null, new object?[] { jObjectPayload });
+                    _logger.LogInformation("[JellyEmu] Successfully registered with {PluginName} plugin.", pluginName);
+                }
+                else
+                {
+                    _logger.LogWarning("[JellyEmu] Could not find 'RegisterTransformation' method on {PluginName} plugin interface.", pluginName);
+                }
             }
             catch (Exception ex)
             {
@@ -175,7 +186,12 @@ namespace JellyEmu.Services
             {
                 Type? pluginInterface = ResolvePluginInterface();
                 string pluginName = _resolvedPluginName ?? "FileTransformation";
-                pluginInterface?.GetMethod("DeregisterTransformation")?.Invoke(null, new object[] { RegistrationId });
+
+                MethodInfo? deregisterMethod = pluginInterface?.GetMethod("DeregisterTransformation", new[] { typeof(Guid) })
+                    ?? pluginInterface?.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .FirstOrDefault(m => m.Name == "DeregisterTransformation" && m.GetParameters().Length == 1);
+
+                deregisterMethod?.Invoke(null, new object[] { RegistrationId });
                 _logger.LogInformation("[JellyEmu] Deregistered from {PluginName} plugin.", pluginName);
             }
             catch (Exception ex)

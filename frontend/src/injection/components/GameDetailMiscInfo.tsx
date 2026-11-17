@@ -33,7 +33,7 @@ const KNOWN_REGIONS = new Set([
 
 const UNSUPPORTED_PLATFORMS = new Set([
   'Dreamcast', 'PlayStation 3', 'Xbox', 'Xbox 360', 'GameCube', 'Wii', 'Wii U',
-  'Nintendo Switch', 'PlayStation Vita', 'Windows', 'Linux', 'MacOS', 'Android', 'Unsupported'
+  'Nintendo Switch', 'Nintendo Switch 2', 'Flash', 'Adobe Flash', 'PlayStation Vita', 'Windows', 'Linux', 'MacOS', 'Android', 'Unsupported'
 ]);
 
 const containerVariants = {

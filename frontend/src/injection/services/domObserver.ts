@@ -16,7 +16,7 @@ export const KNOWN_REGIONS = new Set([
 
 export const UNSUPPORTED_PLATFORMS = new Set([
   'Dreamcast', 'PlayStation 3', 'Xbox', 'Xbox 360', 'GameCube', 'Wii', 'Wii U',
-  'Nintendo Switch', 'PlayStation Vita', 'Windows', 'Linux', 'MacOS', 'Android', 'Unsupported'
+  'Nintendo Switch', 'Nintendo Switch 2', 'Flash', 'Adobe Flash', 'PlayStation Vita', 'Windows', 'Linux', 'MacOS', 'Android', 'Unsupported'
 ]);
 
 export const ROM_EXTENSIONS = new Set([
@@ -24,7 +24,8 @@ export const ROM_EXTENSIONS = new Set([
   'gb', 'gbc', 'gba', 'nds', 'vb', 'sms', 'gg', 'md', 'smd', 'gen', '68k', '32x',
   'pbp', 'cue', 'iso', 'chd', 'gdi', 'cdi', 'mdf', 'cso', 'a26', 'a78', 'lnx',
   'jag', 'j64', 'ws', 'wsc', 'pce', 'col', 'cv', 'ngp', 'ngc', 'zip', 'd64',
-  't64', 'crt', 'tap', 'prg', 'adf', 'dms', 'ipf', 'adz', 'dsk', 'bin', '3ds', 'cci', 'cia'
+  't64', 'crt', 'tap', 'prg', 'adf', 'dms', 'ipf', 'adz', 'dsk', 'bin', '3ds', 'cci', 'cia',
+  'nsp', 'xci', 'nsz', 'xcz', 'nup', 'swf', 'spl'
 ]);
 
 export function isPlayableGame(tags?: string[]): boolean {

@@ -45,7 +45,7 @@
     JE.ejsUnsupportedPlatforms = new Set([
         "Dreamcast","PlayStation 3",
         "Xbox","Xbox 360",
-        "GameCube","Wii","Wii U","Nintendo Switch",
+        "GameCube","Wii","Wii U","Nintendo Switch","Nintendo Switch 2","Flash","Adobe Flash",
         "PlayStation Vita","Windows","Linux","MacOS","Android","Unsupported"
     ]);
 

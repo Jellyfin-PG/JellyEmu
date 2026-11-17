@@ -33,6 +33,21 @@ namespace JellyEmu.Tests
         [InlineData("C:\\Games\\Android\\Minecraft.apk", "Android")]
         [InlineData("C:\\Games\\android\\DeadCells.xapk", "Android")]
         [InlineData("C:\\Games\\GOG\\Game.cue", "Unknown")] // "gog" folder alias removed, cue is ambiguous without platform
+        [InlineData("Super Mario Odyssey.nsp", "Nintendo Switch")]
+        [InlineData("The Legend of Zelda.xci", "Nintendo Switch")]
+        [InlineData("Metroid Dread.nsz", "Nintendo Switch")]
+        [InlineData("Animal Crossing.xcz", "Nintendo Switch")]
+        [InlineData("C:\\Games\\Nintendo Switch\\Game.zip", "Nintendo Switch")]
+        [InlineData("C:\\Games\\Switch\\Game.zip", "Nintendo Switch")]
+        [InlineData("C:\\Games\\Switch 1\\Game.zip", "Nintendo Switch")]
+        [InlineData("Super Mario Switch 2 Game.nup", "Nintendo Switch 2")]
+        [InlineData("C:\\Games\\Nintendo Switch 2\\Game.zip", "Nintendo Switch 2")]
+        [InlineData("C:\\Games\\Switch 2\\Game.zip", "Nintendo Switch 2")]
+        [InlineData("C:\\Games\\nx2\\Game.zip", "Nintendo Switch 2")]
+        [InlineData("Alien Hominid.swf", "Flash")]
+        [InlineData("OldAnimation.spl", "Flash")]
+        [InlineData("C:\\Games\\Flash\\FancyPants.zip", "Flash")]
+        [InlineData("C:\\Games\\Adobe Flash\\FancyPants.zip", "Flash")]
         public void ResolvePlatform_ShouldResolveCorrectly(string path, string expected)
         {
             // Act
@@ -59,6 +74,9 @@ namespace JellyEmu.Tests
         [InlineData("Sonic the Hedgehog (Japan) (Europe)", "Sonic the Hedgehog")]
         [InlineData("Crash Bandicoot (USA) (Disc 1)", "Crash Bandicoot")]
         [InlineData("Legend of Zelda, The (USA)", "Legend of Zelda, The")]
+        [InlineData("Mario Kart (Switch 2)", "Mario Kart")]
+        [InlineData("Fancy Pants (Flash)", "Fancy Pants")]
+        [InlineData("Zelda (Nintendo Switch)", "Zelda")]
         public void CleanDisplayName_ShouldRemoveBracketsAndTokens(string input, string expected)
         {
             // Act
@@ -210,6 +228,28 @@ namespace JellyEmu.Tests
             var result = resolver.ResolvePath(itemArgs);
             Assert.NotNull(result);
             Assert.Equal("Super Mario World", result.Name);
+        }
+
+        [Theory]
+        [InlineData("game.nsp", true)]
+        [InlineData("game.xci", true)]
+        [InlineData("game.nsz", true)]
+        [InlineData("game.xcz", true)]
+        [InlineData("game.nup", true)]
+        [InlineData("game.swf", true)]
+        [InlineData("game.spl", true)]
+        public void IsRomPath_SwitchAndFlash_ShouldReturnTrue(string fileName, bool expected)
+        {
+            Assert.Equal(expected, RomExtensions.IsRomPath(fileName));
+        }
+
+        [Theory]
+        [InlineData("Nintendo Switch", false)]
+        [InlineData("Nintendo Switch 2", false)]
+        [InlineData("Flash", false)]
+        public void IsEjsSupported_SwitchAndFlash_ShouldReturnFalse(string platformTag, bool expected)
+        {
+            Assert.Equal(expected, PlatformResolver.IsEjsSupported(platformTag));
         }
     }
 }

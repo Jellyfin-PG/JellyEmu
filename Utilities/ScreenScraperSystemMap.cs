@@ -31,6 +31,7 @@ namespace JellyEmu.Utilities
             { "Wii", 14 },
             { "Wii U", 18 },
             { "Nintendo Switch", 225 },
+            { "Switch", 225 },
 
             // Nintendo Handheld
             { "Game Boy", 9 },

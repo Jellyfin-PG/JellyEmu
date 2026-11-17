@@ -168,7 +168,17 @@ namespace JellyEmu
                 { "xbox", "Xbox" }, { "xbox 360", "Xbox 360" }, { "x360", "Xbox 360" },
                 { "gamecube", "GameCube" }, { "nintendo gamecube", "GameCube" }, { "gc", "GameCube" },
                 { "wii", "Wii" }, { "nintendo wii", "Wii" }, { "wii u", "Wii U" }, { "wiiu", "Wii U" },
+                // Nintendo Switch
                 { "switch", "Nintendo Switch" }, { "nintendo switch", "Nintendo Switch" },
+                { "switch 1", "Nintendo Switch" }, { "switch1", "Nintendo Switch" },
+                { "nintendo switch 1", "Nintendo Switch" }, { "nintendo switch1", "Nintendo Switch" },
+                { "nx", "Nintendo Switch" }, { "ns", "Nintendo Switch" },
+                // Nintendo Switch 2
+                { "switch 2", "Nintendo Switch 2" }, { "switch2", "Nintendo Switch 2" },
+                { "nintendo switch 2", "Nintendo Switch 2" }, { "nintendo switch2", "Nintendo Switch 2" },
+                { "nx2", "Nintendo Switch 2" }, { "ns2", "Nintendo Switch 2" },
+                // Flash
+                { "flash", "Flash" }, { "adobe flash", "Flash" }, { "macromedia flash", "Flash" }, { "swf", "Flash" },
                 { "psvita", "PlayStation Vita" }, { "ps vita", "PlayStation Vita" }, { "playstation vita", "PlayStation Vita" }, { "play station vita", "PlayStation Vita" },
                 { "windows", "Windows" }, { "win", "Windows" },
                 { "linux", "Linux" },
@@ -182,6 +192,9 @@ namespace JellyEmu
                 { ".gcm", "GameCube" }, { ".gcz", "GameCube" }, { ".rvz", "Wii" },
                 { ".wbfs", "Wii" }, { ".wad", "Wii" }, { ".xex", "Xbox 360" },
                 { ".xiso", "Xbox" }, { ".vpk", "PlayStation Vita" },
+                { ".nsp", "Nintendo Switch" }, { ".xci", "Nintendo Switch" }, { ".nsz", "Nintendo Switch" }, { ".xcz", "Nintendo Switch" },
+                { ".nup", "Nintendo Switch 2" },
+                { ".swf", "Flash" }, { ".spl", "Flash" },
                 { ".exe", "Windows" }, { ".msi", "Windows" },
                 { ".appimage", "Linux" }, { ".deb", "Linux" }, { ".flatpak", "Linux" }, { ".snap", "Linux" }, { ".sh", "Linux" }, { ".x86_64", "Linux" }, { ".x86", "Linux" },
                 { ".app", "MacOS" }, { ".dmg", "MacOS" }, { ".pkg", "MacOS" },
@@ -269,9 +282,9 @@ namespace JellyEmu
                 var inner = m.Groups[1].Value.Trim();
                 if (inner.StartsWith("igdb-", StringComparison.OrdinalIgnoreCase) ||
                     inner.StartsWith("rawg-", StringComparison.OrdinalIgnoreCase)) return "";
-                if (Aliases.ContainsKey(inner)) return "";
+                if (Aliases.ContainsKey(inner) || LibraryOnlyAliases.ContainsKey(inner)) return "";
                 var allParts = inner.Split(',', StringSplitOptions.TrimEntries);
-                if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p))) return "";
+                if (allParts.Length > 0 && allParts.All(p => RegionAliases.ContainsKey(p) || Aliases.ContainsKey(p) || LibraryOnlyAliases.ContainsKey(p))) return "";
                 if (DiscTokenRegex.IsMatch("(" + inner + ")")) return "";
                 return m.Value;
             });
@@ -305,7 +318,7 @@ namespace JellyEmu
             var normalizedPath = dirPath.Replace(Path.DirectorySeparatorChar == '/' ? '\\' : '/', Path.DirectorySeparatorChar);
             var dir = new DirectoryInfo(normalizedPath);
 
-            var brandPrefixRegex = new Regex(@"^(?:sony|nintendo|sega|atari|nec|commodore|snk)\s+(?=\S)|^(?:sony|nintendo|sega|atari|nec|commodore|snk)\s*-\s*(?=\S)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            var brandPrefixRegex = new Regex(@"^(?:sony|nintendo|sega|atari|nec|commodore|snk|adobe|macromedia)\s+(?=\S)|^(?:sony|nintendo|sega|atari|nec|commodore|snk|adobe|macromedia)\s*-\s*(?=\S)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
             for (int depth = 0; depth < 3 && dir != null; depth++, dir = dir.Parent)
             {
@@ -385,6 +398,7 @@ namespace JellyEmu
                 ".cso", ".zip", ".7z", ".d64", ".t64", ".crt", ".tap", ".prg", ".adf", ".dms", ".ipf",
                 ".adz", ".dsk", ".bin", ".3ds", ".cci", ".cia", ".gcm", ".gcz", ".rvz", ".wbfs", ".wad",
                 ".xex", ".xiso", ".vpk", ".j3u", ".exe", ".msi", ".elf", ".nrg",
+                ".nsp", ".xci", ".nsz", ".xcz", ".nup", ".swf", ".spl",
                 ".appimage", ".deb", ".flatpak", ".snap", ".sh", ".x86_64", ".x86",
                 ".app", ".dmg", ".pkg", ".apk", ".xapk"
             };
