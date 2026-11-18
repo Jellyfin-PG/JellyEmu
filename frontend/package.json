@@ -1,7 +1,7 @@
 {
   "name": "jellyemu-frontend",
   "private": true,
-  "version": "0.9.3.0",
+  "version": "0.9.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

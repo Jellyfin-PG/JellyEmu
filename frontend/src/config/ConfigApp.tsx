@@ -28,7 +28,7 @@ export const ConfigApp: React.FC = () => {
     <HeroUIProvider>
       <div className="dark text-foreground bg-background min-h-screen w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Header */}
-        <ConfigHeader version="0.9.3.0" />
+        <ConfigHeader version="0.9.4.1" />
 
         {/* HeroUI Modern Solid Full-Width Segmented Navigation */}
         <div className="w-full">
