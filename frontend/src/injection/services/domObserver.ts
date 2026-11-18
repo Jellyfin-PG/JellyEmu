@@ -358,6 +358,8 @@ export const domObserver = {
       const card = menuBtn.closest('.card[data-jellyemu-game="1"]');
       if (card) {
         domObserver.lastCardId = card.getAttribute('data-id');
+      } else {
+        domObserver.lastCardId = null;
       }
     }, true);
 
@@ -379,8 +381,15 @@ export const domObserver = {
                 ev.preventDefault();
                 ev.stopPropagation();
                 ev.stopImmediatePropagation();
-                const container = document.querySelector('.dialogContainer') || document.querySelector('.dialogBackdrop');
-                if (container) container.remove();
+                try {
+                  const cancelBtn = sheet.querySelector('button[data-action="cancel"], .actionSheetCancelButton, .btnCancel') as HTMLElement | null;
+                  if (cancelBtn) {
+                    cancelBtn.click();
+                  } else if ((window as any).dialogHelper && typeof (window as any).dialogHelper.close === 'function') {
+                    const dlg = sheet.closest('.dialogContainer') || sheet;
+                    (window as any).dialogHelper.close(dlg);
+                  }
+                } catch {}
                 injectionService.launchEmulator(itemId);
               }, true);
             }

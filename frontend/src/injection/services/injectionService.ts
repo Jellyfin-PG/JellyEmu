@@ -309,7 +309,19 @@ export const injectionService = {
   },
 
   launchEmulator: (itemId: string, slot?: number, core?: string): void => {
-    document.querySelectorAll('.dialogBackdrop, .dialogContainer, .focuscontainer-fullscreen').forEach(el => el.remove());
+    // Gracefully dismiss open action sheets/dialogs without corrupting Jellyfin's dialog promises
+    try {
+      const activeDialog = document.querySelector('.dialogContainer, .actionSheet') as HTMLElement | null;
+      if (activeDialog) {
+        const cancelBtn = activeDialog.querySelector('button[data-action="cancel"], .actionSheetCancelButton, .btnCancel') as HTMLElement | null;
+        if (cancelBtn) {
+          cancelBtn.click();
+        } else if ((window as any).dialogHelper && typeof (window as any).dialogHelper.close === 'function') {
+          (window as any).dialogHelper.close(activeDialog);
+        }
+      }
+    } catch {}
+    document.querySelectorAll('#jellyemu-iframe, .jellyemu-overlay').forEach(el => el.remove());
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
 

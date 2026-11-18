@@ -126,7 +126,7 @@ export function initInjection() {
       return;
     }
 
-    // C. Non-JellyEmu routes: Hide our custom pages
+    // C. Non-JellyEmu routes: Hide our custom pages and restore Jellyfin views
     if (settingsPage) {
       settingsPage.classList.add('hide');
       settingsPage.style.display = 'none';
@@ -135,6 +135,14 @@ export function initInjection() {
       savesPage.classList.add('hide');
       savesPage.style.display = 'none';
     }
+
+    // Unhide Jellyfin's current active view if previously hidden by JellyEmu
+    const viewPages = document.querySelectorAll('.view-manager > .page, .mainAnimatedPages > .page, .skinBody > .page');
+    viewPages.forEach(p => {
+      if (p.id !== 'jellyemu-settings-page' && p.id !== 'jellyemu-saves-page') {
+        p.classList.remove('hide');
+      }
+    });
   };
 
   handlePageRoutes();
@@ -203,16 +211,12 @@ export function initInjection() {
   // Patch context menus (action sheets)
   domObserver.observeActionSheets();
 
-  // Window message & BroadcastChannel lifecycle handling
+  // Window message & BroadcastChannel lifecycle handling (only clean up JellyEmu's own overlays)
   const cleanupOverlays = () => {
-    document.querySelectorAll('.dialogBackdrop, .dialogContainer, .focuscontainer-fullscreen, #jellyemu-iframe').forEach(el => el.remove());
+    document.querySelectorAll('#jellyemu-iframe, .jellyemu-overlay').forEach(el => el.remove());
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
   };
-
-  window.addEventListener('pageshow', cleanupOverlays);
-  window.addEventListener('popstate', cleanupOverlays);
-  document.addEventListener('viewshow', cleanupOverlays);
 
   try {
     const exitChannel = new BroadcastChannel('jellyemu-exit');

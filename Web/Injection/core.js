@@ -127,13 +127,22 @@
     };
 
     JE.dismissActionSheet = function(sheetRoot) {
-        const container = document.querySelector('.dialogContainer');
-        const backdrop = document.querySelector('.dialogBackdrop');
+        try {
+            var cancelBtn = sheetRoot.querySelector('button[data-action="cancel"], .actionSheetCancelButton, .btnCancel');
+            if (cancelBtn) {
+                cancelBtn.click();
+                return;
+            }
+            if (window.dialogHelper && typeof window.dialogHelper.close === 'function') {
+                var dlg = sheetRoot.closest('.dialogContainer') || sheetRoot;
+                window.dialogHelper.close(dlg);
+                return;
+            }
+        } catch (_) {}
+        var container = document.querySelector('.dialogContainer');
+        var backdrop = document.querySelector('.dialogBackdrop');
         if (container) container.remove();
         if (backdrop) backdrop.remove();
-
-        var dialog = sheetRoot.closest('.dialog') || sheetRoot.closest('[data-history]') || sheetRoot.parentElement;
-        if (dialog && dialog.parentNode) dialog.remove();
     };
 
     window.addEventListener('message', function(e) {
