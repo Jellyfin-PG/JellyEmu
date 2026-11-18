@@ -127,6 +127,47 @@ namespace JellyEmu.Tests
         }
 
         [Fact]
+        public async Task Rom_SetsNoCryptoFlag_WhenServingDecrypted3dsRomWithStaleHeader()
+        {
+            var (controller, libraryManagerMock, tempDir) = CreateController();
+            try
+            {
+                var image = N3dsRomInspectorTests.BuildNcsd(bootPlain: true, bootNoCryptoFlag: false);
+                var romPath = Path.Combine(tempDir, "Game (Europe) Decrypted.3ds");
+                await File.WriteAllBytesAsync(romPath, image);
+
+                var itemId = Guid.NewGuid();
+                var mockItem = new Mock<BaseItem>();
+                mockItem.Setup(i => i.Path).Returns(romPath);
+                libraryManagerMock.Setup(l => l.GetItemById(itemId)).Returns(mockItem.Object);
+
+                var result = await controller.Rom(itemId.ToString("N"));
+
+                var fileResult = Assert.IsType<FileStreamResult>(result);
+                Assert.True(fileResult.EnableRangeProcessing);
+                using var served = new MemoryStream();
+                await fileResult.FileStream.CopyToAsync(served);
+                fileResult.FileStream.Dispose();
+
+                var bytes = served.ToArray();
+                Assert.Equal(image.Length, bytes.Length);
+                Assert.Equal(0x04, bytes[0x4000 + 0x18F]);
+                bytes[0x4000 + 0x18F] = image[0x4000 + 0x18F];
+                Assert.Equal(image, bytes);
+
+                // The library file itself is left untouched.
+                Assert.Equal(image, await File.ReadAllBytesAsync(romPath));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+        }
+
+        [Fact]
         public async Task DownloadZip_ReturnsNotFound_WhenItemMissingOrEmpty()
         {
             var (controller, libraryManagerMock, tempDir) = CreateController();
