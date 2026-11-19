@@ -659,6 +659,30 @@
     }
     _jeLoadBindings(null);
 
+    function _jeDisableEjsControls() {
+        var e = window.EJS_emulator;
+        if (!e) return;
+        if (e.controls) {
+            for (var p = 0; p < 4; p++) {
+                var ejsControls = e.controls[p];
+                if (ejsControls) {
+                    Object.keys(ejsControls).forEach(function (k) {
+                        if (ejsControls[k] && typeof ejsControls[k] === 'object') {
+                            ejsControls[k].value = 0;
+                            ejsControls[k].value2 = '';
+                            if (ejsControls[k].default_value !== undefined) ejsControls[k].default_value = 0;
+                            if (ejsControls[k].default_value2 !== undefined) ejsControls[k].default_value2 = '';
+                        }
+                    });
+                }
+            }
+        }
+        if (typeof e.keyChange === 'function' && !e.keyChange.__jePatched) {
+            e.keyChange = function () {};
+            e.keyChange.__jePatched = true;
+        }
+    }
+
     // Apply live dynamic bindings into running engine without page reload
     function _jeApplyNewBindings(newPlayerMap) {
         if (!newPlayerMap || typeof newPlayerMap !== 'object') return;
@@ -683,10 +707,24 @@
                 }
             }
 
-            // Clear debounce simulation states on rebind
+            // Clear EJS internal controls so they never execute cleared or default inputs
+            _jeDisableEjsControls();
+
+            // Release any held simulation inputs in the gameManager
+            var g = gm();
+            if (g && typeof g.simulateInput === 'function') {
+                for (var pl = 0; pl < 4; pl++) {
+                    for (var bi = 0; bi < buttons.length; bi++) {
+                        try { g.simulateInput(pl, buttons[bi].id, 0); } catch (_) {}
+                    }
+                }
+            }
+
+            // Clear debounce simulation states and keyboard down states on rebind
             _jeGpActiveState = {};
             _jeSimulatedState = {};
             _jeComboTriggered = {};
+            _jeKbDown = {};
             console.log('[JellyEmu Input] Live bindings updated in running engine:', _jePlayerBindings);
         } catch (e) {
             console.error('[JellyEmu Input] Error applying live bindings:', e);
@@ -899,6 +937,7 @@
                         if (!_jeKbDown[b.kb1] || !_jeKbDown[b.kb2]) continue;
                     }
                     ev.preventDefault();
+                    ev.stopPropagation();
                     _jeSimulate(parseInt(idx, 10), true, numP);
                 }
             }
@@ -918,6 +957,8 @@
                 var b = pBinds[idx];
                 if (!b) continue;
                 if (b.kb1 === kc || b.kb2 === kc) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
                     _jeSimulate(parseInt(idx, 10), false, numP);
                 }
             }
@@ -1208,23 +1249,10 @@
             0: {}, 1: {}, 2: {}, 3: {}
         };
 
-        function _jeDisableEjsControls() {
-            var e = window.EJS_emulator;
-            if (!e || !e.controls) return;
-            for (var p = 0; p < 4; p++) {
-                var ejsControls = e.controls[p];
-                if (ejsControls) {
-                    Object.keys(ejsControls).forEach(function (k) {
-                        if (ejsControls[k] && ejsControls[k].value2 !== undefined) {
-                            ejsControls[k].value2 = '';
-                        }
-                    });
-                }
-            }
-        }
         _jeDisableEjsControls();
         setTimeout(_jeDisableEjsControls, 500);
         setTimeout(_jeDisableEjsControls, 1500);
+        setTimeout(_jeDisableEjsControls, 3000);
 
         function _jeApplyVirtualControls(attemptsLeft) {
             var e = emu();

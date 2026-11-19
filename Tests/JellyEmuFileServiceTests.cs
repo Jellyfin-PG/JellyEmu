@@ -243,5 +243,57 @@ namespace JellyEmu.Tests
                 Directory.Delete(tempDir, true);
             }
         }
+
+        [Fact]
+        public void GetSafeUserSavesDir_ResolvesToExistingNonHyphenatedFolder_WhenHyphenatedGuidPassed()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var guid = Guid.NewGuid();
+                var nonHyphenated = guid.ToString("N");
+                var hyphenated = guid.ToString("D");
+
+                var expectedDir = Path.Combine(tempDir, "jellyemu-saves", nonHyphenated);
+                Directory.CreateDirectory(expectedDir);
+
+                var appPaths = new MockAppPaths(tempDir);
+                var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+                var resolved = service.GetSafeUserSavesDir(hyphenated);
+                Assert.Equal(expectedDir, resolved);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
+        [Fact]
+        public void GetSafeUserSavesDir_ResolvesToExistingHyphenatedFolder_WhenNonHyphenatedGuidPassed()
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var guid = Guid.NewGuid();
+                var nonHyphenated = guid.ToString("N");
+                var hyphenated = guid.ToString("D");
+
+                var expectedDir = Path.Combine(tempDir, "jellyemu-saves", hyphenated);
+                Directory.CreateDirectory(expectedDir);
+
+                var appPaths = new MockAppPaths(tempDir);
+                var service = new JellyEmuFileService(null!, appPaths, NullLogger<JellyEmuFileService>.Instance);
+
+                var resolved = service.GetSafeUserSavesDir(nonHyphenated);
+                Assert.Equal(expectedDir, resolved);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

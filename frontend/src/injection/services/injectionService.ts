@@ -13,10 +13,19 @@ import {
 
 export const injectionService = {
   getCurrentUserId: (): string | null => {
+    const normalizeUserId = (id: string | null): string | null => {
+      if (!id) return null;
+      const clean = id.trim().replace(/[{}]/g, '');
+      if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clean) || /^[0-9a-fA-F]{32}$/.test(clean)) {
+        return clean.replace(/-/g, '').toLowerCase();
+      }
+      return clean;
+    };
+
     try {
       if ((window as any).ApiClient && typeof (window as any).ApiClient.getCurrentUserId === 'function') {
         const id = (window as any).ApiClient.getCurrentUserId();
-        if (id) return id;
+        if (id) return normalizeUserId(id);
       }
     } catch { }
 
@@ -26,11 +35,11 @@ export const injectionService = {
       if (qIdx !== -1) {
         const params = new URLSearchParams(hash.substring(qIdx));
         const uid = params.get('userId') || params.get('userid') || params.get('u');
-        if (uid) return uid;
+        if (uid) return normalizeUserId(uid);
       }
       const sParams = new URLSearchParams(window.location.search || '');
       const sUid = sParams.get('userId') || sParams.get('userid') || sParams.get('u');
-      if (sUid) return sUid;
+      if (sUid) return normalizeUserId(sUid);
     } catch { }
 
     try {
@@ -38,7 +47,7 @@ export const injectionService = {
       if (creds) {
         const parsed = JSON.parse(creds);
         const server = parsed.Servers?.[0];
-        if (server?.UserId) return server.UserId;
+        if (server?.UserId) return normalizeUserId(server.UserId);
       }
     } catch { }
 
@@ -46,7 +55,22 @@ export const injectionService = {
   },
 
   getAuthHeaders: (): Record<string, string> => {
-    const token = (window as any).ApiClient ? (window as any).ApiClient.accessToken() : '';
+    let token = '';
+    try {
+      if ((window as any).ApiClient && typeof (window as any).ApiClient.accessToken === 'function') {
+        token = (window as any).ApiClient.accessToken() || '';
+      }
+    } catch { }
+
+    if (!token) {
+      try {
+        const creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
+        const servers = creds.Servers || [];
+        const first = servers.find((s: any) => s.AccessToken);
+        if (first?.AccessToken) token = first.AccessToken;
+      } catch { }
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };

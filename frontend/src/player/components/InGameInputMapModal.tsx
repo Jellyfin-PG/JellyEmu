@@ -18,7 +18,8 @@ import {
   Cpu,
   User,
   Users,
-  Flame
+  Flame,
+  X
 } from 'lucide-react';
 import { PlayerBridge } from '../services/playerBridge';
 import {
@@ -306,6 +307,14 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
   // Determine current active player index from tab
   const activePlayerIdx = isPlay ? 0 : (activeTab.startsWith('p') ? parseInt(activeTab.slice(1), 10) : 0);
 
+  // Keep global popup open indicator synchronized so underlying emulator engines suppress keydown
+  useEffect(() => {
+    (window as any)._jePopupOpen = isOpen;
+    return () => {
+      (window as any)._jePopupOpen = false;
+    };
+  }, [isOpen]);
+
   // Fetch system scheme and effective player bindings on modal open
   useEffect(() => {
     if (!isOpen) {
@@ -534,6 +543,42 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
       handleSavePlayerBindings(updatedPlayerMap);
     },
     [playerBindings, handleSavePlayerBindings]
+  );
+
+  // Clear an individual binding (keyboard or gamepad)
+  const handleClearBinding = useCallback(
+    (playerIdx: number, btnId: number, field: 'kb1' | 'kb2' | 'gp1' | 'gp2', btnLabel?: string) => {
+      // Cancel active listener if it was on this button/field
+      if (listeningKey?.playerIdx === playerIdx && listeningKey?.id === btnId && listeningKey?.field === field) {
+        setListeningKey(null);
+      }
+      if (listeningGp?.playerIdx === playerIdx && listeningGp?.id === btnId && listeningGp?.field === field) {
+        setListeningGp(null);
+        setCurrentGpCombo([]);
+      }
+
+      const currentPBinds = { ...(playerBindings[playerIdx] || {}) };
+      const currentBtnBind = currentPBinds[btnId] || { kb1: 0, kb2: 0, gp1: '', gp2: '' };
+
+      const isKb = field === 'kb1' || field === 'kb2';
+      const updatedPBinds: Record<number, InputBinding> = {
+        ...currentPBinds,
+        [btnId]: {
+          ...currentBtnBind,
+          [field]: isKb ? 0 : ''
+        }
+      };
+
+      const updatedPlayerMap = {
+        ...playerBindings,
+        [playerIdx]: updatedPBinds
+      };
+
+      handleSavePlayerBindings(updatedPlayerMap);
+      const label = btnLabel || `ID ${btnId}`;
+      setStatusMessage(`Cleared ${field.toUpperCase()} binding for ${label}`);
+    },
+    [listeningKey, listeningGp, playerBindings, handleSavePlayerBindings]
   );
 
   const renderTriggerBadge = (playerIdx: number, btnId: number, bind: InputBinding) => {
@@ -1057,78 +1102,138 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                             <>
                               {/* KB 1 Button */}
                               <div className="flex justify-center px-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setListeningGp(null);
-                                    setListeningKey({ playerIdx: activePlayerIdx, id: btn.id, field: 'kb1' });
-                                  }}
-                                  className={`w-full py-1.5 px-2 rounded-lg text-xs font-mono font-medium transition-all text-center ${
-                                    listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1'
-                                      ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                      : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
-                                  }`}
-                                >
-                                  {listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1'
-                                    ? 'Press key…'
-                                    : PlayerBridge.getKeyName(bind.kb1)}
-                                </button>
+                                <div className="relative flex items-center justify-center w-full group">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setListeningGp(null);
+                                      setListeningKey({ playerIdx: activePlayerIdx, id: btn.id, field: 'kb1' });
+                                    }}
+                                    className={`w-full py-1.5 pl-2 ${bind.kb1 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
+                                      listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1'
+                                        ? 'bg-white text-black animate-pulse shadow-lg font-bold'
+                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                    }`}
+                                  >
+                                    {listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1'
+                                      ? 'Press key…'
+                                      : PlayerBridge.getKeyName(bind.kb1)}
+                                  </button>
+                                  {Boolean(bind.kb1 && bind.kb1 !== 0) && !(listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1') && (
+                                    <button
+                                      type="button"
+                                      title="Clear binding"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleClearBinding(activePlayerIdx, btn.id, 'kb1', btn.label);
+                                      }}
+                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center opacity-70 hover:opacity-100 focus:outline-none"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               {/* KB 2 Button */}
                               <div className="flex justify-center px-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setListeningGp(null);
-                                    setListeningKey({ playerIdx: activePlayerIdx, id: btn.id, field: 'kb2' });
-                                  }}
-                                  className={`w-full py-1.5 px-2 rounded-lg text-xs font-mono font-medium transition-all text-center ${
-                                    listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2'
-                                      ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                      : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
-                                  }`}
-                                >
-                                  {listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2'
-                                    ? 'Press key…'
-                                    : PlayerBridge.getKeyName(bind.kb2)}
-                                </button>
+                                <div className="relative flex items-center justify-center w-full group">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setListeningGp(null);
+                                      setListeningKey({ playerIdx: activePlayerIdx, id: btn.id, field: 'kb2' });
+                                    }}
+                                    className={`w-full py-1.5 pl-2 ${bind.kb2 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
+                                      listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2'
+                                        ? 'bg-white text-black animate-pulse shadow-lg font-bold'
+                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                    }`}
+                                  >
+                                    {listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2'
+                                      ? 'Press key…'
+                                      : PlayerBridge.getKeyName(bind.kb2)}
+                                  </button>
+                                  {Boolean(bind.kb2 && bind.kb2 !== 0) && !(listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2') && (
+                                    <button
+                                      type="button"
+                                      title="Clear binding"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleClearBinding(activePlayerIdx, btn.id, 'kb2', btn.label);
+                                      }}
+                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center opacity-70 hover:opacity-100 focus:outline-none"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </>
                           ) : (
                             <>
                               {/* GP 1 Button */}
                               <div className="flex justify-center px-1">
-                                <button
-                                  type="button"
-                                  onClick={() => startListeningGp(activePlayerIdx, btn.id, 'gp1')}
-                                  className={`w-full py-1.5 px-2 rounded-lg text-xs font-mono font-medium transition-all text-center ${
-                                    listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1'
-                                      ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                      : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
-                                  }`}
-                                >
-                                  {listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1'
-                                    ? (currentGpCombo.length > 0 ? PlayerBridge.getGpName(currentGpCombo.join('+')) : 'Hold button…')
-                                    : PlayerBridge.getGpName(bind.gp1)}
-                                </button>
+                                <div className="relative flex items-center justify-center w-full group">
+                                  <button
+                                    type="button"
+                                    onClick={() => startListeningGp(activePlayerIdx, btn.id, 'gp1')}
+                                    className={`w-full py-1.5 pl-2 ${bind.gp1 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
+                                      listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1'
+                                        ? 'bg-white text-black animate-pulse shadow-lg font-bold'
+                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                    }`}
+                                  >
+                                    {listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1'
+                                      ? (currentGpCombo.length > 0 ? PlayerBridge.getGpName(currentGpCombo.join('+')) : 'Hold button…')
+                                      : PlayerBridge.getGpName(bind.gp1)}
+                                  </button>
+                                  {Boolean(bind.gp1 && bind.gp1.trim().length > 0) && !(listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1') && (
+                                    <button
+                                      type="button"
+                                      title="Clear binding"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleClearBinding(activePlayerIdx, btn.id, 'gp1', btn.label);
+                                      }}
+                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center opacity-70 hover:opacity-100 focus:outline-none"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               {/* GP 2 Button */}
                               <div className="flex justify-center px-1">
-                                <button
-                                  type="button"
-                                  onClick={() => startListeningGp(activePlayerIdx, btn.id, 'gp2')}
-                                  className={`w-full py-1.5 px-2 rounded-lg text-xs font-mono font-medium transition-all text-center ${
-                                    listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2'
-                                      ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                      : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
-                                  }`}
-                                >
-                                  {listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2'
-                                    ? (currentGpCombo.length > 0 ? PlayerBridge.getGpName(currentGpCombo.join('+')) : 'Hold button…')
-                                    : PlayerBridge.getGpName(bind.gp2)}
-                                </button>
+                                <div className="relative flex items-center justify-center w-full group">
+                                  <button
+                                    type="button"
+                                    onClick={() => startListeningGp(activePlayerIdx, btn.id, 'gp2')}
+                                    className={`w-full py-1.5 pl-2 ${bind.gp2 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
+                                      listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2'
+                                        ? 'bg-white text-black animate-pulse shadow-lg font-bold'
+                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                    }`}
+                                  >
+                                    {listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2'
+                                      ? (currentGpCombo.length > 0 ? PlayerBridge.getGpName(currentGpCombo.join('+')) : 'Hold button…')
+                                      : PlayerBridge.getGpName(bind.gp2)}
+                                  </button>
+                                  {Boolean(bind.gp2 && bind.gp2.trim().length > 0) && !(listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2') && (
+                                    <button
+                                      type="button"
+                                      title="Clear binding"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleClearBinding(activePlayerIdx, btn.id, 'gp2', btn.label);
+                                      }}
+                                      className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center opacity-70 hover:opacity-100 focus:outline-none"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </>
                           )}
@@ -1166,12 +1271,10 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                       const displayDesc = btn.description || meta?.description || '';
                       const defaultBind = safeDefaultBindings(scheme)[btnId] || { kb1: 0, kb2: 0, gp1: '', gp2: '' };
                       const currentBind = playerBindings[0]?.[btnId];
-                      const bind = currentBind && (currentBind.kb1 !== 0 || currentBind.kb2 !== 0 || currentBind.gp1 !== '' || currentBind.gp2 !== '')
-                        ? currentBind
-                        : (currentBind || defaultBind);
+                      const bind = currentBind || defaultBind;
 
-                      const displayKb = (bind.kb1 !== undefined && bind.kb1 !== 0) ? bind.kb1 : defaultBind.kb1;
-                      const displayGp = (bind.gp1 !== undefined && bind.gp1 !== '') ? bind.gp1 : defaultBind.gp1;
+                      const displayKb = bind.kb1 !== undefined ? bind.kb1 : defaultBind.kb1;
+                      const displayGp = bind.gp1 !== undefined ? bind.gp1 : defaultBind.gp1;
 
                       return (
                         <div
@@ -1197,39 +1300,69 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
 
                           {/* Keyboard Hotkey Button */}
                           <div className="flex justify-center px-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setListeningGp(null);
-                                setListeningKey({ playerIdx: 0, id: btnId, field: 'kb1' });
-                              }}
-                              className={`w-full py-1.5 px-2 rounded-lg text-xs font-mono font-medium transition-all text-center ${
-                                listeningKey?.playerIdx === 0 && listeningKey?.id === btnId && listeningKey?.field === 'kb1'
-                                  ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                  : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
-                              }`}
-                            >
-                              {listeningKey?.playerIdx === 0 && listeningKey?.id === btnId && listeningKey?.field === 'kb1'
-                                ? 'Press key…'
-                                : PlayerBridge.getKeyName(displayKb)}
-                            </button>
+                            <div className="relative flex items-center justify-center w-full group">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setListeningGp(null);
+                                  setListeningKey({ playerIdx: 0, id: btnId, field: 'kb1' });
+                                }}
+                                className={`w-full py-1.5 pl-2 ${displayKb ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
+                                  listeningKey?.playerIdx === 0 && listeningKey?.id === btnId && listeningKey?.field === 'kb1'
+                                    ? 'bg-white text-black animate-pulse shadow-lg font-bold'
+                                    : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                }`}
+                              >
+                                {listeningKey?.playerIdx === 0 && listeningKey?.id === btnId && listeningKey?.field === 'kb1'
+                                  ? 'Press key…'
+                                  : PlayerBridge.getKeyName(displayKb)}
+                              </button>
+                              {Boolean(displayKb && displayKb !== 0) && !(listeningKey?.playerIdx === 0 && listeningKey?.id === btnId && listeningKey?.field === 'kb1') && (
+                                <button
+                                  type="button"
+                                  title="Clear keyboard binding"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearBinding(0, btnId, 'kb1', displayLabel);
+                                  }}
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center opacity-70 hover:opacity-100 focus:outline-none"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {/* Gamepad Combo Hotkey Button */}
                           <div className="flex justify-center px-1">
-                            <button
-                              type="button"
-                              onClick={() => startListeningGp(0, btnId, 'gp1')}
-                              className={`w-full py-1.5 px-2 rounded-lg text-xs font-mono font-medium transition-all text-center ${
-                                listeningGp?.playerIdx === 0 && listeningGp?.id === btnId && listeningGp?.field === 'gp1'
-                                  ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                  : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
-                              }`}
-                            >
-                              {listeningGp?.playerIdx === 0 && listeningGp?.id === btnId && listeningGp?.field === 'gp1'
-                                ? (currentGpCombo.length > 0 ? PlayerBridge.getGpName(currentGpCombo.join('+')) : 'Hold combo…')
-                                : PlayerBridge.getGpName(displayGp)}
-                            </button>
+                            <div className="relative flex items-center justify-center w-full group">
+                              <button
+                                type="button"
+                                onClick={() => startListeningGp(0, btnId, 'gp1')}
+                                className={`w-full py-1.5 pl-2 ${displayGp ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
+                                  listeningGp?.playerIdx === 0 && listeningGp?.id === btnId && listeningGp?.field === 'gp1'
+                                    ? 'bg-white text-black animate-pulse shadow-lg font-bold'
+                                    : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                }`}
+                              >
+                                {listeningGp?.playerIdx === 0 && listeningGp?.id === btnId && listeningGp?.field === 'gp1'
+                                  ? (currentGpCombo.length > 0 ? PlayerBridge.getGpName(currentGpCombo.join('+')) : 'Hold combo…')
+                                  : PlayerBridge.getGpName(displayGp)}
+                              </button>
+                              {Boolean(displayGp && displayGp.trim().length > 0) && !(listeningGp?.playerIdx === 0 && listeningGp?.id === btnId && listeningGp?.field === 'gp1') && (
+                                <button
+                                  type="button"
+                                  title="Clear gamepad binding"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearBinding(0, btnId, 'gp1', displayLabel);
+                                  }}
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center opacity-70 hover:opacity-100 focus:outline-none"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

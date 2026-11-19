@@ -15,7 +15,8 @@ import {
   Image as ImageIcon,
   Search,
   Download,
-  Globe
+  Globe,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { injectionService } from '../services/injectionService';
@@ -80,6 +81,17 @@ export const GlobalSaveBrowserPage: React.FC = () => {
 
   useEffect(() => {
     loadSaves();
+
+    const handleRefresh = () => {
+      loadSaves();
+    };
+    window.addEventListener('jellyemu-saves-refresh', handleRefresh);
+    window.addEventListener('hashchange', handleRefresh);
+
+    return () => {
+      window.removeEventListener('jellyemu-saves-refresh', handleRefresh);
+      window.removeEventListener('hashchange', handleRefresh);
+    };
   }, []);
 
   const handleDelete = async (itemId: string, slot: number) => {
@@ -208,6 +220,18 @@ export const GlobalSaveBrowserPage: React.FC = () => {
           <div className="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-bold text-white">
             {filtered.length} {filtered.length === 1 ? 'save' : 'saves'}
           </div>
+
+          <Button
+            size="sm"
+            variant="light"
+            isIconOnly
+            onPress={loadSaves}
+            isLoading={loading}
+            title="Refresh Saves"
+            className="text-neutral-400 hover:text-white hover:bg-white/10 cursor-pointer shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </div>
 

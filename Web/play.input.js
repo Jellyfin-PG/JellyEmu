@@ -189,6 +189,27 @@
             this.customBindings = customBindings || null;
             this.setupKeyboardPassthrough();
             this.startGamepadPolling();
+
+            const applyNewBindings = (newBindings) => {
+                const effective = (newBindings && newBindings[0]) ? newBindings[0] : newBindings;
+                this.customBindings = effective;
+                window._jeBindings = effective;
+                // Immediately release any keys held down
+                if (this.activeKeys) {
+                    for (const code of Array.from(this.activeKeys)) {
+                        this.simulateKey(code, false);
+                    }
+                    this.activeKeys.clear();
+                }
+                console.log('[JellyEmu Play] Live bindings updated:', this.customBindings);
+            };
+
+            window._jeApplyNewBindings = applyNewBindings;
+            window.addEventListener('jellyemu:bindings-changed', (ev) => {
+                if (ev && ev.detail) {
+                    applyNewBindings(ev.detail);
+                }
+            });
         }
 
         getActiveBindings() {
@@ -275,10 +296,12 @@
             const handleKeyEvent = (e, isDown) => {
                 if (!e.isTrusted) return;
                 if (e.repeat) return;
+                if (window._jePopupOpen) return;
                 const activeBindings = this.getActiveBindings();
                 let handled = false;
+                const hasCustomBindings = activeBindings && typeof activeBindings === 'object' && Object.keys(activeBindings).length > 0;
 
-                if (activeBindings && typeof activeBindings === 'object') {
+                if (hasCustomBindings) {
                     for (const [idStr, bind] of Object.entries(activeBindings)) {
                         const btnId = parseInt(idStr, 10);
                         const k1 = bind && (bind.kb1 || bind.Kb1);
@@ -294,7 +317,8 @@
                     }
                 }
 
-                if (!handled) {
+                // Only fall back to default key map if NO custom/active bindings are configured
+                if (!handled && !hasCustomBindings) {
                     const mapped = defaultKeyMap[e.code] || defaultKeyMap[e.key];
                     if (mapped) {
                         this.simulateKey(mapped, isDown);

@@ -122,6 +122,7 @@ export function initInjection() {
 
       page.classList.remove('hide');
       page.style.display = 'block';
+      window.dispatchEvent(new CustomEvent('jellyemu-saves-refresh'));
 
       // Hide non-JellyEmu pages, tracking what WE hid
       document.querySelectorAll('.mainAnimatedPages > .page, .skinBody > .page').forEach(p => {

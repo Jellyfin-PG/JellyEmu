@@ -134,6 +134,21 @@ namespace JellyEmu.Services
                 throw new SecurityException("Path traversal detected in user ID.");
             }
 
+            if (!Directory.Exists(userDir) && Guid.TryParse(safeUserId, out var guid))
+            {
+                var nDir = Path.GetFullPath(Path.Combine(baseDir, guid.ToString("N")));
+                if (nDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && Directory.Exists(nDir))
+                {
+                    return nDir;
+                }
+
+                var dDir = Path.GetFullPath(Path.Combine(baseDir, guid.ToString("D")));
+                if (dDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && Directory.Exists(dDir))
+                {
+                    return dDir;
+                }
+            }
+
             return userDir;
         }
 
