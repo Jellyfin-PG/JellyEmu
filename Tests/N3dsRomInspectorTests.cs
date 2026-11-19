@@ -202,11 +202,11 @@ namespace JellyEmu.Tests
         public void PlayController_GetN3dsRomError_ExplainsEncryptedRomsAndBustsCacheForPatchedOnes(
             bool bootPlain, bool noCryptoFlag, string? expectedError, string expectedUrl)
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "je_test_" + Guid.NewGuid().ToString("N"));
+            var tempDir = Path.Join(Path.GetTempPath(), "je_test_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDir);
             try
             {
-                var romPath = Path.Combine(tempDir, "game.3ds");
+                var romPath = Path.Join(tempDir, "game.3ds");
                 File.WriteAllBytes(romPath, BuildNcsd(bootPlain, noCryptoFlag));
                 var controller = new JellyEmuPlayController(
                     new Mock<ILibraryManager>().Object,

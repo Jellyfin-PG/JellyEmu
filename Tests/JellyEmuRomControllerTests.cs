@@ -133,7 +133,7 @@ namespace JellyEmu.Tests
             try
             {
                 var image = N3dsRomInspectorTests.BuildNcsd(bootPlain: true, bootNoCryptoFlag: false);
-                var romPath = Path.Combine(tempDir, "Game (Europe) Decrypted.3ds");
+                var romPath = Path.Join(tempDir, "Game (Europe) Decrypted.3ds");
                 await File.WriteAllBytesAsync(romPath, image);
 
                 var itemId = Guid.NewGuid();
