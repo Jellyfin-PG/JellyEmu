@@ -1,6 +1,7 @@
 using System.Net.Mime;
 using System.Text.Encodings.Web;
 using JellyEmu.Services;
+using JellyEmu.Utilities;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Http;
@@ -277,6 +278,8 @@ namespace JellyEmu.Controllers
                 romUrl += $"?userId={userId}";
             }
 
+            var romError = GetN3dsRomError(item.Path, ref romUrl);
+
             var isJ3u = !string.IsNullOrEmpty(item.Path) && item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase);
 
             var hasSaves = !string.IsNullOrEmpty(userId);
@@ -376,6 +379,7 @@ namespace JellyEmu.Controllers
                 save_post_url = savePostUrl,
                 is_m3u = isJ3u,
                 needs_threads = IsThreadedCore(resolvedCore),
+                rom_error_json = romError == null ? "null" : System.Text.Json.JsonSerializer.Serialize(romError),
                 virtual_gamepad = effectivePrefs.VirtualGamepad,
                 virtual_gamepad_lefty = effectivePrefs.VirtualGamepadLefty,
                 vsync = effectivePrefs.Vsync,
@@ -394,6 +398,46 @@ namespace JellyEmu.Controllers
             ApplyCrossOriginIsolationHeaders();
 
             return Content(html, MediaTypeNames.Text.Html);
+        }
+
+        internal const string EncryptedN3dsRomMessage =
+            "This Nintendo 3DS ROM is encrypted, and the Azahar core can only run decrypted games. " +
+            "Replace it with a decrypted dump (.3ds/.cci, e.g. made with GodMode9) to play it.";
+
+        /// <summary>
+        /// Azahar shows a black screen, without any error, on encrypted 3DS ROMs. Detect them
+        /// before launching so the player can explain what is wrong. For decrypted ROMs whose
+        /// header is fixed while serving, a distinct ROM URL is used so that browsers which
+        /// cached the unpatched copy (EmulatorJS caches ROMs by URL) download it again.
+        /// </summary>
+        /// <returns>A user-facing error message, or null when the ROM can be launched.</returns>
+        internal string? GetN3dsRomError(string? romPath, ref string romUrl)
+        {
+            if (string.IsNullOrEmpty(romPath) || !N3dsRomInspector.IsCandidate(romPath) || !System.IO.File.Exists(romPath))
+                return null;
+
+            N3dsRomInspection inspection;
+            try
+            {
+                inspection = N3dsRomInspector.Inspect(romPath);
+            }
+            catch (IOException ex)
+            {
+                Logger.LogWarning(ex, "[JellyEmu] Could not inspect 3DS ROM header of {Path}", romPath);
+                return null;
+            }
+
+            switch (inspection.State)
+            {
+                case N3dsCryptoState.Encrypted:
+                    Logger.LogWarning("[JellyEmu] Play: 3DS ROM {Path} is encrypted and cannot run in Azahar", romPath);
+                    return EncryptedN3dsRomMessage;
+                case N3dsCryptoState.DecryptedMissingFlag:
+                    romUrl += (romUrl.Contains('?') ? "&" : "?") + "ncch=nocrypto";
+                    return null;
+                default:
+                    return null;
+            }
         }
 
         internal static string CleanCosmeticFilename(string filename)

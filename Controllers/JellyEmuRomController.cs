@@ -1,6 +1,7 @@
 using System.Net.Mime;
 using System.Text.Encodings.Web;
 using JellyEmu.Services;
+using JellyEmu.Utilities;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -71,7 +72,7 @@ namespace JellyEmu.Controllers
             Response.Headers["X-Rom-Extension"] = fileInfo.Extension;
             Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(romPath);
 
-            var stream = System.IO.File.OpenRead(romPath);
+            var stream = OpenRomStream(romPath);
             var finalFileName = Path.GetFileName(romPath);
             Response.Headers["Content-Disposition"] = $"attachment; filename=\"{finalFileName}\"";
             return File(stream, "application/octet-stream", enableRangeProcessing: true);
@@ -112,7 +113,7 @@ namespace JellyEmu.Controllers
                     Response.Headers["X-Rom-Extension"] = singleInfo.Extension;
                     Response.Headers["X-Rom-Name"] = Path.GetFileNameWithoutExtension(singleFile);
 
-                    var singleStream = System.IO.File.OpenRead(singleFile);
+                    var singleStream = OpenRomStream(singleFile);
                     var singleName = Path.GetFileName(singleFile);
                     Response.Headers["Content-Disposition"] = $"attachment; filename=\"{singleName}\"";
                     return File(singleStream, "application/octet-stream", enableRangeProcessing: true);
@@ -167,6 +168,44 @@ namespace JellyEmu.Controllers
                 }
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
+        }
+
+        /// <summary>
+        /// Opens a ROM for streaming to the emulator. 3DS images whose content is decrypted
+        /// but whose NCCH header still claims encryption (old "Decrypted" dumps) get the
+        /// NoCrypto flag set on the fly, otherwise Azahar refuses them and shows a black screen.
+        /// The file on disk is never modified.
+        /// </summary>
+        private Stream OpenRomStream(string path)
+        {
+            var stream = System.IO.File.OpenRead(path);
+            if (!N3dsRomInspector.IsCandidate(path)) return stream;
+
+            try
+            {
+                var inspection = N3dsRomInspector.Inspect(stream);
+                stream.Position = 0;
+
+                if (inspection.State == N3dsCryptoState.Encrypted)
+                {
+                    Logger.LogWarning("[JellyEmu] 3DS ROM {Path} is encrypted; Azahar can only run decrypted dumps", path);
+                }
+
+                if (inspection.Patches.Count > 0)
+                {
+                    Logger.LogInformation(
+                        "[JellyEmu] 3DS ROM {Path} is decrypted but flagged as encrypted; setting the NoCrypto flag on {Count} partition(s) while serving",
+                        path, inspection.Patches.Count);
+                    return new PatchedReadStream(stream, inspection.Patches);
+                }
+            }
+            catch (IOException ex)
+            {
+                Logger.LogWarning(ex, "[JellyEmu] Could not inspect 3DS ROM header of {Path}; serving it unchanged", path);
+                stream.Position = 0;
+            }
+
+            return stream;
         }
 
         private static FileStream CreateDeleteOnCloseStream(string path)

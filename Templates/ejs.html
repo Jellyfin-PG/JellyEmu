@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ game_name }}</title>
     <script src="{{ base_url }}/jellyemu/assets/jellyemu.utils.js?v={{ version }}"></script>
-    <script src="{{ base_url }}/jellyemu/assets/coi-serviceworker.js"></script>
+    <script src="{{ base_url }}/jellyemu/assets/coi-serviceworker.js?v={{ version }}"></script>
     <script src="{{ base_url }}/jellyemu/threejs/three.min.js"></script>
     <link rel="stylesheet" href="{{ base_url }}/jellyemu/assets/dist/jellyemu.index.bundle.css?v={{ version }}">
     <link rel="stylesheet" href="{{ base_url }}/jellyemu/assets/ejs.style.css">
@@ -110,6 +110,8 @@
 
             window.EJS_core = '{{ core }}';
             window.EJS_platformTag = '{{ platform_tag }}';
+            // Set by the server when the game cannot run at all (e.g. an encrypted 3DS ROM).
+            window.__JE_FATAL_ERROR__ = {{ rom_error_json }};
             var biosUrl = '{{ bios_url }}';
             if (biosUrl && biosUrl.trim().length > 0) {
                 window.EJS_biosUrl = biosUrl.startsWith('http') ? biosUrl : (window.location.origin + biosUrl);
@@ -194,6 +196,7 @@
             }
 
             function dismissLoader() {
+                if (window.__JE_FATAL_ERROR__) return;
                 if (!loader || loader.classList.contains('je-dismiss')) return;
                 loader.classList.add('je-dismiss');
                 setTimeout(function () { loader.style.display = 'none'; }, 450);
@@ -347,6 +350,48 @@
             if (window.EJS_core) _jeLogLoadingStep('Target Core: ' + window.EJS_core);
             if (window.EJS_gameUrl) _jeLogLoadingStep('ROM payload stream ready');
 
+            // Fatal launch errors keep the loader on screen with a readable message, instead of
+            // an endless spinner (EmulatorJS draws its own error behind the loader) or a black screen.
+            function _jeShowFatalError(msg) {
+                window.__JE_FATAL_ERROR__ = msg;
+                if (myStatusEl) {
+                    myStatusEl.textContent = msg;
+                    myStatusEl.style.color = '#ff6b6b';
+                    myStatusEl.style.maxWidth = '640px';
+                    myStatusEl.style.margin = '0 auto';
+                    myStatusEl.style.padding = '0 16px';
+                    myStatusEl.style.textAlign = 'center';
+                    myStatusEl.style.lineHeight = '1.5';
+                }
+                var anim = loader && loader.querySelector('.je-loader-anim');
+                if (anim) anim.style.display = 'none';
+                _jeLogLoadingStep('[ERROR] ' + msg, true);
+            }
+            window._jeShowFatalError = _jeShowFatalError;
+            if (window.__JE_FATAL_ERROR__) _jeShowFatalError(window.__JE_FATAL_ERROR__);
+
+            var _jeNeedsThreads = {{ needs_threads }};
+            var _jeFailWatch = setInterval(function () {
+                var e = window.EJS_emulator;
+                if (window.__JE_FATAL_ERROR__ || (e && e.started)) { clearInterval(_jeFailWatch); return; }
+                if (!e || !e.failedToStart) return;
+                clearInterval(_jeFailWatch);
+                if (_jeNeedsThreads && !window.crossOriginIsolated) {
+                    var isolationMsg = 'This emulator core needs SharedArrayBuffer, which only works when the page is ' +
+                        'cross-origin isolated. Use Jellyfin over HTTPS, and make sure your reverse proxy does not remove ' +
+                        'the Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers on /jellyemu/ URLs.';
+                    if (window.JellyEmuCOI && window.JellyEmuCOI.reloadPending) {
+                        // The isolation service worker is about to reload the page.
+                        if (myStatusEl) myStatusEl.textContent = 'Activating cross-origin isolation…';
+                        setTimeout(function () { _jeShowFatalError(isolationMsg); }, 6000);
+                    } else {
+                        _jeShowFatalError(isolationMsg);
+                    }
+                } else {
+                    _jeShowFatalError('The emulator failed to start. Open the log below for details.');
+                }
+            }, 500);
+
             var _jeEjsObserver = null;
             var _jeFindLoader = setInterval(function () {
                 var ejsTextEl = document.querySelector('.ejs_loading_text');
@@ -354,6 +399,7 @@
                     clearInterval(_jeFindLoader);
 
                     _jeEjsObserver = new MutationObserver(function () {
+                        if (window.__JE_FATAL_ERROR__) return;
                         var text = ejsTextEl.textContent || ejsTextEl.innerText;
                         if (text && text.trim() !== '') {
                             var trimmed = text.trim();
@@ -1422,7 +1468,9 @@
     <script src="{{ base_url }}/jellyemu/assets/ejs.setting.js?v={{ version }}"></script>
     <script src="{{ base_url }}/jellyemu/assets/ejs.xr.js?v={{ version }}"></script>
     <script src="{{ base_url }}/jellyemu/assets/ejs.netplay.js?v={{ version }}"></script>
+    {{ if rom_error_json == "null" }}
     <script src="{{ ejs_base }}/loader.js"></script>
+    {{ end }}
     <script>
         window.addEventListener('load', function () {
             var loadEvent = (typeof CustomEvent === 'function') ?
