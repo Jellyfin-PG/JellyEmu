@@ -17,7 +17,7 @@ export const ConfigApp: React.FC = () => {
   if (loading) {
     return (
       <HeroUIProvider>
-        <div className="dark text-foreground bg-background p-12 flex items-center justify-center min-h-[400px]">
+        <div className="dark text-foreground bg-transparent p-12 flex items-center justify-center min-h-[400px]">
           <Spinner label="Loading JellyEmu Dashboard..." color="primary" size="lg" />
         </div>
       </HeroUIProvider>
@@ -26,7 +26,7 @@ export const ConfigApp: React.FC = () => {
 
   return (
     <HeroUIProvider>
-      <div className="dark text-foreground bg-background min-h-screen w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="dark text-foreground bg-transparent min-h-screen w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Header */}
         <ConfigHeader version="0.9.4.1" />
 

@@ -22,6 +22,10 @@ export function initInjection() {
   domObserver.observePreferencesMenu();
 
   // Full page navigation integration for #/jellyemu-settings and #/jellyemu-saves
+  // Track which elements JellyEmu has hidden so we only restore those — never touch
+  // .hide on elements Jellyfin's ring buffer is managing.
+  const jellyemuHiddenElements = new Set<Element>();
+
   const handlePageRoutes = () => {
     const hash = window.location.hash || '';
 
@@ -65,9 +69,14 @@ export function initInjection() {
       page.classList.remove('hide');
       page.style.display = 'block';
 
-      // Gracefully hide other Jellyfin pages without destroying their DOM
-      document.querySelectorAll('.page:not(#jellyemu-settings-page)').forEach(p => {
-        (p as HTMLElement).classList.add('hide');
+      // Hide non-JellyEmu pages, tracking what WE hid
+      document.querySelectorAll('.mainAnimatedPages > .page, .skinBody > .page').forEach(p => {
+        if (p.id !== 'jellyemu-settings-page' && p.id !== 'jellyemu-saves-page') {
+          if (!p.classList.contains('hide')) {
+            p.classList.add('hide');
+            jellyemuHiddenElements.add(p);
+          }
+        }
       });
 
       document.title = 'JellyEmu Settings';
@@ -114,9 +123,14 @@ export function initInjection() {
       page.classList.remove('hide');
       page.style.display = 'block';
 
-      // Gracefully hide other Jellyfin pages without destroying their DOM
-      document.querySelectorAll('.page:not(#jellyemu-saves-page)').forEach(p => {
-        (p as HTMLElement).classList.add('hide');
+      // Hide non-JellyEmu pages, tracking what WE hid
+      document.querySelectorAll('.mainAnimatedPages > .page, .skinBody > .page').forEach(p => {
+        if (p.id !== 'jellyemu-saves-page' && p.id !== 'jellyemu-settings-page') {
+          if (!p.classList.contains('hide')) {
+            p.classList.add('hide');
+            jellyemuHiddenElements.add(p);
+          }
+        }
       });
 
       document.title = 'Save State Browser';
@@ -126,7 +140,7 @@ export function initInjection() {
       return;
     }
 
-    // C. Non-JellyEmu routes: Hide our custom pages and restore Jellyfin views
+    // C. Non-JellyEmu routes: Hide our custom pages and restore only what WE hid
     if (settingsPage) {
       settingsPage.classList.add('hide');
       settingsPage.style.display = 'none';
@@ -136,13 +150,13 @@ export function initInjection() {
       savesPage.style.display = 'none';
     }
 
-    // Unhide Jellyfin's current active view if previously hidden by JellyEmu
-    const viewPages = document.querySelectorAll('.view-manager > .page, .mainAnimatedPages > .page, .skinBody > .page');
-    viewPages.forEach(p => {
-      if (p.id !== 'jellyemu-settings-page' && p.id !== 'jellyemu-saves-page') {
+    // Only restore pages that JellyEmu explicitly hid — never broad-remove .hide
+    jellyemuHiddenElements.forEach(p => {
+      if (p.isConnected) {
         p.classList.remove('hide');
       }
     });
+    jellyemuHiddenElements.clear();
   };
 
   handlePageRoutes();
