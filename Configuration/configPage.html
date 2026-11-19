@@ -35,6 +35,37 @@
                 document.head.appendChild(link);
             }
 
+            // Lifecycle cleanup handlers
+            var page = document.getElementById('JellyEmuConfigPage');
+            var unmount = function () {
+                if (window.JellyEmuConfig && typeof window.JellyEmuConfig.unmount === 'function') {
+                    window.JellyEmuConfig.unmount();
+                }
+            };
+            if (page) {
+                page.addEventListener('viewhide', unmount);
+                page.addEventListener('pagehide', unmount);
+                page.addEventListener('viewdestroy', unmount);
+
+                // MutationObserver fallback for React Router navigations
+                // (viewhide/pagehide/viewdestroy don't fire during React Router transitions)
+                if (page.parentNode) {
+                    var parentObserver = new MutationObserver(function (mutations) {
+                        for (var i = 0; i < mutations.length; i++) {
+                            var removed = mutations[i].removedNodes;
+                            for (var j = 0; j < removed.length; j++) {
+                                if (removed[j] === page || (removed[j].contains && removed[j].contains(page))) {
+                                    unmount();
+                                    parentObserver.disconnect();
+                                    return;
+                                }
+                            }
+                        }
+                    });
+                    parentObserver.observe(page.parentNode, { childList: true });
+                }
+            }
+
             // Load ES Module via dynamic import()
             var scriptUrl = getUrl('jellyemu/assets/dist/jellyemu.config.bundle.js');
             import(scriptUrl).then(function (mod) {
