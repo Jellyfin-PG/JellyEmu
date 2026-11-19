@@ -99,8 +99,197 @@ export function getConsoleColor(platformName: string): string {
 
 const KNOWN_REGIONS = new Set([
   'USA', 'US', 'Europe', 'EU', 'Japan', 'JP', 'World', 'En', 'Fr', 'De', 'Es', 'It', 'NTSC', 'PAL',
-  'NTSC-U', 'NTSC-J', 'PAL-E', 'North America', 'Australia', 'Rev 1', 'Rev 2', 'v1.0', 'v1.1', 'v1.2'
+  'NTSC-U', 'NTSC-J', 'PAL-E', 'North America', 'Australia', 'Brazil', 'Canada', 'China', 'France',
+  'Germany', 'Italy', 'Korea', 'Netherlands', 'Russia', 'Spain', 'Sweden', 'Asia', 'Scandinavia',
+  'Unlicensed', 'Prototype', 'Demo', 'Sample', 'Rev 1', 'Rev 2', 'v1.0', 'v1.1', 'v1.2'
 ]);
+
+const PLATFORM_ALIASES: Record<string, string> = {
+  // PlayStation
+  'playstation 2': 'PlayStation 2',
+  'ps2': 'PlayStation 2',
+  'sony playstation 2': 'PlayStation 2',
+  'play station 2': 'PlayStation 2',
+  'playstation': 'PlayStation',
+  'psx': 'PlayStation',
+  'ps1': 'PlayStation',
+  'sony playstation': 'PlayStation',
+  'play station': 'PlayStation',
+  'ps one': 'PlayStation',
+  'playstation portable': 'PSP',
+  'psp': 'PSP',
+  'playstation 3': 'PlayStation 3',
+  'ps3': 'PlayStation 3',
+  'playstation vita': 'PlayStation Vita',
+  'psvita': 'PlayStation Vita',
+  'ps vita': 'PlayStation Vita',
+  // Nintendo
+  'nes': 'NES',
+  'nintendo entertainment system': 'NES',
+  'famicom': 'NES',
+  'super nintendo': 'SNES',
+  'snes': 'SNES',
+  'super famicom': 'SNES',
+  'super nintendo entertainment system': 'SNES',
+  'n64': 'N64',
+  'nintendo 64': 'N64',
+  '64dd': 'N64',
+  'game boy': 'Game Boy',
+  'gb': 'Game Boy',
+  'gameboy': 'Game Boy',
+  'game boy color': 'Game Boy Color',
+  'gbc': 'Game Boy Color',
+  'gameboy color': 'Game Boy Color',
+  'game boy advance': 'Game Boy Advance',
+  'gba': 'Game Boy Advance',
+  'gameboy advance': 'Game Boy Advance',
+  'nintendo ds': 'Nintendo DS',
+  'nds': 'Nintendo DS',
+  'ds': 'Nintendo DS',
+  'nintendo 3ds': 'Nintendo 3DS',
+  '3ds': 'Nintendo 3DS',
+  'virtual boy': 'Virtual Boy',
+  'vb': 'Virtual Boy',
+  'gamecube': 'GameCube',
+  'wii': 'Wii',
+  'wii u': 'Wii U',
+  'nintendo switch': 'Nintendo Switch',
+  'switch': 'Nintendo Switch',
+  'nintendo switch 2': 'Nintendo Switch 2',
+  // Sega
+  'sega genesis': 'Sega Genesis',
+  'genesis': 'Sega Genesis',
+  'mega drive': 'Sega Genesis',
+  'megadrive': 'Sega Genesis',
+  'master system': 'Master System',
+  'game gear': 'Game Gear',
+  'sega cd': 'Sega CD',
+  'sega 32x': 'Sega 32X',
+  'sega saturn': 'Sega Saturn',
+  'saturn': 'Sega Saturn',
+  'dreamcast': 'Dreamcast',
+  // Atari
+  'atari 2600': 'Atari 2600',
+  '2600': 'Atari 2600',
+  'atari 7800': 'Atari 7800',
+  '7800': 'Atari 7800',
+  'atari 5200': 'Atari 5200',
+  '5200': 'Atari 5200',
+  'atari lynx': 'Atari Lynx',
+  'lynx': 'Atari Lynx',
+  'atari jaguar': 'Atari Jaguar',
+  'jaguar': 'Atari Jaguar',
+  // Other Consoles & Computers
+  'turbografx-16': 'TurboGrafx-16',
+  'turbografx': 'TurboGrafx-16',
+  'pc engine': 'TurboGrafx-16',
+  'pce': 'TurboGrafx-16',
+  'supergrafx': 'TurboGrafx-16',
+  'colecovision': 'ColecoVision',
+  'neogeo pocket': 'NeoGeo Pocket',
+  'ngp': 'NeoGeo Pocket',
+  'ngpc': 'NeoGeo Pocket',
+  'wonderswan': 'WonderSwan',
+  'ws': 'WonderSwan',
+  'pico-8': 'PICO-8',
+  'pico8': 'PICO-8',
+  'dos': 'DOS',
+  'ms-dos': 'DOS',
+  'arcade': 'Arcade',
+  'mame 2003': 'MAME 2003',
+  'mame': 'MAME 2003',
+  '3do': '3DO',
+  'commodore 64': 'Commodore 64',
+  'c64': 'Commodore 64',
+  'commodore amiga': 'Commodore Amiga',
+  'amiga': 'Commodore Amiga',
+  'pc-fx': 'PC-FX',
+  // Microsoft
+  'xbox': 'Xbox',
+  'xbox 360': 'Xbox 360',
+  // Web / OS
+  'flash': 'Flash',
+  'adobe flash': 'Flash',
+  'windows': 'Windows',
+  'linux': 'Linux',
+  'macos': 'MacOS',
+  'android': 'Android'
+};
+
+const EXTENSION_MAP: Record<string, string> = {
+  '.nes': 'NES', '.fds': 'NES', '.unf': 'NES', '.unif': 'NES',
+  '.smc': 'SNES', '.sfc': 'SNES', '.swc': 'SNES', '.fig': 'SNES',
+  '.z64': 'N64', '.n64': 'N64', '.v64': 'N64',
+  '.gb': 'Game Boy', '.gbc': 'Game Boy Color', '.gba': 'Game Boy Advance',
+  '.nds': 'Nintendo DS', '.3ds': 'Nintendo 3DS', '.cci': 'Nintendo 3DS', '.cia': 'Nintendo 3DS',
+  '.vb': 'Virtual Boy', '.sms': 'Master System', '.gg': 'Game Gear',
+  '.md': 'Sega Genesis', '.smd': 'Sega Genesis', '.gen': 'Sega Genesis', '.68k': 'Sega Genesis',
+  '.32x': 'Sega 32X', '.a26': 'Atari 2600', '.a78': 'Atari 7800', '.lnx': 'Atari Lynx',
+  '.jag': 'Atari Jaguar', '.j64': 'Atari Jaguar', '.ws': 'WonderSwan', '.wsc': 'WonderSwan',
+  '.pce': 'TurboGrafx-16', '.col': 'ColecoVision', '.cv': 'ColecoVision',
+  '.ngp': 'NeoGeo Pocket', '.ngc': 'NeoGeo Pocket', '.p8': 'PICO-8',
+  '.gcm': 'GameCube', '.gcz': 'GameCube', '.rvz': 'Wii', '.wbfs': 'Wii', '.wad': 'Wii',
+  '.xex': 'Xbox 360', '.xiso': 'Xbox', '.vpk': 'PlayStation Vita',
+  '.nsp': 'Nintendo Switch', '.xci': 'Nintendo Switch', '.nsz': 'Nintendo Switch', '.xcz': 'Nintendo Switch',
+  '.nup': 'Nintendo Switch 2', '.swf': 'Flash', '.spl': 'Flash'
+};
+
+function resolvePlatformFromItem(item: any): string | null {
+  // Check item.Tags for an exact/alias match with a known platform
+  if (item.Tags && Array.isArray(item.Tags)) {
+    for (const tag of item.Tags) {
+      const lower = tag.trim().toLowerCase();
+      if (PLATFORM_ALIASES[lower]) {
+        return PLATFORM_ALIASES[lower];
+      }
+    }
+  }
+
+  // Fallback: Check item.Path (parent folder names & filename tokens)
+  if (item.Path) {
+    const normalized = item.Path.replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    // Check parent folder names from bottom up (up to 3 levels)
+    for (let i = parts.length - 2; i >= 0 && i >= parts.length - 4; i--) {
+      const folder = parts[i].trim().toLowerCase();
+      const cleaned = folder.replace(/^(?:sony|nintendo|sega|atari|nec|commodore|snk|adobe|macromedia)\s+/, '');
+      if (PLATFORM_ALIASES[cleaned]) return PLATFORM_ALIASES[cleaned];
+      if (PLATFORM_ALIASES[folder]) return PLATFORM_ALIASES[folder];
+    }
+
+    // Check filename tokens like (PS2) or [PS2]
+    const fileName = parts[parts.length - 1];
+    const tokenMatches = fileName.match(/[\[\(]([^\]\)]+)[\]\)]/g);
+    if (tokenMatches) {
+      for (const m of tokenMatches) {
+        const inner = m.slice(1, -1).trim().toLowerCase();
+        for (const sub of inner.split(',')) {
+          const t = sub.trim();
+          if (PLATFORM_ALIASES[t]) return PLATFORM_ALIASES[t];
+        }
+      }
+    }
+
+    // Check file extension
+    const extMatch = fileName.match(/\.([a-zA-Z0-9]+)$/);
+    if (extMatch) {
+      const ext = '.' + extMatch[1].toLowerCase();
+      if (EXTENSION_MAP[ext]) return EXTENSION_MAP[ext];
+    }
+  }
+
+  // Fallback: If item has any tag that isn't region, metadata or blacklist
+  if (item.Tags && Array.isArray(item.Tags)) {
+    for (const tag of item.Tags) {
+      if (tag === 'JellyEmu' || tag === 'Game' || tag === 'Unsupported' || tag === 'MultiDisc') continue;
+      if (KNOWN_REGIONS.has(tag)) continue;
+      if (tag.startsWith('Disc ') || tag.startsWith('Side ') || tag.startsWith('Tape ')) continue;
+      return tag;
+    }
+  }
+
+  return null;
+}
 
 const EJS_UNSUPPORTED_PLATFORMS = new Set([
   'Dreamcast',
@@ -230,32 +419,17 @@ export const statsService = {
       let unsupportedCount = 0;
 
       items.forEach((item) => {
-        let consoleTag: string | null = null;
-        let isUnsupported = false;
+        const platform = resolvePlatformFromItem(item) || 'Unknown Platform';
 
-        if (item.Tags && Array.isArray(item.Tags)) {
-          if (item.Tags.includes('Unsupported')) {
-            isUnsupported = true;
-          }
-
-          item.Tags.forEach((tag: string) => {
-            if (tag === 'JellyEmu' || tag === 'Game' || tag === 'Unsupported' || tag === 'MultiDisc') return;
-            if (KNOWN_REGIONS.has(tag)) return;
-            if (tag.startsWith('Disc ') || tag.startsWith('Side ') || tag.startsWith('Tape ')) return;
-
-            if (EJS_UNSUPPORTED_PLATFORMS.has(tag)) {
-              isUnsupported = true;
-            }
-            consoleTag = tag;
-          });
-        }
+        const isUnsupported =
+          Boolean(item.Tags && item.Tags.includes('Unsupported')) ||
+          EJS_UNSUPPORTED_PLATFORMS.has(platform);
 
         if (isUnsupported) {
           unsupportedCount++;
         }
 
-        const finalPlatform = consoleTag || 'Unknown Platform';
-        consoleCounts[finalPlatform] = (consoleCounts[finalPlatform] || 0) + 1;
+        consoleCounts[platform] = (consoleCounts[platform] || 0) + 1;
       });
 
       const platforms: PlatformStat[] = Object.keys(consoleCounts)
