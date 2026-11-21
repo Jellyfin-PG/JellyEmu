@@ -23,11 +23,11 @@
   <ItemGroup>
     <PackageReference Include="Jellyfin.Controller" Version="10.11.11" />
     <PackageReference Include="Jellyfin.Model" Version="10.11.11" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
     <PackageReference Include="Scriban" Version="7.6.1" />
     <PackageReference Include="SharpCompress" Version="0.50.9" />
-    <PackageReference Include="System.Text.Encodings.Web" Version="9.0.2" />
+    <PackageReference Include="System.Text.Encodings.Web" Version="9.0.23" />
   </ItemGroup>
 
   <ItemGroup>
