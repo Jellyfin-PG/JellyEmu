@@ -42,6 +42,7 @@ export function initPlayer() {
       saveGetUrl: rawPlayerData.saveGetUrl || rawConfig.saveGetUrl || '',
       savePostUrl: rawPlayerData.savePostUrl || rawConfig.savePostUrl || '',
       activeSlot: rawPlayerData.activeSlot ?? rawConfig.activeSlot ?? 1,
+      launchSlot: rawPlayerData.launchSlot ?? rawConfig.launchSlot ?? 0,
       hasNetplay: (isPlay || isPico8) ? false : (rawPlayerData.hasNetplay ?? rawConfig.hasNetplay ?? true),
       hasSaves: (isPlay || isPico8) ? false : (rawPlayerData.hasSaves ?? rawConfig.hasSaves ?? true),
       isPlay: isPlay,

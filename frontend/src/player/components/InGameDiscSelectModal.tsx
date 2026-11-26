@@ -24,6 +24,21 @@ export const InGameDiscSelectModal: React.FC<InGameDiscSelectModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    const emu = PlayerBridge.getEngine();
+    if (emu && emu.discs) {
+      const discList = emu.discs.getDiscList();
+      if (discList.length > 0) {
+        const curIdx = emu.discs.getCurrentDiscIndex();
+        setDiscs(discList.map((d, idx) => ({
+          index: idx,
+          name: d.name || `Disc ${idx + 1}`,
+          path: d.path || '',
+          current: curIdx === idx
+        })));
+        return;
+      }
+    }
+
     const gm = PlayerBridge.getGameManager();
     if (gm && gm.discs) {
       const list: DiscItem[] = gm.discs.map((d: any, idx: number) => ({

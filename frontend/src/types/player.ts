@@ -9,6 +9,7 @@ export interface PlayerInitialData {
   saveGetUrl?: string;
   savePostUrl?: string;
   activeSlot?: number;
+  launchSlot?: number;
   hasNetplay?: boolean;
   hasSaves?: boolean;
   isPlay?: boolean;
@@ -31,6 +32,8 @@ export interface PlayerInitialData {
   inputScheme?: any;
   customBindings?: any;
   availableCores?: Array<{ id: string; name: string; needsThreads?: boolean }>;
+  biosUrl?: string;
+  dataBaseUrl?: string;
   screenshotsToLibrary?: boolean;
   version?: string;
 }

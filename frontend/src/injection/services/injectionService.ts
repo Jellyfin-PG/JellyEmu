@@ -354,7 +354,7 @@ export const injectionService = {
     let path = `jellyemu/play/${safeItemId}`;
     const params = new URLSearchParams();
     if (userId) params.append('userId', encodeURIComponent(userId));
-    if (slot && slot > 1) params.append('slot', String(Math.floor(slot)));
+    if (slot && slot >= 1) params.append('slot', String(Math.floor(slot)));
     if (core) params.append('core', encodeURIComponent(core));
 
     const query = params.toString();

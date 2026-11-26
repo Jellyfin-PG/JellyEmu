@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { HeroUIProvider, Tabs, Tab, Spinner } from '@heroui/react';
-import { BarChart3, Settings as SettingsIcon, ShoppingBag, MessageSquare, Code, Info } from 'lucide-react';
+import { BarChart3, Settings as SettingsIcon, ShoppingBag, Code, Info } from 'lucide-react';
 import { usePluginConfig } from './hooks/usePluginConfig';
 import { ConfigHeader } from './components/ConfigHeader';
 import { SettingsTab } from './tabs/settings/SettingsTab';
 import { StatisticsTab } from './tabs/statistics/StatisticsTab';
 import { MarketplaceTab } from './tabs/marketplace/MarketplaceTab';
-import { CommunityTab } from './tabs/community/CommunityTab';
 import { ApiDocTab } from './tabs/api/ApiDocTab';
 import { AboutTab } from './tabs/about/AboutTab';
 
@@ -28,7 +27,7 @@ export const ConfigApp: React.FC = () => {
     <HeroUIProvider>
       <div className="dark text-foreground bg-transparent min-h-screen w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Header */}
-        <ConfigHeader version="0.9.4.1" />
+        <ConfigHeader version="0.9.5" />
 
         {/* HeroUI Modern Solid Full-Width Segmented Navigation */}
         <div className="w-full">
@@ -89,18 +88,6 @@ export const ConfigApp: React.FC = () => {
               }
             >
               <MarketplaceTab />
-            </Tab>
-
-            <Tab
-              key="community"
-              title={
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-purple-400 group-data-[selected=true]:text-white transition-colors" />
-                  <span>Community</span>
-                </div>
-              }
-            >
-              <CommunityTab />
             </Tab>
 
             <Tab

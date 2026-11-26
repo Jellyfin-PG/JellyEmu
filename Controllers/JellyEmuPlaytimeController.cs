@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Microsoft.Data.Sqlite;
+using LiteDB;
 using System.IO;
 
 namespace JellyEmu.Controllers
@@ -57,39 +57,28 @@ namespace JellyEmu.Controllers
             long totalSeconds = 0;
 
             EnsureDatabaseCreated();
-            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
-            var connectionString = $"Data Source={dbPath}";
 
             try
             {
-                using var connection = new SqliteConnection(connectionString);
-                connection.Open();
-
-                using var command = connection.CreateCommand();
-                command.CommandText = "SELECT ItemId, Seconds FROM Playtime WHERE UserId = $userId;";
-                command.Parameters.AddWithValue("$userId", userId);
-
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
+                using var db = new LiteDatabase(GetPlaytimeConnectionString());
+                var col = db.GetCollection<PlaytimeEntry>("Playtime");
+                foreach (var entry in col.Find(x => x.UserId == userId))
                 {
-                    var itemId = reader.GetString(0);
-                    var seconds = reader.GetInt64(1);
-                    totalSeconds += seconds;
-
-                    var item = LibraryManager.GetItemById(itemId);
+                    totalSeconds += entry.Seconds;
+                    var item = LibraryManager.GetItemById(entry.ItemId);
                     var itemName = item?.Name ?? "Unknown Game";
 
                     games.Add(new
                     {
-                        itemId,
+                        itemId = entry.ItemId,
                         itemName,
-                        seconds
+                        seconds = entry.Seconds
                     });
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Failed to query user playtime from SQLite for user {UserId}", userId);
+                Logger.LogError(ex, "[JellyEmu] Failed to query user playtime from LiteDB for user {UserId}", userId);
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to query database.");
             }
 
@@ -120,22 +109,17 @@ namespace JellyEmu.Controllers
             long grandTotalSeconds = 0;
 
             EnsureDatabaseCreated();
-            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
-            var connectionString = $"Data Source={dbPath}";
 
             try
             {
-                using var connection = new SqliteConnection(connectionString);
-                connection.Open();
+                using var db = new LiteDatabase(GetPlaytimeConnectionString());
+                var col = db.GetCollection<PlaytimeEntry>("Playtime");
+                var allEntries = col.FindAll().ToList();
 
-                using var command = connection.CreateCommand();
-                command.CommandText = "SELECT UserId, SUM(Seconds) FROM Playtime GROUP BY UserId;";
-
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
+                foreach (var group in allEntries.GroupBy(x => x.UserId))
                 {
-                    var userIdStr = reader.GetString(0);
-                    var totalSeconds = reader.GetInt64(1);
+                    var userIdStr = group.Key;
+                    var totalSeconds = group.Sum(x => x.Seconds);
                     grandTotalSeconds += totalSeconds;
 
                     string username = "Unknown User";
@@ -156,27 +140,22 @@ namespace JellyEmu.Controllers
                     });
                 }
 
-                // Query Top 10 Most Played Game Titles across all users
-                var topGames = new List<object>();
-                using (var topGamesCommand = connection.CreateCommand())
-                {
-                    topGamesCommand.CommandText = "SELECT ItemId, SUM(Seconds) AS TotalSecs FROM Playtime GROUP BY ItemId ORDER BY TotalSecs DESC LIMIT 10;";
-                    using var topGamesReader = topGamesCommand.ExecuteReader();
-                    while (topGamesReader.Read())
+                var topGames = allEntries
+                    .GroupBy(x => x.ItemId)
+                    .Select(g => new { ItemId = g.Key, Seconds = g.Sum(x => x.Seconds) })
+                    .OrderByDescending(g => g.Seconds)
+                    .Take(10)
+                    .Select(g =>
                     {
-                        var itemId = topGamesReader.GetString(0);
-                        var seconds = topGamesReader.GetInt64(1);
-                        var item = LibraryManager.GetItemById(itemId);
-                        var itemName = item?.Name ?? "Unknown Game";
-
-                        topGames.Add(new
+                        var item = LibraryManager.GetItemById(g.ItemId);
+                        return (object)new
                         {
-                            itemId,
-                            itemName,
-                            seconds
-                        });
-                    }
-                }
+                            itemId = g.ItemId,
+                            itemName = item?.Name ?? "Unknown Game",
+                            seconds = g.Seconds
+                        };
+                    })
+                    .ToList();
 
                 return Ok(new
                 {
@@ -187,7 +166,7 @@ namespace JellyEmu.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Failed to query all users playtime from SQLite");
+                Logger.LogError(ex, "[JellyEmu] Failed to query all users playtime from LiteDB");
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to query database.");
             }
         }

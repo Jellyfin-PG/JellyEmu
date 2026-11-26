@@ -9,7 +9,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
-using Microsoft.Data.Sqlite;
+using LiteDB;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace JellyEmu.Controllers
@@ -552,7 +552,21 @@ namespace JellyEmu.Controllers
         }
 
         private static bool _dbInitialized = false;
+        public class PlaytimeEntry
+        {
+            public string Id { get; set; } = string.Empty;
+            public string UserId { get; set; } = string.Empty;
+            public string ItemId { get; set; } = string.Empty;
+            public long Seconds { get; set; }
+        }
+
         private static readonly object _dbLock = new object();
+
+        protected string GetPlaytimeConnectionString()
+        {
+            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.litedb");
+            return $"Filename={dbPath};Connection=shared";
+        }
 
         protected void EnsureDatabaseCreated()
         {
@@ -561,48 +575,76 @@ namespace JellyEmu.Controllers
             {
                 if (_dbInitialized) return;
 
-                var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
-                var connectionString = $"Data Source={dbPath}";
-
                 try
                 {
-                    using (var connection = new SqliteConnection(connectionString))
-                    {
-                        connection.Open();
-                        using var createTableCommand = connection.CreateCommand();
-                        createTableCommand.CommandText =
-                            @"CREATE TABLE IF NOT EXISTS Playtime (
-                                UserId TEXT NOT NULL,
-                                ItemId TEXT NOT NULL,
-                                Seconds INTEGER NOT NULL,
-                                PRIMARY KEY (UserId, ItemId)
-                            );";
-                        createTableCommand.ExecuteNonQuery();
-                    }
+                    using var db = new LiteDatabase(GetPlaytimeConnectionString());
+                    var col = db.GetCollection<PlaytimeEntry>("Playtime");
+                    col.EnsureIndex(x => x.UserId);
+                    col.EnsureIndex(x => x.ItemId);
 
-                    // Run migration for existing playtime.json files
-                    MigrateLegacyPlaytime(dbPath);
+                    MigrateLegacyPlaytime(col);
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "[JellyEmu] Failed to initialize SQLite database or migrate legacy playtime.");
+                    Logger.LogError(ex, "[JellyEmu] Failed to initialize LiteDB playtime database or migrate legacy playtime.");
                 }
 
                 _dbInitialized = true;
             }
         }
 
-        private void MigrateLegacyPlaytime(string dbPath)
+        private void MigrateLegacyPlaytime(ILiteCollection<PlaytimeEntry> col)
         {
+            var legacyDbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
+            if (System.IO.File.Exists(legacyDbPath))
+            {
+                try
+                {
+                    int migratedCount = 0;
+                    var readOk = LegacySqliteMigrator.TryReadTable(
+                        legacyDbPath,
+                        "SELECT UserId, ItemId, Seconds FROM Playtime",
+                        reader =>
+                        {
+                            var userId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                            var itemId = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                            var seconds = reader.IsDBNull(2) ? 0L : reader.GetInt64(2);
+                            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(itemId)) return;
+
+                            var id = $"{userId}|{itemId}";
+                            var existing = col.FindById(id);
+                            if (existing == null || existing.Seconds < seconds)
+                            {
+                                col.Upsert(new PlaytimeEntry
+                                {
+                                    Id = id,
+                                    UserId = userId,
+                                    ItemId = itemId,
+                                    Seconds = seconds
+                                });
+                            }
+                            migratedCount++;
+                        },
+                        Logger);
+
+                    if (readOk)
+                    {
+                        var bakPath = legacyDbPath + ".bak";
+                        if (System.IO.File.Exists(bakPath)) System.IO.File.Delete(bakPath);
+                        System.IO.File.Move(legacyDbPath, bakPath);
+                        Logger.LogInformation("[JellyEmu] Migrated {Count} playtime records from {DbPath} to LiteDB and renamed to .bak", migratedCount, legacyDbPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "[JellyEmu] Failed to migrate legacy playtime SQLite database {DbPath}", legacyDbPath);
+                }
+            }
+
             var savesDir = Path.Combine(AppPaths.DataPath, "jellyemu-saves");
             if (!Directory.Exists(savesDir)) return;
 
             var userDirs = Directory.GetDirectories(savesDir);
-            var connectionString = $"Data Source={dbPath}";
-
-            using var connection = new SqliteConnection(connectionString);
-            connection.Open();
-
             foreach (var userDir in userDirs)
             {
                 var userId = Path.GetFileName(userDir);
@@ -615,33 +657,27 @@ namespace JellyEmu.Controllers
                     {
                         var json = System.IO.File.ReadAllText(jsonPath);
                         using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        
-                        using var transaction = connection.BeginTransaction();
+
                         foreach (var prop in doc.RootElement.EnumerateObject())
                         {
                             var itemId = prop.Name;
                             var seconds = prop.Value.GetInt64();
-
-                            using var insertCommand = connection.CreateCommand();
-                            insertCommand.Transaction = transaction;
-                            insertCommand.CommandText =
-                                @"INSERT INTO Playtime (UserId, ItemId, Seconds)
-                                  VALUES ($userId, $itemId, $seconds)
-                                  ON CONFLICT(UserId, ItemId) DO UPDATE SET
-                                    Seconds = Seconds + excluded.Seconds;";
-                            insertCommand.Parameters.AddWithValue("$userId", userId);
-                            insertCommand.Parameters.AddWithValue("$itemId", itemId);
-                            insertCommand.Parameters.AddWithValue("$seconds", seconds);
-                            insertCommand.ExecuteNonQuery();
+                            var id = $"{userId}|{itemId}";
+                            var existing = col.FindById(id);
+                            col.Upsert(new PlaytimeEntry
+                            {
+                                Id = id,
+                                UserId = userId,
+                                ItemId = itemId,
+                                Seconds = (existing?.Seconds ?? 0) + seconds
+                            });
                         }
-                        transaction.Commit();
 
-                        // Rename legacy file to prevent re-migration
                         var migratedPath = Path.Combine(userDir, "playtime.json.migrated");
                         if (System.IO.File.Exists(migratedPath)) System.IO.File.Delete(migratedPath);
                         System.IO.File.Move(jsonPath, migratedPath);
 
-                        Logger.LogInformation("[JellyEmu] Successfully migrated playtime.json to SQLite for user {UserId}", userId);
+                        Logger.LogInformation("[JellyEmu] Successfully migrated playtime.json to LiteDB for user {UserId}", userId);
                     }
                     catch (Exception ex)
                     {
@@ -654,25 +690,19 @@ namespace JellyEmu.Controllers
         protected long ReadPlaytimeSeconds(string userId, string itemId)
         {
             EnsureDatabaseCreated();
-            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
-            var connectionString = $"Data Source={dbPath}";
-
             try
             {
-                using var connection = new SqliteConnection(connectionString);
-                connection.Open();
-
-                using var selectCommand = connection.CreateCommand();
-                selectCommand.CommandText = "SELECT Seconds FROM Playtime WHERE UserId = $userId AND ItemId = $itemId LIMIT 1;";
-                selectCommand.Parameters.AddWithValue("$userId", userId);
-                selectCommand.Parameters.AddWithValue("$itemId", itemId);
-
-                var result = selectCommand.ExecuteScalar();
-                return result != null ? (long)result : 0;
+                lock (_dbLock)
+                {
+                    using var db = new LiteDatabase(GetPlaytimeConnectionString());
+                    var col = db.GetCollection<PlaytimeEntry>("Playtime");
+                    var entry = col.FindById($"{userId}|{itemId}");
+                    return entry?.Seconds ?? 0;
+                }
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Failed to read playtime from SQLite for user {UserId}, itemId {ItemId}", userId, itemId);
+                Logger.LogError(ex, "[JellyEmu] Failed to read playtime from LiteDB for user {UserId}, itemId {ItemId}", userId, itemId);
                 return 0;
             }
         }
@@ -681,29 +711,26 @@ namespace JellyEmu.Controllers
         {
             if (seconds <= 0) return;
             EnsureDatabaseCreated();
-            var dbPath = Path.Combine(AppPaths.DataPath, "jellyemu-playtime.db");
-            var connectionString = $"Data Source={dbPath}";
-
             try
             {
-                using var connection = new SqliteConnection(connectionString);
-                connection.Open();
-
-                using var insertCommand = connection.CreateCommand();
-                insertCommand.CommandText =
-                    @"INSERT INTO Playtime (UserId, ItemId, Seconds)
-                      VALUES ($userId, $itemId, $seconds)
-                      ON CONFLICT(UserId, ItemId) DO UPDATE SET
-                        Seconds = Seconds + excluded.Seconds;";
-                insertCommand.Parameters.AddWithValue("$userId", userId);
-                insertCommand.Parameters.AddWithValue("$itemId", itemId);
-                insertCommand.Parameters.AddWithValue("$seconds", seconds);
-
-                insertCommand.ExecuteNonQuery();
+                lock (_dbLock)
+                {
+                    using var db = new LiteDatabase(GetPlaytimeConnectionString());
+                    var col = db.GetCollection<PlaytimeEntry>("Playtime");
+                    var id = $"{userId}|{itemId}";
+                    var existing = col.FindById(id);
+                    col.Upsert(new PlaytimeEntry
+                    {
+                        Id = id,
+                        UserId = userId,
+                        ItemId = itemId,
+                        Seconds = (existing?.Seconds ?? 0) + seconds
+                    });
+                }
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[JellyEmu] Failed to save/update playtime in SQLite for user {UserId}, itemId {ItemId}", userId, itemId);
+                Logger.LogError(ex, "[JellyEmu] Failed to save/update playtime in LiteDB for user {UserId}, itemId {ItemId}", userId, itemId);
             }
         }
 

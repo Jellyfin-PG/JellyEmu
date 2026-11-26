@@ -37,7 +37,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -76,7 +75,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -122,7 +120,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -145,7 +142,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -172,7 +168,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -210,7 +205,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -245,7 +239,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -296,7 +289,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }
@@ -333,7 +325,6 @@ namespace JellyEmu.Tests
             }
             finally
             {
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
             }
         }

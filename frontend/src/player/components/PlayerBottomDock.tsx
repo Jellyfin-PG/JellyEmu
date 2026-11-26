@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Button,
   Popover,
@@ -22,6 +22,7 @@ import {
   Camera,
   Settings,
   Sliders,
+  SlidersHorizontal,
   Disc,
   Maximize2,
   Minimize2,
@@ -92,6 +93,12 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
       {/* Minimized Expand FAB */}
       {isMinimized && (
         <div
+          data-player-dock="true"
+          onMouseDown={(e) => {
+            if (!(e.target as HTMLElement)?.closest('input, textarea, select')) {
+              e.preventDefault();
+            }
+          }}
           className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out ${
             visible
               ? 'translate-y-0 opacity-100 pointer-events-auto'
@@ -112,6 +119,21 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
 
       {/* Floating Bottom Dock */}
       <div
+        data-player-dock="true"
+        onMouseDown={(e) => {
+          if (!(e.target as HTMLElement)?.closest('input, textarea, select')) {
+            e.preventDefault();
+          }
+        }}
+        onClick={(e) => {
+          const btn = (e.target as HTMLElement)?.closest('button');
+          if (btn && btn.getAttribute('aria-haspopup') !== 'dialog') {
+            requestAnimationFrame(() => {
+              btn.blur();
+              (document.getElementById('retrokit-canvas') as HTMLElement | null)?.focus({ preventScroll: true });
+            });
+          }
+        }}
         className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out ${
           visible && !isMinimized
             ? 'translate-y-0 opacity-100 pointer-events-auto'
@@ -221,35 +243,13 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="bg-neutral-900 border border-white/10 p-3 rounded-xl shadow-2xl text-white min-w-[220px]">
-              <div className="flex flex-col gap-3 w-full">
-                <div className="flex items-center justify-between text-xs text-neutral-300 font-medium">
-                  <span>Audio Volume</span>
-                  <span>{isMuted ? 'Muted' : `${volume}%`}</span>
-                </div>
-                <Slider
-                  size="sm"
-                  step={1}
-                  maxValue={100}
-                  minValue={0}
-                  aria-label="Volume Slider"
-                  value={isMuted ? 0 : volume}
-                  onChange={(val) => onVolumeChange(val as number)}
-                  classNames={{
-                    track: 'bg-white/10',
-                    filler: 'bg-white',
-                    thumb: 'bg-white shadow-md'
-                  }}
-                />
-                <Button
-                  size="sm"
-                  variant="flat"
-                  onPress={onToggleMute}
-                  className="w-full h-8 text-xs bg-white/10 hover:bg-white/15 text-white border border-white/10"
-                >
-                  {isMuted ? 'Unmute Audio' : 'Mute Audio'}
-                </Button>
-              </div>
+            <PopoverContent className="bg-neutral-900 border border-white/10 p-3 rounded-xl shadow-2xl text-white min-w-[240px]">
+              <VolumeMixerPopoverContent
+                volume={volume}
+                isMuted={isMuted}
+                onVolumeChange={onVolumeChange}
+                onToggleMute={onToggleMute}
+              />
             </PopoverContent>
           </Popover>
 
@@ -390,5 +390,146 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
         </div>
       </div>
     </>
+  );
+};
+
+const EQ_CHANNELS: Array<{
+  key: 'subBass' | 'bass' | 'mid' | 'presence' | 'treble';
+  label: string;
+  freq: string;
+}> = [
+  { key: 'subBass', label: 'Sub Bass', freq: '60Hz' },
+  { key: 'bass', label: 'Bass', freq: '230Hz' },
+  { key: 'mid', label: 'Mid', freq: '910Hz' },
+  { key: 'presence', label: 'Presence', freq: '3.6kHz' },
+  { key: 'treble', label: 'Treble', freq: '14kHz' }
+];
+
+const VolumeMixerPopoverContent: React.FC<{
+  volume: number;
+  isMuted: boolean;
+  onVolumeChange: (val: number) => void;
+  onToggleMute: () => void;
+}> = ({ volume, isMuted, onVolumeChange, onToggleMute }) => {
+  const [showMixer, setShowMixer] = useState(false);
+  const [bands, setBands] = useState(() => PlayerBridge.getAudioEqBands());
+
+  const handleBandChange = (key: 'subBass' | 'bass' | 'mid' | 'presence' | 'treble', val: number) => {
+    const next = { ...bands, [key]: val };
+    setBands(next);
+    PlayerBridge.setAudioEqBand(key, val);
+    const userId = PlayerBridge.getConfig()?.userId;
+    if (userId) PlayerBridge.syncAudioEqToServer(userId, next);
+  };
+
+  const handleResetEq = () => {
+    const zeroed = { subBass: 0, bass: 0, mid: 0, presence: 0, treble: 0 };
+    PlayerBridge.resetAudioEq();
+    setBands(zeroed);
+    const userId = PlayerBridge.getConfig()?.userId;
+    if (userId) PlayerBridge.syncAudioEqToServer(userId, zeroed);
+  };
+
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      <div className="flex items-center justify-between text-xs text-neutral-300 font-medium">
+        <span>Audio Volume</span>
+        <span>{isMuted ? 'Muted' : `${volume}%`}</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Slider
+          size="sm"
+          step={1}
+          maxValue={100}
+          minValue={0}
+          aria-label="Volume Slider"
+          value={isMuted ? 0 : volume}
+          onChange={(val) => onVolumeChange(val as number)}
+          classNames={{
+            base: 'flex-1',
+            track: 'bg-white/10',
+            filler: 'bg-white',
+            thumb: 'bg-white shadow-md'
+          }}
+        />
+        <Tooltip content={isMuted ? 'Unmute Audio' : 'Mute Audio'} placement="top">
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            onPress={onToggleMute}
+            className={`w-8 h-8 min-w-8 rounded-lg border border-white/10 transition-colors ${
+              isMuted
+                ? 'bg-white text-black hover:bg-neutral-200'
+                : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </Button>
+        </Tooltip>
+        <Tooltip content="Audio Mixer" placement="top">
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            aria-label="Toggle Audio Mixer"
+            onPress={() => setShowMixer((prev) => !prev)}
+            className={`w-8 h-8 min-w-8 rounded-lg border border-white/10 transition-colors ${
+              showMixer
+                ? 'bg-white text-black hover:bg-neutral-200'
+                : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </Button>
+        </Tooltip>
+      </div>
+
+      {showMixer && (
+        <div className="flex flex-col gap-2.5 pt-2 border-t border-white/10">
+          <div className="flex items-center justify-between text-[11px] text-neutral-400">
+            <span className="font-medium text-neutral-300">Frequency Mixer</span>
+            <button
+              type="button"
+              onClick={handleResetEq}
+              className="text-[10px] text-neutral-400 hover:text-white transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+          {EQ_CHANNELS.map(({ key, label, freq }) => {
+            const db = bands[key] ?? 0;
+            return (
+              <div key={key} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                  <span>
+                    {label} <span className="text-neutral-500">({freq})</span>
+                  </span>
+                  <span className="font-mono text-neutral-300">
+                    {db > 0 ? `+${db}` : db} dB
+                  </span>
+                </div>
+                <Slider
+                  size="sm"
+                  step={1}
+                  minValue={-12}
+                  maxValue={12}
+                  aria-label={`${label} ${freq}`}
+                  value={db}
+                  onChange={(val) => handleBandChange(key, val as number)}
+                  classNames={{
+                    track: 'bg-white/10',
+                    filler: 'bg-white',
+                    thumb: 'bg-white shadow-sm'
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };

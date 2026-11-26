@@ -17,8 +17,7 @@ import {
   Check,
   Tv,
   Gamepad2,
-  Activity,
-  Volume2
+  Activity
 } from 'lucide-react';
 import { PlayerBridge } from '../services/playerBridge';
 import { PlayerInitialData } from '../../types/player';
@@ -63,12 +62,24 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
   const [screenSize, setScreenSize] = useState<string>(config.scale || 'fit');
   const [rotation, setRotation] = useState<string>(String(config.videoRotation || '0'));
   const [fpsOverlay, setFpsOverlay] = useState<string>(config.showFps || '0');
-  const [volume, setVolume] = useState<string>(config.volume !== undefined ? String(config.volume) : '1');
   const [isMuted, setIsMuted] = useState<boolean>(config.mute === '1' || String(config.mute) === 'true');
   const [ffRate, setFfRate] = useState<string>(config.ffrate || '3');
   const [smRate, setSmRate] = useState<string>(config.smrate || '3');
   const [autosave, setAutosave] = useState<boolean>(true);
   const [haptics, setHaptics] = useState<boolean>(true);
+
+  // Sync state from live config whenever modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    const live = PlayerBridge.getConfig() || config;
+    if (live.activeShader) setShader(live.activeShader);
+    if (live.scale) setScreenSize(live.scale);
+    if (live.videoRotation !== undefined) setRotation(String(live.videoRotation));
+    if (live.showFps !== undefined) setFpsOverlay(String(live.showFps));
+    setIsMuted(live.mute === '1' || String(live.mute) === 'true');
+    if (live.ffrate) setFfRate(String(live.ffrate));
+    if (live.smrate) setSmRate(String(live.smrate));
+  }, [isOpen, config]);
 
   const handleSaveSystem = async () => {
     if (!config.userId || !config.platformTag) return;
@@ -109,13 +120,24 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
         scale: screenSize,
         videoRotation: rotation,
         showFps: fpsOverlay,
-        volume,
         mute: isMuted ? '1' : '0',
         ffrate: ffRate,
         smrate: smRate,
         autosave: autosave ? '1' : '0',
         haptics: haptics ? '1' : '0'
       });
+
+      // Keep in-memory config in sync so reopening modal reflects saved values
+      const liveCfg = PlayerBridge.getConfig() as any;
+      if (liveCfg) {
+        liveCfg.activeShader = shader;
+        liveCfg.scale = screenSize;
+        liveCfg.videoRotation = rotation;
+        liveCfg.showFps = fpsOverlay;
+        liveCfg.mute = isMuted ? '1' : '0';
+        liveCfg.ffrate = ffRate;
+        liveCfg.smrate = smRate;
+      }
 
       // Apply live updates directly into running emulator
       PlayerBridge.applyShader(shader);
@@ -124,7 +146,7 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
       PlayerBridge.applyFpsOverlay(fpsOverlay);
       PlayerBridge.applyFastForwardRate(ffRate);
       PlayerBridge.applySlowMotionRate(smRate);
-      PlayerBridge.setVolume(isMuted ? 0 : parseFloat(volume) || 1);
+      PlayerBridge.toggleMute(isMuted);
 
       setStatusMessage('Global settings saved & applied live');
       setTimeout(() => setStatusMessage(''), 3000);
@@ -179,20 +201,6 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
     { value: '2', label: 'Detailed Performance Metrics' }
   ];
 
-  const volumeOptions = [
-    { value: '1', label: '100% (Default)' },
-    { value: '0.9', label: '90%' },
-    { value: '0.8', label: '80%' },
-    { value: '0.7', label: '70%' },
-    { value: '0.6', label: '60%' },
-    { value: '0.5', label: '50%' },
-    { value: '0.4', label: '40%' },
-    { value: '0.3', label: '30%' },
-    { value: '0.2', label: '20%' },
-    { value: '0.1', label: '10%' },
-    { value: '0', label: 'Muted (0%)' }
-  ];
-
   const ffRateOptions = [
     { value: '2', label: '2x Speed' },
     { value: '3', label: '3x Speed' },
@@ -242,10 +250,10 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
                 onSelectionChange={(key) => setActiveTab(key as string)}
                 variant="solid"
                 classNames={{
-                  tabList: 'bg-black/50 p-1 rounded-xl border border-white/10 w-full',
-                  cursor: 'bg-white text-black rounded-lg shadow-sm',
-                  tab: 'h-8 text-xs font-medium text-neutral-400 data-[selected=true]:text-black transition-colors',
-                  tabContent: 'group-data-[selected=true]:text-black'
+                  tabList: 'bg-black/60 p-1 rounded-xl border border-white/10 w-full',
+                  cursor: 'bg-white/15 border border-white/20 rounded-lg shadow-sm',
+                  tab: 'h-8 text-xs font-medium text-neutral-400 hover:text-neutral-200 data-[selected=true]:text-white transition-colors',
+                  tabContent: 'text-neutral-400 group-data-[selected=true]:text-white font-semibold'
                 }}
               >
                 <Tab key="sys" title={`${config.platformTag || 'System'} Settings`} />
@@ -393,20 +401,6 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
                         />
                       </div>
 
-                      {/* Volume */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs text-neutral-300 font-medium flex items-center gap-1">
-                          <Volume2 className="w-3.5 h-3.5 text-neutral-400" />
-                          Default Sound Volume
-                        </label>
-                        <CustomSelect
-                          value={volume}
-                          onChange={setVolume}
-                          options={volumeOptions}
-                          size="sm"
-                        />
-                      </div>
-
                       {/* Audio Mute */}
                       <div className="flex items-center justify-between p-3 rounded-xl bg-black/30 border border-white/10 self-end h-[38px]">
                         <span className="text-xs font-medium text-white">Default Audio Mute</span>
@@ -500,7 +494,6 @@ export const InGameSettingsModal: React.FC<InGameSettingsModalProps> = ({
                         setScreenSize('fit');
                         setRotation('0');
                         setFpsOverlay('0');
-                        setVolume('1');
                         setIsMuted(false);
                         setFfRate('3');
                         setSmRate('3');

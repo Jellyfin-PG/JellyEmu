@@ -291,9 +291,17 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
   const gpCommitTimerRef = useRef<any>(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__JE_INPUT_MODAL_OPEN__ = isOpen;
+    }
     if (isOpen && initialTab) {
       setActiveTab(initialTab);
     }
+    return () => {
+      if (typeof window !== 'undefined') {
+        (window as any).__JE_INPUT_MODAL_OPEN__ = false;
+      }
+    };
   }, [isOpen, initialTab]);
 
   const targetPlatform = resolveTargetPlatform(config);
@@ -483,6 +491,7 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
       (window as any)._jeBindings = updatedPlayerMap[0] || {};
 
       // Immediately propagate to running emulator input engine
+      PlayerBridge.applyInputBindings(updatedPlayerMap);
       if (typeof (window as any)._jeApplyNewBindings === 'function') {
         (window as any)._jeApplyNewBindings(updatedPlayerMap);
       }
@@ -916,10 +925,10 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                 }}
                 variant="solid"
                 classNames={{
-                  tabList: 'bg-black/50 p-1 rounded-xl border border-white/10 w-full overflow-x-auto',
-                  cursor: 'bg-white text-black rounded-lg shadow-sm',
-                  tab: 'h-8 text-xs font-medium text-neutral-400 data-[selected=true]:text-black transition-colors',
-                  tabContent: 'group-data-[selected=true]:text-black font-semibold'
+                  tabList: 'bg-black/60 p-1 rounded-xl border border-white/10 w-full overflow-x-auto',
+                  cursor: 'bg-white/15 border border-white/20 rounded-lg shadow-sm',
+                  tab: 'h-8 text-xs font-medium text-neutral-400 hover:text-neutral-200 data-[selected=true]:text-white transition-colors',
+                  tabContent: 'text-neutral-400 group-data-[selected=true]:text-white font-semibold'
                 }}
               >
                 {Array.from({ length: maxPlayers }).map((_, pIdx) => (

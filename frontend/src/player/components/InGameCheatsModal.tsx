@@ -33,8 +33,18 @@ export const InGameCheatsModal: React.FC<InGameCheatsModalProps> = ({
     const loadCheats = async () => {
       setLoading(true);
       const dbCheats = await PlayerBridge.fetchCheats(itemId);
-      const e = PlayerBridge.getEmulator();
-      const liveCheats = e?.cheats || [];
+      const emu = PlayerBridge.getEngine();
+      let liveCheats: any[] = [];
+      if (emu && emu.cheats) {
+        liveCheats = emu.cheats.getCheats().map((c) => ({
+          desc: c.name,
+          code: c.code,
+          checked: !!c.enabled
+        }));
+      } else {
+        const e = PlayerBridge.getEmulator();
+        liveCheats = e?.cheats || [];
+      }
 
       // Merge server db cheats with live cheats
       const merged: CheatItem[] = dbCheats.map((ch) => {

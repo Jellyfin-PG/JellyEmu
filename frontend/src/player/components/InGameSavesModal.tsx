@@ -139,10 +139,10 @@ export const InGameSavesModal: React.FC<InGameSavesModalProps> = ({
                 onSelectionChange={(key) => setActiveTab(key as string)}
                 variant="solid"
                 classNames={{
-                  tabList: 'bg-black/50 p-1 rounded-xl border border-white/10 w-full',
-                  cursor: 'bg-white text-black rounded-lg shadow-sm',
-                  tab: 'h-8 text-xs font-medium text-neutral-400 data-[selected=true]:text-black transition-colors',
-                  tabContent: 'group-data-[selected=true]:text-black'
+                  tabList: 'bg-black/60 p-1 rounded-xl border border-white/10 w-full',
+                  cursor: 'bg-white/15 border border-white/20 rounded-lg shadow-sm',
+                  tab: 'h-8 text-xs font-medium text-neutral-400 hover:text-neutral-200 data-[selected=true]:text-white transition-colors',
+                  tabContent: 'text-neutral-400 group-data-[selected=true]:text-white font-semibold'
                 }}
               >
                 <Tab key="states" title="Save States" />
