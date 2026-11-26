@@ -25,8 +25,8 @@
     <img src="https://img.shields.io/github/actions/workflow/status/Jellyfin-PG/JellyEmu/codeql.yml?branch=main&label=CodeQL%20Security" alt="CodeQL Status" />
   </a>
 
-  <a href="https://discord.gg/v7P9CAvCKZ">
-    <img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white" />
+  <a href="https://groups.google.com/u/1/g/jellyemu">
+    <img src="https://img.shields.io/badge/Google%20Groups-Join%20Community-4285F4?logo=google&logoColor=white" alt="Google Groups" />
   </a>
 </p>
 
