@@ -52,9 +52,10 @@ export function usePlayerHUD(autoHideMs: number = 3000) {
   useEffect(() => {
     const cfg = PlayerBridge.getConfig();
     if (cfg) {
-      const vol = parseFloat(cfg.volume || '1.0');
-      const muted = cfg.mute === '1';
-      if (!isNaN(vol)) setVolumeState(Math.round(vol * 100));
+      const rawVol = cfg.volume !== undefined && cfg.volume !== '' ? parseFloat(String(cfg.volume)) : 1.0;
+      const pct = isNaN(rawVol) ? 100 : rawVol > 1 ? Math.round(rawVol) : Math.round(rawVol * 100);
+      const muted = cfg.mute === '1' || String(cfg.mute) === 'true' || (cfg.mute as any) === 1;
+      setVolumeState(Math.max(0, Math.min(100, pct)));
       setIsMuted(muted);
     }
     const rawMode = cfg?.showFps || (window as any).JellyEmuConfig?.showFps || (window as any)._globPrefs?.showFps || '0';
@@ -211,7 +212,8 @@ export function usePlayerHUD(autoHideMs: number = 3000) {
     setIsMuted(prev => {
       const next = !prev;
       const floatVol = volume / 100;
-      PlayerBridge.setVolume(next ? 0 : floatVol);
+      PlayerBridge.toggleMute(next);
+      PlayerBridge.setVolume(floatVol);
       const cfg = PlayerBridge.getConfig();
       if (cfg?.userId) {
         PlayerBridge.syncVolumeToServer(cfg.userId, floatVol, next);

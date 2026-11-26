@@ -10,9 +10,9 @@
     <!-- Plugin Metadata Start -->
     <AssemblyName>JellyEmu</AssemblyName>
     <RootNamespace>JellyEmu</RootNamespace>
-    <Version>0.9.4.4</Version>
-    <AssemblyVersion>0.9.4.4</AssemblyVersion>
-    <FileVersion>0.9.4.4</FileVersion>
+    <Version>0.9.5</Version>
+    <AssemblyVersion>0.9.5.0</AssemblyVersion>
+    <FileVersion>0.9.5.0</FileVersion>
     <Authors>Jellyfin-PG</Authors>
     <RepositoryUrl>https://github.com/Jellyfin-PG/JellyEmu</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -23,8 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Jellyfin.Controller" Version="10.11.11" />
     <PackageReference Include="Jellyfin.Model" Version="10.11.11" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Scriban" Version="7.6.1" />
     <PackageReference Include="SharpCompress" Version="0.50.9" />
     <PackageReference Include="System.Text.Encodings.Web" Version="9.0.2" />
@@ -40,6 +39,7 @@
     <EmbeddedResource Include="Configuration\tabs\*.html" />
     <EmbeddedResource Include="Configuration\js\*.js" />
     <!-- Templates -->
+    <EmbeddedResource Include="Templates\player.html" LogicalName="JellyEmu.Templates.player.html" />
     <EmbeddedResource Include="Templates\pico8.html" LogicalName="JellyEmu.Templates.pico8.html" />
     <EmbeddedResource Include="Templates\ejs.html" LogicalName="JellyEmu.Templates.ejs.html" />
     <EmbeddedResource Include="Templates\play.html" LogicalName="JellyEmu.Templates.play.html" />

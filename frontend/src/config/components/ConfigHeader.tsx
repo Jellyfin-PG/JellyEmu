@@ -7,7 +7,7 @@ interface ConfigHeaderProps {
 }
 
 export const ConfigHeader: React.FC<ConfigHeaderProps> = ({
-  version = '0.9.4.1'
+  version = '0.9.5'
 }) => {
   return (
     <div className="flex items-center justify-between border-b border-white/10 pb-5 pt-2">

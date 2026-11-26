@@ -4,8 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using LiteDB;
 using MediaBrowser.Common.Configuration;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -30,13 +30,25 @@ namespace JellyEmu.Services
         string Vsync,
         string FfRate,
         string SmRate,
-        string ShowFps);
+        string ShowFps,
+        string AudioEq);
 
     public record OverrideSummaryItem(
         string Scope,
         string TargetId,
         int PreferenceCount,
         DateTime LastUpdatedUtc);
+
+    public class PreferenceEntry
+    {
+        public string Id { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string Scope { get; set; } = string.Empty;
+        public string TargetId { get; set; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public DateTime UpdatedAt { get; set; }
+    }
 
     public class JellyEmuPreferenceService
     {
@@ -65,18 +77,22 @@ namespace JellyEmu.Services
             Vsync: "1",
             FfRate: "3",
             SmRate: "3",
-            ShowFps: "0");
+            ShowFps: "0",
+            AudioEq: "{}");
 
         public JellyEmuPreferenceService(IApplicationPaths appPaths, ILogger<JellyEmuPreferenceService>? logger = null)
         {
             _appPaths = appPaths;
             _logger = logger ?? NullLogger<JellyEmuPreferenceService>.Instance;
 
-            var dbPath = Path.Combine(_appPaths.DataPath, "jellyemu-preferences.db");
-            _connectionString = $"Data Source={dbPath}";
+            var dbPath = Path.Combine(_appPaths.DataPath, "jellyemu-preferences.litedb");
+            _connectionString = $"Filename={dbPath};Connection=shared";
 
             EnsureDatabaseCreated();
         }
+
+        private static string BuildEntryId(string userId, string scope, string targetId, string key)
+            => $"{userId}|{scope}|{targetId}|{key}";
 
         public void EnsureDatabaseCreated()
         {
@@ -87,37 +103,78 @@ namespace JellyEmu.Services
 
                 try
                 {
-                    using var connection = new SqliteConnection(_connectionString);
-                    connection.Open();
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
+                    col.EnsureIndex(x => x.UserId);
+                    col.EnsureIndex(x => x.Scope);
 
-                    using var command = connection.CreateCommand();
-                    command.CommandText = @"
-                        CREATE TABLE IF NOT EXISTS UserPreferences (
-                            UserId TEXT NOT NULL,
-                            Scope TEXT NOT NULL,
-                            TargetId TEXT NOT NULL,
-                            Key TEXT NOT NULL,
-                            Value TEXT NOT NULL,
-                            UpdatedAt TEXT NOT NULL,
-                            PRIMARY KEY (UserId, Scope, TargetId, Key)
-                        );
-                        CREATE INDEX IF NOT EXISTS IX_UserPreferences_Lookup 
-                        ON UserPreferences(UserId, Scope, TargetId);
-                    ";
-                    command.ExecuteNonQuery();
-
-                    MigrateLegacyPreferences(connection);
+                    MigrateLegacyPreferences(col);
                     _dbInitialized = true;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "[JellyEmu] Failed to initialize SQLite preferences database.");
+                    _logger.LogError(ex, "[JellyEmu] Failed to initialize LiteDB preferences database.");
                 }
             }
         }
 
-        private void MigrateLegacyPreferences(SqliteConnection connection)
+        private void MigrateLegacyPreferences(ILiteCollection<PreferenceEntry> col)
         {
+            var legacyDbPath = Path.Combine(_appPaths.DataPath, "jellyemu-preferences.db");
+            if (File.Exists(legacyDbPath))
+            {
+                try
+                {
+                    int migratedCount = 0;
+                    var readOk = LegacySqliteMigrator.TryReadTable(
+                        legacyDbPath,
+                        "SELECT UserId, Scope, TargetId, Key, Value, UpdatedAt FROM UserPreferences",
+                        reader =>
+                        {
+                            var userId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                            var scope = reader.IsDBNull(1) ? "global" : reader.GetString(1);
+                            var targetId = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+                            var key = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
+                            var value = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
+                            var updatedRaw = reader.IsDBNull(5) ? string.Empty : reader.GetString(5);
+                            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(key)) return;
+
+                            var updatedAt = DateTime.TryParse(updatedRaw, out var parsed)
+                                ? parsed.ToUniversalTime()
+                                : DateTime.UtcNow;
+
+                            var id = BuildEntryId(userId, scope, targetId, key);
+                            if (col.FindById(id) == null)
+                            {
+                                col.Upsert(new PreferenceEntry
+                                {
+                                    Id = id,
+                                    UserId = userId,
+                                    Scope = scope,
+                                    TargetId = targetId,
+                                    Key = key,
+                                    Value = value,
+                                    UpdatedAt = updatedAt
+                                });
+                            }
+                            migratedCount++;
+                        },
+                        _logger);
+
+                    if (readOk)
+                    {
+                        var bakPath = legacyDbPath + ".bak";
+                        if (File.Exists(bakPath)) File.Delete(bakPath);
+                        File.Move(legacyDbPath, bakPath);
+                        _logger.LogInformation("[JellyEmu] Migrated {Count} preference records from {DbPath} to LiteDB and renamed to .bak", migratedCount, legacyDbPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[JellyEmu] Failed to migrate legacy preferences SQLite database {DbPath}", legacyDbPath);
+                }
+            }
+
             try
             {
                 var savesDir = Path.Combine(_appPaths.DataPath, "jellyemu-saves");
@@ -138,33 +195,25 @@ namespace JellyEmu.Services
                             using var doc = JsonDocument.Parse(json);
                             var root = doc.RootElement;
 
-                            var now = DateTime.UtcNow.ToString("o");
-                            using var transaction = connection.BeginTransaction();
+                            var now = DateTime.UtcNow;
 
                             void Upsert(string scope, string targetId, string key, string value)
                             {
-                                using var cmd = connection.CreateCommand();
-                                cmd.Transaction = transaction;
-                                cmd.CommandText = @"
-                                    INSERT INTO UserPreferences (UserId, Scope, TargetId, Key, Value, UpdatedAt)
-                                    VALUES ($userId, $scope, $targetId, $key, $value, $updatedAt)
-                                    ON CONFLICT(UserId, Scope, TargetId, Key) DO UPDATE SET
-                                        Value = excluded.Value,
-                                        UpdatedAt = excluded.UpdatedAt;
-                                ";
-                                cmd.Parameters.AddWithValue("$userId", userId);
-                                cmd.Parameters.AddWithValue("$scope", scope);
-                                cmd.Parameters.AddWithValue("$targetId", targetId);
-                                cmd.Parameters.AddWithValue("$key", key);
-                                cmd.Parameters.AddWithValue("$value", value);
-                                cmd.Parameters.AddWithValue("$updatedAt", now);
-                                cmd.ExecuteNonQuery();
+                                col.Upsert(new PreferenceEntry
+                                {
+                                    Id = BuildEntryId(userId, scope, targetId, key),
+                                    UserId = userId,
+                                    Scope = scope,
+                                    TargetId = targetId,
+                                    Key = key,
+                                    Value = value,
+                                    UpdatedAt = now
+                                });
                             }
 
                             string Str(string k, string def) => root.TryGetProperty(k, out var v) ? (v.GetString() ?? def) : def;
                             int Int(string k, int def) => root.TryGetProperty(k, out var v) ? v.GetInt32() : def;
 
-                            // Global settings
                             Upsert("global", "", "scale", Str("scale", SystemDefaults.Scale));
                             Upsert("global", "", "mute", Str("mute", SystemDefaults.Mute));
                             Upsert("global", "", "controller", Str("controller", SystemDefaults.Controller));
@@ -183,13 +232,12 @@ namespace JellyEmu.Services
                             Upsert("global", "", "smrate", Str("smrate", SystemDefaults.SmRate));
                             Upsert("global", "", "showFps", Str("showFps", SystemDefaults.ShowFps));
 
-                            // Extract platformCores into 'system' scope
                             var platformCoresJson = Str("platformCores", string.Empty);
                             if (!string.IsNullOrWhiteSpace(platformCoresJson))
                             {
                                 try
                                 {
-                                    var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(platformCoresJson);
+                                    var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(platformCoresJson);
                                     if (dict != null)
                                     {
                                         foreach (var (platform, core) in dict)
@@ -202,13 +250,11 @@ namespace JellyEmu.Services
                                 catch { }
                             }
 
-                            transaction.Commit();
-
                             var migratedPath = Path.Combine(userDir, "prefs.json.migrated");
                             if (File.Exists(migratedPath)) File.Delete(migratedPath);
                             File.Move(prefsPath, migratedPath);
 
-                            _logger.LogInformation("[JellyEmu] Successfully migrated prefs.json to SQLite for user {UserId}", userId);
+                            _logger.LogInformation("[JellyEmu] Successfully migrated prefs.json to LiteDB for user {UserId}", userId);
                         }
                         catch (Exception ex)
                         {
@@ -239,7 +285,7 @@ namespace JellyEmu.Services
         /// Retrieves effective runtime preferences for a user:
         /// Defaults -> Global -> System (platformTag).
         /// </summary>
-        public async Task<EffectiveUserPrefs> GetEffectivePreferencesAsync(string userId, string? platformTag = null)
+        public Task<EffectiveUserPrefs> GetEffectivePreferencesAsync(string userId, string? platformTag = null)
         {
             var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var canonical = !string.IsNullOrWhiteSpace(platformTag) ? JellyEmuInputService.ResolveSchemeKey(platformTag) : null;
@@ -247,33 +293,31 @@ namespace JellyEmu.Services
 
             try
             {
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
-
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    SELECT Scope, Key, Value 
-                    FROM UserPreferences
-                    WHERE UserId = $userId AND (
-                        (Scope = 'global' AND TargetId = '') OR
-                        ($platformTag IS NOT NULL AND Scope = 'system' AND (TargetId = $platformTag OR ($canonical IS NOT NULL AND TargetId = $canonical)))
-                    )
-                    ORDER BY CASE Scope 
-                        WHEN 'global' THEN 1 
-                        WHEN 'system' THEN 2 
-                        ELSE 0 END,
-                        CASE WHEN TargetId = $canonical THEN 2 ELSE 1 END;
-                ";
-                cmd.Parameters.AddWithValue("$userId", userId);
-                cmd.Parameters.AddWithValue("$platformTag", (object?)platformTag ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("$canonical", (object?)canonical ?? DBNull.Value);
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                lock (_dbLock)
                 {
-                    var key = reader.GetString(1);
-                    var val = reader.GetString(2);
-                    dict[key] = val;
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
+                    var entries = col.Find(x => x.UserId == userId).ToList();
+
+                    foreach (var e in entries.Where(x => x.Scope == "global" && string.IsNullOrEmpty(x.TargetId)))
+                    {
+                        dict[e.Key] = e.Value;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(platformTag))
+                    {
+                        foreach (var e in entries.Where(x => x.Scope == "system" && x.TargetId == platformTag))
+                        {
+                            dict[e.Key] = e.Value;
+                        }
+                        if (!string.IsNullOrWhiteSpace(canonical))
+                        {
+                            foreach (var e in entries.Where(x => x.Scope == "system" && x.TargetId == canonical))
+                            {
+                                dict[e.Key] = e.Value;
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -323,7 +367,7 @@ namespace JellyEmu.Services
                 return SystemDefaults.Controls;
             }
 
-            return new EffectiveUserPrefs(
+            return Task.FromResult(new EffectiveUserPrefs(
                 Scale: GetScale(),
                 Mute: Get("mute", SystemDefaults.Mute),
                 Volume: Get("volume", SystemDefaults.Volume),
@@ -342,13 +386,14 @@ namespace JellyEmu.Services
                 Vsync: Get("vsync", SystemDefaults.Vsync),
                 FfRate: Get("ffrate", SystemDefaults.FfRate),
                 SmRate: Get("smrate", SystemDefaults.SmRate),
-                ShowFps: Get("showFps", SystemDefaults.ShowFps));
+                ShowFps: Get("showFps", SystemDefaults.ShowFps),
+                AudioEq: Get("audioEq", "{}")));
         }
 
         /// <summary>
         /// Retrieves explicit scoped preferences (raw key-value pairs) configured at that exact level.
         /// </summary>
-        public async Task<Dictionary<string, string>> GetScopedPreferencesAsync(string userId, string scope, string targetId)
+        public Task<Dictionary<string, string>> GetScopedPreferencesAsync(string userId, string scope, string targetId)
         {
             var normalizedScope = NormalizeScope(scope);
             var normalizedTarget = NormalizeTarget(normalizedScope, targetId);
@@ -356,23 +401,14 @@ namespace JellyEmu.Services
 
             try
             {
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
-
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    SELECT Key, Value 
-                    FROM UserPreferences 
-                    WHERE UserId = $userId AND Scope = $scope AND TargetId = $targetId;
-                ";
-                cmd.Parameters.AddWithValue("$userId", userId);
-                cmd.Parameters.AddWithValue("$scope", normalizedScope);
-                cmd.Parameters.AddWithValue("$targetId", normalizedTarget);
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                lock (_dbLock)
                 {
-                    results[reader.GetString(0)] = reader.GetString(1);
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
+                    foreach (var e in col.Find(x => x.UserId == userId && x.Scope == normalizedScope && (x.TargetId ?? "") == normalizedTarget))
+                    {
+                        results[e.Key] = e.Value;
+                    }
                 }
             }
             catch (Exception ex)
@@ -380,173 +416,137 @@ namespace JellyEmu.Services
                 _logger.LogError(ex, "[JellyEmu] Failed to get scoped preferences for user {UserId}, scope={Scope}, target={Target}", userId, scope, targetId);
             }
 
-            return results;
+            return Task.FromResult(results);
         }
 
         /// <summary>
         /// Upserts preferences at the specified scope (global or system).
         /// </summary>
-        public async Task SetPreferencesAsync(string userId, string scope, string targetId, IDictionary<string, string?> preferences)
+        public Task SetPreferencesAsync(string userId, string scope, string targetId, IDictionary<string, string?> preferences)
         {
-            if (preferences == null || preferences.Count == 0) return;
+            if (preferences == null || preferences.Count == 0) return Task.CompletedTask;
 
             var normalizedScope = NormalizeScope(scope);
             var normalizedTarget = NormalizeTarget(normalizedScope, targetId);
-            var now = DateTime.UtcNow.ToString("o");
+            var now = DateTime.UtcNow;
 
             try
             {
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
-                await using var transaction = await connection.BeginTransactionAsync();
-
-                foreach (var (key, value) in preferences)
+                lock (_dbLock)
                 {
-                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
 
-                    if (value == null)
+                    foreach (var (key, value) in preferences)
                     {
-                        await using var deleteCmd = connection.CreateCommand();
-                        deleteCmd.Transaction = (SqliteTransaction)transaction;
-                        deleteCmd.CommandText = @"
-                            DELETE FROM UserPreferences 
-                            WHERE UserId = $userId AND Scope = $scope AND TargetId = $targetId AND Key = $key;
-                        ";
-                        deleteCmd.Parameters.AddWithValue("$userId", userId);
-                        deleteCmd.Parameters.AddWithValue("$scope", normalizedScope);
-                        deleteCmd.Parameters.AddWithValue("$targetId", normalizedTarget);
-                        deleteCmd.Parameters.AddWithValue("$key", key);
-                        await deleteCmd.ExecuteNonQueryAsync();
-                    }
-                    else
-                    {
-                        await using var upsertCmd = connection.CreateCommand();
-                        upsertCmd.Transaction = (SqliteTransaction)transaction;
-                        upsertCmd.CommandText = @"
-                            INSERT INTO UserPreferences (UserId, Scope, TargetId, Key, Value, UpdatedAt)
-                            VALUES ($userId, $scope, $targetId, $key, $value, $updatedAt)
-                            ON CONFLICT(UserId, Scope, TargetId, Key) DO UPDATE SET
-                                Value = excluded.Value,
-                                UpdatedAt = excluded.UpdatedAt;
-                        ";
-                        upsertCmd.Parameters.AddWithValue("$userId", userId);
-                        upsertCmd.Parameters.AddWithValue("$scope", normalizedScope);
-                        upsertCmd.Parameters.AddWithValue("$targetId", normalizedTarget);
-                        upsertCmd.Parameters.AddWithValue("$key", key);
-                        upsertCmd.Parameters.AddWithValue("$value", value);
-                        upsertCmd.Parameters.AddWithValue("$updatedAt", now);
-                        await upsertCmd.ExecuteNonQueryAsync();
+                        if (string.IsNullOrWhiteSpace(key)) continue;
+                        var id = BuildEntryId(userId, normalizedScope, normalizedTarget, key);
+
+                        if (value == null)
+                        {
+                            col.Delete(id);
+                        }
+                        else
+                        {
+                            col.Upsert(new PreferenceEntry
+                            {
+                                Id = id,
+                                UserId = userId,
+                                Scope = normalizedScope,
+                                TargetId = normalizedTarget,
+                                Key = key,
+                                Value = value,
+                                UpdatedAt = now
+                            });
+                        }
                     }
                 }
-
-                await transaction.CommitAsync();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[JellyEmu] Failed to set preferences for user {UserId}, scope={Scope}, target={Target}", userId, scope, targetId);
                 throw;
             }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>
         /// Deletes a specific preference key or all preferences at a scope.
         /// </summary>
-        public async Task<bool> DeletePreferenceAsync(string userId, string scope, string targetId, string? key = null)
+        public Task<bool> DeletePreferenceAsync(string userId, string scope, string targetId, string? key = null)
         {
             var normalizedScope = NormalizeScope(scope);
             var normalizedTarget = NormalizeTarget(normalizedScope, targetId);
 
             try
             {
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
-
-                await using var cmd = connection.CreateCommand();
-                if (string.IsNullOrWhiteSpace(key))
+                lock (_dbLock)
                 {
-                    cmd.CommandText = @"
-                        DELETE FROM UserPreferences 
-                        WHERE UserId = $userId AND Scope = $scope AND TargetId = $targetId;
-                    ";
-                }
-                else
-                {
-                    cmd.CommandText = @"
-                        DELETE FROM UserPreferences 
-                        WHERE UserId = $userId AND Scope = $scope AND TargetId = $targetId AND Key = $key;
-                    ";
-                    cmd.Parameters.AddWithValue("$key", key);
-                }
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
 
-                cmd.Parameters.AddWithValue("$userId", userId);
-                cmd.Parameters.AddWithValue("$scope", normalizedScope);
-                cmd.Parameters.AddWithValue("$targetId", normalizedTarget);
+                    if (string.IsNullOrWhiteSpace(key))
+                    {
+                        var deleted = col.DeleteMany(x => x.UserId == userId && x.Scope == normalizedScope && x.TargetId == normalizedTarget);
+                        return Task.FromResult(deleted > 0);
+                    }
 
-                var rows = await cmd.ExecuteNonQueryAsync();
-                return rows > 0;
+                    var id = BuildEntryId(userId, normalizedScope, normalizedTarget, key);
+                    return Task.FromResult(col.Delete(id));
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[JellyEmu] Failed to delete preferences for user {UserId}, scope={Scope}, target={Target}, key={Key}", userId, scope, targetId, key);
-                return false;
+                return Task.FromResult(false);
             }
         }
 
         /// <summary>
         /// Completely resets all preferences for a user back to factory defaults.
         /// </summary>
-        public async Task<bool> ResetUserPreferencesAsync(string userId)
+        public Task<bool> ResetUserPreferencesAsync(string userId)
         {
             try
             {
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
-
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM UserPreferences WHERE UserId = $userId;";
-                cmd.Parameters.AddWithValue("$userId", userId);
-
-                await cmd.ExecuteNonQueryAsync();
-                return true;
+                lock (_dbLock)
+                {
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
+                    col.DeleteMany(x => x.UserId == userId);
+                    return Task.FromResult(true);
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[JellyEmu] Failed to reset preferences for user {UserId}", userId);
-                return false;
+                return Task.FromResult(false);
             }
         }
 
         /// <summary>
         /// Summarizes all custom system overrides configured for a user.
         /// </summary>
-        public async Task<List<OverrideSummaryItem>> GetAllOverridesSummaryAsync(string userId)
+        public Task<List<OverrideSummaryItem>> GetAllOverridesSummaryAsync(string userId)
         {
             var list = new List<OverrideSummaryItem>();
             try
             {
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
-
-                await using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    SELECT Scope, TargetId, COUNT(*), MAX(UpdatedAt)
-                    FROM UserPreferences
-                    WHERE UserId = $userId AND Scope = 'system'
-                    GROUP BY Scope, TargetId
-                    ORDER BY TargetId;
-                ";
-                cmd.Parameters.AddWithValue("$userId", userId);
-
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                lock (_dbLock)
                 {
-                    var scope = reader.GetString(0);
-                    var targetId = reader.GetString(1);
-                    var count = reader.GetInt32(2);
-                    var updatedStr = reader.GetString(3);
-                    var updated = DateTime.TryParse(updatedStr, out var d) ? d : DateTime.UtcNow;
+                    using var db = new LiteDatabase(_connectionString);
+                    var col = db.GetCollection<PreferenceEntry>("UserPreferences");
+                    var groups = col.Find(x => x.UserId == userId && x.Scope == "system")
+                        .GroupBy(x => x.TargetId)
+                        .OrderBy(g => g.Key);
 
-                    list.Add(new OverrideSummaryItem(scope, targetId, count, updated));
+                    foreach (var g in groups)
+                    {
+                        var count = g.Count();
+                        var updated = g.Max(x => x.UpdatedAt);
+                        list.Add(new OverrideSummaryItem("system", g.Key, count, updated));
+                    }
                 }
             }
             catch (Exception ex)
@@ -554,7 +554,7 @@ namespace JellyEmu.Services
                 _logger.LogError(ex, "[JellyEmu] Failed to fetch override summary for user {UserId}", userId);
             }
 
-            return list;
+            return Task.FromResult(list);
         }
 
         private static string NormalizeScope(string? scope)

@@ -65,7 +65,8 @@ namespace JellyEmu.Controllers
                 vsync               = prefs.Vsync,
                 ffrate              = prefs.FfRate,
                 smrate              = prefs.SmRate,
-                showFps             = prefs.ShowFps
+                showFps             = prefs.ShowFps,
+                audioEq             = prefs.AudioEq
             };
             CacheService.Set(cacheKey, (object)result, slidingExpiration: TimeSpan.FromHours(2));
             return Ok(result);

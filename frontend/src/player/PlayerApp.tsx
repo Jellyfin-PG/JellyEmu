@@ -12,6 +12,7 @@ import { InGameNetplayModal } from './components/InGameNetplayModal';
 import { InGameCoreOptionsModal } from './components/InGameCoreOptionsModal';
 import { InGameDiscSelectModal } from './components/InGameDiscSelectModal';
 import { PlayerNotification } from './components/PlayerNotification';
+import { PlayerPerformanceOverlay } from './components/PlayerPerformanceOverlay';
 import { PlayerBridge } from './services/playerBridge';
 
 interface PlayerAppProps {
@@ -21,6 +22,28 @@ interface PlayerAppProps {
 export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
   useEffect(() => {
     PlayerBridge.init(initialData);
+
+    let booted = false;
+    const attemptBoot = async () => {
+      if (booted || PlayerBridge.getEngine()) return;
+      const canvas = (document.getElementById('retrokit-canvas') ||
+        document.querySelector('canvas.ejs_canvas') ||
+        document.querySelector('#game canvas') ||
+        document.querySelector('canvas')) as HTMLCanvasElement | null;
+
+      if (canvas && initialData.romUrl) {
+        booted = true;
+        try {
+          await PlayerBridge.boot(canvas, initialData);
+        } catch (err) {
+          console.error('[PlayerApp] RetroKit boot error:', err);
+        }
+      }
+    };
+
+    attemptBoot();
+    const timer = setTimeout(attemptBoot, 300);
+    return () => clearTimeout(timer);
   }, [initialData]);
 
   const {
@@ -66,7 +89,37 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
 
   useEffect(() => {
     setHasOpenModal(anyModalOpen);
+    if (!anyModalOpen) {
+      const canvas = document.getElementById('retrokit-canvas') as HTMLElement | null;
+      if (canvas) {
+        requestAnimationFrame(() => canvas.focus({ preventScroll: true }));
+      }
+    }
   }, [anyModalOpen, setHasOpenModal]);
+
+  // Ensure clicking/tapping anywhere on the game screen always focuses #retrokit-canvas and blurs any dock/topbar button
+  useEffect(() => {
+    const canvas = document.getElementById('retrokit-canvas') as HTMLElement | null;
+    if (!canvas) return;
+    if (!canvas.hasAttribute('tabindex')) {
+      canvas.setAttribute('tabindex', '0');
+    }
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.closest('header') || target.closest('[data-player-dock]') || target.closest('[role="dialog"]'))) {
+        return;
+      }
+      if (document.activeElement && document.activeElement !== canvas) {
+        (document.activeElement as HTMLElement).blur?.();
+      }
+      canvas.focus({ preventScroll: true });
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    canvas.focus({ preventScroll: true });
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, []);
 
   const isPlay = Boolean(
     initialData.isPlay ||
@@ -92,6 +145,14 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
       }
       if (anyModalOpen) {
         return;
+      }
+
+      // If focus is stuck on a dock/header button (outside a popover/dialog), return focus to the game canvas
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (activeEl && activeEl.tagName === 'BUTTON' && !activeEl.closest('[role="dialog"]')) {
+        activeEl.blur();
+        const canvas = document.getElementById('retrokit-canvas') as HTMLElement | null;
+        canvas?.focus({ preventScroll: true });
       }
 
       // Escape -> Exit game (available across all systems)
@@ -158,6 +219,9 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
   return (
     <HeroUIProvider>
       <div className="dark text-foreground pointer-events-none select-none">
+        {/* Real-time Performance HUD Overlay */}
+        <PlayerPerformanceOverlay initialMode={initialData.showFps} />
+
         {/* In-game OSD Hotkey & Action Notification Pill */}
         <PlayerNotification topBarVisible={visible} />
 

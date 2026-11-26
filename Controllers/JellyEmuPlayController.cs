@@ -29,7 +29,7 @@ namespace JellyEmu.Controllers
 
         [HttpGet("/jellyemu/play/{itemId}")]
         public async Task<IActionResult> Play(string itemId, [FromQuery] string? userId, [FromQuery] int? slot, [FromQuery] string? core,
-            [FromServices] IHttpClientFactory httpClientFactory)
+            [FromQuery] string? engine, [FromServices] IHttpClientFactory httpClientFactory)
         {
             if (!IsValidId(itemId) || (!string.IsNullOrEmpty(userId) && !IsValidId(userId)))
                 return BadRequest("Invalid item or user ID.");
@@ -39,12 +39,135 @@ namespace JellyEmu.Controllers
 
             var resolvedCore = ResolveCore(item, userId, core);
 
-            return resolvedCore switch
+            // Allow legacy fallback query parameter ?engine=legacy if requested
+            if (string.Equals(engine, "legacy", StringComparison.OrdinalIgnoreCase))
             {
-                "pico8" => PlayPico8(itemId, userId),
-                "play"  => await PlayPlay(itemId, userId, slot),
-                _       => await PlayEjs(itemId, userId, slot, core, httpClientFactory)
-            };
+                return resolvedCore switch
+                {
+                    "pico8" => PlayPico8(itemId, userId),
+                    "play"  => await PlayPlay(itemId, userId, slot),
+                    _       => await PlayEjs(itemId, userId, slot, core, httpClientFactory)
+                };
+            }
+
+            return await PlayRetroKit(item, userId, slot, resolvedCore);
+        }
+
+        private async Task<IActionResult> PlayRetroKit(MediaBrowser.Controller.Entities.BaseItem item, string? userId, int? slot, string? resolvedCore)
+        {
+            var itemId = item.Id.ToString("N");
+            var platformTag = ResolvePlatformTag(item);
+            var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".bin";
+            var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
+            var cleanFilename = CleanCosmeticFilename(filename);
+            if (string.IsNullOrWhiteSpace(cleanFilename)) cleanFilename = itemId;
+
+            var romUrl = ToAppUrl($"jellyemu/rom/{itemId}/{cleanFilename}{ext}");
+            if (!string.IsNullOrEmpty(userId)) romUrl += $"?userId={userId}";
+
+            var isM3u = !string.IsNullOrEmpty(item.Path) && (item.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase));
+            var hasSaves = !string.IsNullOrEmpty(userId);
+            var effectivePrefs = hasSaves
+                ? await PreferenceService.GetEffectivePreferencesAsync(userId!, platformTag)
+                : JellyEmuPreferenceService.SystemDefaults;
+
+            var activeSlot = Math.Max(1, slot ?? 1);
+            var activeShader = effectivePrefs.Shader ?? "crt-easymode";
+            var videoRotation = effectivePrefs.VideoRotation;
+            var saveGetUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+            var savePostUrl = hasSaves ? ToAppUrl($"jellyemu/save/{itemId}/{userId}") : "";
+
+            var igdbId = item.GetProviderId("IGDB");
+            int numericGameId;
+            if (!int.TryParse(igdbId, out numericGameId) || numericGameId <= 0)
+            {
+                numericGameId = (item.Id.GetHashCode() & 0x7FFFFFFF);
+                if (numericGameId == 0) numericGameId = 1;
+            }
+
+            var netplayServer = ToAppUrl("jellyemu/netplay");
+            var netplayIceServers = Plugin.Instance?.Configuration.NetplayIceServers ?? string.Empty;
+            var netplayIceServersJson = System.Text.Json.JsonSerializer.Serialize(netplayIceServers);
+            const bool hasNetplay = true;
+
+            var biosService = HttpContext.RequestServices.GetService(typeof(JellyEmuBiosService)) as JellyEmuBiosService;
+            var relBios = biosService?.ResolveBiosRelativePath(platformTag, resolvedCore ?? string.Empty);
+            var biosUrl = !string.IsNullOrEmpty(relBios) ? ToAppUrl($"jellyemu/bios/file/{relBios}") : string.Empty;
+            var dataBaseUrl = ToAppUrl("jellyemu/data");
+
+            var availableCores = GetAvailableCoresForItem(item);
+            var availableCoresJson = System.Text.Json.JsonSerializer.Serialize(availableCores.Select(c => new
+            {
+                id = c.Id,
+                name = c.Name,
+                needsThreads = c.NeedsThreads
+            }));
+
+            var inputService = HttpContext.RequestServices.GetService(typeof(JellyEmuInputService)) as JellyEmuInputService;
+            var inputScheme = inputService?.GetScheme(!string.IsNullOrWhiteSpace(platformTag) ? platformTag : resolvedCore);
+            var inputSchemeJson = inputScheme != null
+                ? System.Text.Json.JsonSerializer.Serialize(inputScheme, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase })
+                : "null";
+
+            var gameName = HtmlEncoder.Default.Encode(item.Name);
+
+            var assembly = typeof(JellyEmuPlayController).Assembly;
+            var resourceName = "JellyEmu.Templates.player.html";
+
+            using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+            {
+                Logger.LogError("[JellyEmu] Player embedded template not found at {ResourceName}", resourceName);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Template resource is missing.");
+            }
+
+            using StreamReader reader = new StreamReader(stream);
+            var templateContent = reader.ReadToEnd();
+            var template = Template.Parse(templateContent);
+
+            if (template.HasErrors)
+            {
+                var errors = string.Join(", ", template.Messages);
+                Logger.LogError("[JellyEmu] Player template parse error: {Errors}", errors);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error parsing Scriban template.");
+            }
+
+            var html = template.Render(new
+            {
+                game_name = gameName,
+                base_url = GetPathBase(),
+                item_id = itemId,
+                user_id = userId ?? string.Empty,
+                platform_tag = platformTag,
+                core = resolvedCore ?? "mgba",
+                rom_url = romUrl,
+                bios_url = biosUrl,
+                data_base_url = dataBaseUrl,
+                available_cores_json = availableCoresJson,
+                input_scheme_json = inputSchemeJson,
+                save_get_url = saveGetUrl,
+                save_post_url = savePostUrl,
+                active_slot = activeSlot,
+                slot_value = slot ?? 0,
+                is_m3u = isM3u,
+                has_netplay = hasNetplay,
+                netplay_server = netplayServer,
+                netplay_ice_servers_json = netplayIceServersJson,
+                game_id = numericGameId,
+                active_shader = activeShader,
+                scale = effectivePrefs.Scale ?? "auto",
+                video_rotation = videoRotation,
+                show_fps = effectivePrefs.ShowFps ?? "0",
+                ffrate = effectivePrefs.FfRate ?? "3",
+                smrate = effectivePrefs.SmRate ?? "3",
+                volume = string.IsNullOrWhiteSpace(effectivePrefs.Volume) ? "1" : effectivePrefs.Volume,
+                mute = effectivePrefs.Mute ?? "0",
+                audio_eq_json = string.IsNullOrWhiteSpace(effectivePrefs.AudioEq) ? "{}" : effectivePrefs.AudioEq,
+                version = JellyEmuVersion.Value
+            });
+
+            ApplyCrossOriginIsolationHeaders();
+            return Content(html, MediaTypeNames.Text.Html);
         }
 
         /// <summary>

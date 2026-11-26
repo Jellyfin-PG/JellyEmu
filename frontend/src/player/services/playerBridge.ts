@@ -1,3 +1,4 @@
+import { RetroKit, StandardAxis, StandardButton } from '@grimmdev/retrokit';
 import {
   PlayerInitialData,
   CheatItem,
@@ -9,12 +10,247 @@ import {
 import { PlayerSessionTracker } from './playerSession';
 
 export class PlayerBridge {
+  private static emu: RetroKit | null = null;
   private static config: PlayerInitialData | null = null;
+  private static sramSyncTimer: any = null;
 
   public static init(config: PlayerInitialData) {
     this.config = config;
     (window as any).jeNotify = this.notify.bind(this);
     PlayerSessionTracker.init(config);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        this.flushSramImmediate();
+      });
+    }
+  }
+
+  public static getEngine(): RetroKit | null {
+    return this.emu;
+  }
+
+  public static async boot(canvas: HTMLCanvasElement, config: PlayerInitialData): Promise<RetroKit> {
+    this.config = config;
+    this.init(config);
+
+    // Determine custom data directory in JellyEmu for WASM cores and engine assets
+    const dataBase = (config.dataBaseUrl || this.getUrl('/jellyemu/data')).replace(/\/$/, '');
+    const playBase = this.getUrl('/jellyemu/play/runtime').replace(/\/$/, '');
+    const assetPaths = {
+      libretro: `${dataBase}/cores`,
+      play: playBase,
+      pico8: `${dataBase}/pico8`,
+      love: `${dataBase}/love`,
+      ruffle: `${dataBase}/ruffle`
+    };
+    const coreLower = (config.core || '').toLowerCase();
+    let assetSubdir = 'cores';
+    if (coreLower === 'play') assetSubdir = 'play';
+    else if (coreLower === 'pico8') assetSubdir = 'pico8';
+    else if (coreLower === 'love') assetSubdir = 'love';
+    else if (coreLower === 'ruffle') assetSubdir = 'ruffle';
+    const assetBaseUrl = coreLower === 'play' ? playBase : `${dataBase}/${assetSubdir}`;
+
+    // Instantiate RetroKit universal orchestrator with custom data directory and per-engine paths
+    this.emu = new RetroKit({
+      canvas,
+      assetBaseUrl,
+      assetPaths,
+      debug: false
+    });
+    this.emu.setCoresDirectory(assetBaseUrl);
+    (window as any).emu = this.emu;
+
+    // Core Lifecycle Event Listeners
+    const urlSlotParam = Number(new URLSearchParams(window.location.search).get('slot') || '0');
+    const launchSlot = (config.launchSlot && config.launchSlot > 0)
+      ? config.launchSlot
+      : (urlSlotParam > 0 ? urlSlotParam : 0);
+
+    this.emu.on('ready', ({ core }) => {
+      this.notify({
+        message: `Core Loaded: ${core.toUpperCase()}`,
+        subtext: config.gameName || 'Ready to play',
+        icon: 'gamepad',
+        variant: 'success'
+      });
+      const loader = document.getElementById('je-loader');
+      if (loader) loader.classList.add('je-dismiss');
+
+      if (launchSlot > 0 && config.itemId && config.userId) {
+        setTimeout(() => {
+          this.loadState(config.itemId, config.userId!, launchSlot)
+            .then((ok) => {
+              if (ok) {
+                this.notify({
+                  message: `Loaded Save State Slot ${launchSlot}`,
+                  icon: 'save',
+                  variant: 'success'
+                });
+              } else {
+                this.notify({
+                  message: `Could not load Save State Slot ${launchSlot}`,
+                  icon: 'alert',
+                  variant: 'warning'
+                });
+              }
+            })
+            .catch(() => {});
+        }, 1500);
+      }
+    });
+
+    this.emu.on('fps', ({ fps }) => {
+      window.dispatchEvent(new CustomEvent('jellyemu:fps-update', { detail: { fps } }));
+    });
+
+    this.emu.on('sramModified', () => {
+      this.queueSramSync();
+    });
+
+    this.emu.on('achievementUnlocked', ({ achievement, hardcore }) => {
+      this.playAchievementSound();
+      this.notify({
+        message: `Achievement Unlocked: ${achievement.title}`,
+        subtext: `${achievement.points} Points${hardcore ? ' [Hardcore]' : ''} - ${achievement.description}`,
+        icon: 'trophy',
+        variant: 'warning',
+        duration: 6000
+      });
+    });
+
+    this.emu.on('error', ({ error }) => {
+      console.error('[PlayerBridge] RetroKit error:', error);
+      this.notify({
+        message: 'Emulation Error',
+        subtext: error?.message || 'Unexpected emulation error',
+        icon: 'alert',
+        variant: 'danger',
+        duration: 8000
+      });
+    });
+
+    // Derive file extension and clean filename
+    const urlClean = (config.romUrl || '').split('?')[0];
+    const ext = urlClean.includes('.') ? urlClean.split('.').pop()! : 'bin';
+    const cleanGameName = (config.gameName || config.itemId || 'game').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // Slot 1 in UI maps to index 0 in RetroArch/RetroKit
+    const slotIndex = config.activeSlot && config.activeSlot > 0 ? config.activeSlot - 1 : 0;
+
+    // Fetch BIOS file if configured for this system
+    let biosMap: Record<string, Uint8Array> | undefined;
+    if (config.biosUrl && config.biosUrl.trim().length > 0) {
+      try {
+        const biosResp = await fetch(this.getUrl(config.biosUrl), { headers: this.getAuthHeaders() });
+        if (biosResp.ok) {
+          const biosBuf = await biosResp.arrayBuffer();
+          const biosFileName = config.biosUrl.split('?')[0].split('/').pop() || 'bios.bin';
+          biosMap = { [biosFileName]: new Uint8Array(biosBuf) };
+        }
+      } catch (err) {
+        console.warn('[PlayerBridge] Failed to fetch BIOS:', err);
+      }
+    }
+
+    // Load Game via RetroKit
+    await this.emu.load(config.romUrl, {
+      core: config.core,
+      system: config.platformTag,
+      platformTag: config.platformTag,
+      fileName: `${cleanGameName}.${ext}`,
+      gameId: config.itemId,
+      coresDirectory: assetBaseUrl,
+      bios: biosMap,
+      initialStateSlot: slotIndex
+    });
+
+    // Apply Live Preferences
+    if (config.activeShader) {
+      this.applyShader(config.activeShader);
+    }
+    if (config.scale) {
+      this.applyScaling(config.scale);
+    }
+    if (config.videoRotation !== undefined) {
+      this.applyRotation(Number(config.videoRotation));
+    }
+    if (config.volume !== undefined) {
+      this.setVolume(Number(config.volume));
+    } else {
+      this.setVolume(1.0);
+    }
+    if (config.mute !== undefined) {
+      this.toggleMute(config.mute === '1' || config.mute === 'true' || config.mute === 1 as any);
+    }
+    if ((config as any).audioEq && typeof (config as any).audioEq === 'object') {
+      const eq = (config as any).audioEq as Record<string, number>;
+      for (const band of ['subBass', 'bass', 'mid', 'presence', 'treble'] as const) {
+        if (typeof eq[band] === 'number') {
+          this.setAudioEqBand(band, eq[band]);
+        }
+      }
+    }
+    if (config.ffrate) {
+      this.applyFastForwardRate(String(config.ffrate));
+    }
+    if (config.smrate) {
+      this.applySlowMotionRate(String(config.smrate));
+    }
+
+    // Load per-user saved core options from server endpoint
+    if (config.userId) {
+      const coreKey = config.platformTag || this.getCoreName();
+      fetch(this.getUrl(`/jellyemu/prefs/${config.userId}?scope=system&targetId=${encodeURIComponent(coreKey)}`), {
+        headers: this.getAuthHeaders()
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const rawJson = data?.preferences?.coreOptionsJson;
+          if (rawJson && typeof rawJson === 'string') {
+            const parsed = JSON.parse(rawJson);
+            for (const [k, v] of Object.entries(parsed)) {
+              if (typeof v === 'string') {
+                this.emu?.options.setOption(k, v);
+              }
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    // Load and apply per-user (or default) input bindings into RetroKit
+    const targetPlatform = config.platformTag || config.core || 'default';
+    Promise.all([
+      this.fetchInputScheme(targetPlatform),
+      config.userId
+        ? this.fetchEffectiveBindings(config.userId, config.itemId || '', targetPlatform)
+        : Promise.resolve(null)
+    ])
+      .then(([schemeRes, savedRes]) => {
+        const merged: Record<number, Record<number, InputBinding>> = {};
+        const defaults = schemeRes?.scheme?.playerDefaultBindings;
+        if (defaults) {
+          for (const [pKey, binds] of Object.entries(defaults)) {
+            merged[Number(pKey)] = { ...(binds as Record<number, InputBinding>) };
+          }
+        }
+        if (savedRes?.playerBindings) {
+          for (const [pKey, binds] of Object.entries(savedRes.playerBindings)) {
+            const pIdx = Number(pKey);
+            merged[pIdx] = { ...(merged[pIdx] || {}), ...binds };
+          }
+        }
+        if (Object.keys(merged).length > 0) {
+          (window as any)._jePlayerBindings = merged;
+          (window as any)._jeBindings = merged[0] || {};
+          this.applyInputBindings(merged);
+        }
+      })
+      .catch(() => {});
+
+    return this.emu;
   }
 
   public static notify(
@@ -82,11 +318,15 @@ export class PlayerBridge {
 
   // Lifecycle & Playback Controls
   public static pause(): void {
-    const e = this.getEmulator();
-    if (e && typeof e.pause === 'function') {
-      try { e.pause(); } catch (err) { console.warn('[PlayerBridge] pause failed:', err); }
-    } else if ((window as any).Module && typeof (window as any).Module.pico8TogglePaused === 'function') {
-      try { (window as any).Module.pico8TogglePaused(); } catch (_) {}
+    if (this.emu) {
+      this.emu.pause();
+    } else {
+      const e = this.getEmulator();
+      if (e && typeof e.pause === 'function') {
+        try { e.pause(); } catch (err) { console.warn('[PlayerBridge] pause failed:', err); }
+      } else if ((window as any).Module && typeof (window as any).Module.pico8TogglePaused === 'function') {
+        try { (window as any).Module.pico8TogglePaused(); } catch (_) {}
+      }
     }
     if (typeof (window as any)._jePauseSessionTracking === 'function') {
       (window as any)._jePauseSessionTracking();
@@ -94,11 +334,15 @@ export class PlayerBridge {
   }
 
   public static resume(): void {
-    const e = this.getEmulator();
-    if (e && typeof e.play === 'function') {
-      try { e.play(); } catch (err) { console.warn('[PlayerBridge] resume failed:', err); }
-    } else if ((window as any).Module && typeof (window as any).Module.pico8TogglePaused === 'function') {
-      try { (window as any).Module.pico8TogglePaused(); } catch (_) {}
+    if (this.emu) {
+      this.emu.play();
+    } else {
+      const e = this.getEmulator();
+      if (e && typeof e.play === 'function') {
+        try { e.play(); } catch (err) { console.warn('[PlayerBridge] resume failed:', err); }
+      } else if ((window as any).Module && typeof (window as any).Module.pico8TogglePaused === 'function') {
+        try { (window as any).Module.pico8TogglePaused(); } catch (_) {}
+      }
     }
     if (typeof (window as any)._jeResumeSessionTracking === 'function') {
       (window as any)._jeResumeSessionTracking();
@@ -107,6 +351,10 @@ export class PlayerBridge {
 
   public static restart(): void {
     this.notify({ message: 'Restarting Game...', subtext: 'Resetting emulator core', icon: 'restart', variant: 'warning' });
+    if (this.emu) {
+      this.emu.restart();
+      return;
+    }
     const gm = this.getGameManager();
     if (gm && typeof gm.restart === 'function') {
       try { gm.restart(); } catch (err) { console.warn('[PlayerBridge] restart failed:', err); }
@@ -115,65 +363,52 @@ export class PlayerBridge {
     }
   }
 
+  private static _fastForwardRate = 2.5;
+  private static _slowMotionRate = 0.5;
+
   public static toggleFastForward(active: boolean): void {
-    const gm = this.getGameManager();
-    if (active) {
-      (window as any)._jeFFActive = true;
-      (window as any)._jeSlowActive = false;
-      if (gm && typeof gm.toggleSlowMotion === 'function') {
-        try { gm.toggleSlowMotion(0); } catch (_) {}
-      }
+    if (this.emu) {
+      this.emu.timing.setFastForward(active, this._fastForwardRate);
     } else {
-      (window as any)._jeFFActive = false;
-    }
-    if (gm && typeof gm.toggleFastForward === 'function') {
-      try { gm.toggleFastForward(active ? 1 : 0); } catch (err) { console.warn('[PlayerBridge] toggleFastForward failed:', err); }
+      const gm = this.getGameManager();
+      if (gm && typeof gm.toggleFastForward === 'function') {
+        try { gm.toggleFastForward(active ? 1 : 0); } catch (err) { console.warn('[PlayerBridge] toggleFastForward failed:', err); }
+      }
     }
     try {
       window.dispatchEvent(new CustomEvent('jellyemu:speed-changed', {
-        detail: { ff: Boolean((window as any)._jeFFActive), slow: Boolean((window as any)._jeSlowActive) }
+        detail: { ff: active, slow: false }
       }));
     } catch (_) {}
   }
 
   public static toggleSlowMotion(active: boolean): void {
-    const gm = this.getGameManager();
-    if (active) {
-      (window as any)._jeSlowActive = true;
-      (window as any)._jeFFActive = false;
-      if (gm && typeof gm.toggleFastForward === 'function') {
-        try { gm.toggleFastForward(0); } catch (_) {}
-      }
+    if (this.emu) {
+      this.emu.timing.setSlowMotion(active, this._slowMotionRate);
     } else {
-      (window as any)._jeSlowActive = false;
-    }
-    if (gm && typeof gm.toggleSlowMotion === 'function') {
-      try { gm.toggleSlowMotion(active ? 1 : 0); } catch (err) { console.warn('[PlayerBridge] toggleSlowMotion failed:', err); }
+      const gm = this.getGameManager();
+      if (gm && typeof gm.toggleSlowMotion === 'function') {
+        try { gm.toggleSlowMotion(active ? 1 : 0); } catch (err) { console.warn('[PlayerBridge] toggleSlowMotion failed:', err); }
+      }
     }
     try {
       window.dispatchEvent(new CustomEvent('jellyemu:speed-changed', {
-        detail: { ff: Boolean((window as any)._jeFFActive), slow: Boolean((window as any)._jeSlowActive) }
+        detail: { ff: false, slow: active }
       }));
     } catch (_) {}
   }
 
   public static exit(): void {
     this.notify({ message: 'Exiting Game...', subtext: 'Closing session', icon: 'exit', variant: 'default' });
+    this.flushSramImmediate();
     PlayerSessionTracker.stop();
-    if ((window as any).JellyEmuNetplay && typeof (window as any).JellyEmuNetplay.dispose === 'function') {
-      try { (window as any).JellyEmuNetplay.dispose(); } catch (_) {}
+
+    if (this.emu) {
+      this.emu.destroy();
     }
     const e = this.getEmulator();
     if (e && typeof e.exit === 'function') {
       try { e.exit(); return; } catch (_) {}
-    }
-    if (typeof (window as any).EJS_onExit === 'function') {
-      (window as any).EJS_onExit();
-      return;
-    }
-    if (typeof (window as any).jeExit === 'function') {
-      (window as any).jeExit();
-      return;
     }
     if (window.opener) {
       window.close();
@@ -231,21 +466,165 @@ export class PlayerBridge {
     if (btn) btn.click();
   }
 
-  // Fullscreen
-  public static toggleFullscreen(): void {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => {
-        this.notify({ message: 'Fullscreen Enabled', icon: 'fullscreen', variant: 'info' });
-      }).catch((err) => {
-        console.warn('[PlayerBridge] Fullscreen failed:', err);
-      });
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().then(() => {
-          this.notify({ message: 'Fullscreen Exited', icon: 'exitfullscreen', variant: 'default' });
-        }).catch(() => {});
+  public static applyFastForwardRate(rate: string): void {
+    const parsed = parseFloat(rate);
+    if (!Number.isNaN(parsed) && parsed > 1) {
+      this._fastForwardRate = parsed;
+      if (this.emu?.timing.isFastForward) {
+        this.emu.timing.setFastForward(true, parsed);
       }
     }
+    const e = this.getEmulator();
+    if (e && typeof e.changeSettingOption === 'function') {
+      try { e.changeSettingOption('ff-ratio', rate); } catch (_) {}
+    }
+  }
+
+  public static applySlowMotionRate(rate: string): void {
+    const parsed = parseFloat(rate);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      // EJS sm-ratio is often "3.0" meaning 1/3 speed, or "0.5" meaning half speed
+      const speedRatio = parsed > 1 ? 1 / parsed : parsed;
+      this._slowMotionRate = speedRatio;
+      if (this.emu?.timing.isSlowMotion) {
+        this.emu.timing.setSlowMotion(true, speedRatio);
+      }
+    }
+    const e = this.getEmulator();
+    if (e && typeof e.changeSettingOption === 'function') {
+      try { e.changeSettingOption('sm-ratio', rate); } catch (_) {}
+    }
+  }
+
+  public static async deleteCachedRom(_itemId?: string): Promise<boolean> {
+    try {
+      const e = this.getEmulator();
+      if (e && e.gameManager && typeof e.gameManager.deleteCache === 'function') {
+        e.gameManager.deleteCache();
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (const k of keys) {
+          if (k.includes('jellyemu') || k.includes('emulatorjs')) {
+            await caches.delete(k);
+          }
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public static async syncVirtualControls(userId: string, enabled: boolean, lefty: boolean): Promise<void> {
+    const e = this.getEmulator();
+    if (e) {
+      if (typeof e.toggleVirtualGamepad === 'function') e.toggleVirtualGamepad(enabled);
+      if (typeof e.toggleVirtualGamepadLeftHanded === 'function') e.toggleVirtualGamepadLeftHanded(lefty);
+    }
+    if ((window as any).JellyEmuConfig) {
+      (window as any).JellyEmuConfig.virtualGamepad = String(enabled);
+      (window as any).JellyEmuConfig.virtualGamepadLefty = String(lefty);
+    }
+    if (!userId) return;
+    try {
+      await fetch(this.getUrl(`/jellyemu/prefs/${userId}`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders()
+        },
+        body: JSON.stringify({
+          virtualGamepad: String(enabled),
+          virtualGamepadLefty: String(lefty)
+        })
+      });
+    } catch (err) {
+      console.warn('[PlayerBridge] syncVirtualControls failed:', err);
+    }
+  }
+
+  // Audio / Volume
+  public static setVolume(vol: number): void {
+    const normalized = Math.max(0, Math.min(1, vol > 1 ? vol / 100 : vol));
+    if (this.emu) {
+      this.emu.audio.setVolume(normalized);
+    }
+    const e = this.getEmulator();
+    if (e) {
+      try {
+        if (typeof e.setVolume === 'function') e.setVolume(normalized);
+        e.volume = normalized;
+      } catch (_) {}
+    }
+    const pm = this.getPlayModule();
+    if (pm && typeof pm.setVolume === 'function') {
+      try { pm.setVolume(normalized); } catch (_) {}
+    }
+  }
+
+  public static toggleMute(muted: boolean): void {
+    if (this.emu) {
+      this.emu.audio.setMute(muted);
+    }
+  }
+
+  public static setAudioEqBand(band: 'subBass' | 'bass' | 'mid' | 'presence' | 'treble', gainDb: number): void {
+    if (this.emu?.audio && typeof this.emu.audio.setEqBand === 'function') {
+      this.emu.audio.setEqBand(band, gainDb);
+    }
+  }
+
+  public static getAudioEqBands(): Record<'subBass' | 'bass' | 'mid' | 'presence' | 'treble', number> {
+    if (this.emu?.audio && typeof this.emu.audio.getEqBands === 'function') {
+      return this.emu.audio.getEqBands();
+    }
+    return { subBass: 0, bass: 0, mid: 0, presence: 0, treble: 0 };
+  }
+
+  public static resetAudioEq(): void {
+    if (this.emu?.audio && typeof this.emu.audio.resetEq === 'function') {
+      this.emu.audio.resetEq();
+    }
+  }
+
+  public static syncAudioEqToServer(userId: string, bands: Record<string, number>): void {
+    if (!userId) return;
+    const cfg = this.getConfig() as any;
+    if (cfg) cfg.audioEq = { ...bands };
+    fetch(this.getUrl(`/jellyemu/prefs/${userId}`), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders()
+      },
+      body: JSON.stringify({
+        scope: 'global',
+        targetId: '',
+        preferences: {
+          audioEq: JSON.stringify(bands)
+        }
+      })
+    }).catch(() => {});
+  }
+
+  public static syncVolumeToServer(userId: string, volume: number, isMuted: boolean): void {
+    if (!userId) return;
+    fetch(this.getUrl(`/jellyemu/prefs/${userId}`), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders()
+      },
+      body: JSON.stringify({
+        scope: 'global',
+        targetId: '',
+        preferences: {
+          volume: volume.toString(),
+          mute: isMuted ? '1' : '0'
+        }
+      })
+    }).catch(() => {});
   }
 
   // Saves & States
@@ -275,6 +654,62 @@ export class PlayerBridge {
   }
 
   public static async saveState(itemId: string, userId: string, slot: number): Promise<boolean> {
+    const slotIndex = Math.max(0, slot > 0 ? slot - 1 : 0);
+
+    if (this.emu) {
+      try {
+        const record = await this.emu.state.saveState(slotIndex);
+        if (!record || !record.data) return false;
+
+        const resp = await fetch(this.getUrl(`/jellyemu/save/${itemId}/${userId}?slot=${slot}`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            ...this.getAuthHeaders()
+          },
+          body: record.data
+        });
+        if (!resp.ok) throw new Error('Save rejected');
+
+        // Screenshot upload
+        if (record.metadata?.screenshot) {
+          const shot = record.metadata.screenshot;
+          if (typeof shot === 'string') {
+            fetch(this.getUrl(`/jellyemu/save-screenshot/${itemId}/${userId}/${slot}`), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders()
+              },
+              body: JSON.stringify({ dataUrl: shot })
+            }).catch(() => {});
+          } else if (shot instanceof Blob) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = reader.result as string;
+              if (dataUrl) {
+                fetch(this.getUrl(`/jellyemu/save-screenshot/${itemId}/${userId}/${slot}`), {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...this.getAuthHeaders()
+                  },
+                  body: JSON.stringify({ dataUrl })
+                }).catch(() => {});
+              }
+            };
+            reader.readAsDataURL(shot);
+          }
+        }
+
+        return true;
+      } catch (err) {
+        console.error('[PlayerBridge] Save state failed:', err);
+        return false;
+      }
+    }
+
+    // Legacy Fallback
     const gm = this.getGameManager();
     if (!gm) return false;
 
@@ -315,15 +750,20 @@ export class PlayerBridge {
   }
 
   public static async loadState(itemId: string, userId: string, slot: number): Promise<boolean> {
-    const gm = this.getGameManager();
-    if (!gm) return false;
-
     try {
       const resp = await fetch(this.getUrl(`/jellyemu/save/${itemId}/${userId}?slot=${slot}`), {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        cache: 'no-store'
       });
       if (!resp.ok) throw new Error('Failed to download state');
       const buf = await resp.arrayBuffer();
+
+      if (this.emu) {
+        return await this.emu.state.loadState(new Uint8Array(buf));
+      }
+
+      const gm = this.getGameManager();
+      if (!gm) return false;
       gm.loadState(new Uint8Array(buf));
       return true;
     } catch (err) {
@@ -333,14 +773,22 @@ export class PlayerBridge {
   }
 
   public static async exportState(gameName: string): Promise<void> {
-    const gm = this.getGameManager();
-    if (!gm) return;
-
     try {
-      const raw = await Promise.resolve(gm.getState());
-      const blob = this.ensureBinary(raw);
-      if (!blob) return;
+      let blob: Blob | null = null;
+      if (this.emu) {
+        const record = await this.emu.state.saveState(0);
+        if (record?.data) {
+          blob = new Blob([record.data], { type: 'application/octet-stream' });
+        }
+      } else {
+        const gm = this.getGameManager();
+        if (gm) {
+          const raw = await Promise.resolve(gm.getState());
+          blob = this.ensureBinary(raw);
+        }
+      }
 
+      if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -355,11 +803,13 @@ export class PlayerBridge {
   }
 
   public static async importState(file: File): Promise<boolean> {
-    const gm = this.getGameManager();
-    if (!gm) return false;
-
     try {
       const buf = await file.arrayBuffer();
+      if (this.emu) {
+        return await this.emu.state.loadState(new Uint8Array(buf));
+      }
+      const gm = this.getGameManager();
+      if (!gm) return false;
       gm.loadState(new Uint8Array(buf));
       return true;
     } catch (err) {
@@ -368,50 +818,69 @@ export class PlayerBridge {
     }
   }
 
-  // Audio / Volume
-  public static setVolume(vol: number): void {
-    const e = this.getEmulator();
-    if (e) {
-      try {
-        if (typeof e.setVolume === 'function') e.setVolume(vol);
-        e.volume = vol;
-      } catch (_) {}
-    }
-    const pm = this.getPlayModule();
-    if (pm && typeof pm.setVolume === 'function') {
-      try { pm.setVolume(vol); } catch (_) {}
-    }
+  // Battery SRAM Synchronization
+  public static queueSramSync(): void {
+    if (this.sramSyncTimer) clearTimeout(this.sramSyncTimer);
+    this.sramSyncTimer = setTimeout(() => {
+      this.flushSramImmediate();
+    }, 10000); // 10 second debounce
   }
 
-  public static syncVolumeToServer(userId: string, volume: number, isMuted: boolean): void {
-    if (!userId) return;
-    fetch(this.getUrl(`/jellyemu/prefs/${userId}`), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders()
-      },
-      body: JSON.stringify({
-        scope: 'global',
-        targetId: '',
-        preferences: {
-          volume: volume.toString(),
-          mute: isMuted ? '1' : '0'
-        }
-      })
-    }).catch(() => {});
+  public static async flushSramImmediate(): Promise<void> {
+    if (!this.emu) return;
+    try {
+      await this.emu.sram.flushSram();
+      const sramData = await this.emu.sram.getSram();
+      if (!sramData) return;
+
+      const cfg = this.getConfig();
+      if (!cfg?.itemId || !cfg?.userId) return;
+
+      let body: BodyInit;
+      let contentType = 'application/octet-stream';
+
+      if (sramData instanceof Uint8Array) {
+        body = sramData;
+      } else {
+        // Multi-file memory card (Play! PS2)
+        body = JSON.stringify(sramData);
+        contentType = 'application/json';
+      }
+
+      await fetch(this.getUrl(`/jellyemu/sram/${cfg.itemId}/${cfg.userId}`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': contentType,
+          ...this.getAuthHeaders()
+        },
+        body
+      });
+      console.log('[PlayerBridge] Battery SRAM synchronized successfully.');
+    } catch (err) {
+      console.warn('[PlayerBridge] Battery SRAM flush failed:', err);
+    }
   }
 
   // Screenshots
   public static captureCanvas(format = 'image/jpeg', quality = 0.9): string | null {
-    if (typeof (window as any)._jeCaptureCanvas === 'function') {
-      return (window as any)._jeCaptureCanvas(format, quality);
-    }
     try {
-      const canvas = document.querySelector('canvas.ejs_canvas') as HTMLCanvasElement ||
-                     document.querySelector('#game canvas') as HTMLCanvasElement ||
-                     document.querySelector('canvas') as HTMLCanvasElement;
+      const canvas = (document.getElementById('retrokit-canvas') ||
+        document.querySelector('canvas:not([data-hud-canvas])')) as HTMLCanvasElement | null;
       if (canvas && canvas.width > 0 && canvas.height > 0) {
+        const dpr = window.devicePixelRatio || 1;
+        const displayW = Math.round((canvas.clientWidth || canvas.width) * dpr);
+        const displayH = Math.round((canvas.clientHeight || canvas.height) * dpr);
+        if (displayW > canvas.width || displayH > canvas.height) {
+          const offscreen = document.createElement('canvas');
+          offscreen.width = displayW;
+          offscreen.height = displayH;
+          const ctx = offscreen.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(canvas, 0, 0, displayW, displayH);
+            return offscreen.toDataURL(format, quality);
+          }
+        }
         return canvas.toDataURL(format, quality);
       }
     } catch (e) {
@@ -421,13 +890,45 @@ export class PlayerBridge {
   }
 
   public static async takeScreenshot(itemId: string, gameName: string): Promise<boolean> {
-    const dataUrl = this.captureCanvas('image/png');
-    if (!dataUrl) return false;
+    let blob: Blob | null = null;
+    let dataUrl: string | null = null;
+
+    if (this.emu) {
+      try {
+        blob = await this.emu.video.takeScreenshot('image/png');
+      } catch (err) {
+        console.warn('[PlayerBridge] RetroKit takeScreenshot failed, falling back:', err);
+      }
+    }
+
+    if (!blob) {
+      dataUrl = this.captureCanvas('image/png');
+      if (dataUrl) {
+        try {
+          const res = await fetch(dataUrl);
+          blob = await res.blob();
+        } catch (_) {}
+      }
+    }
+
+    if (!blob && !dataUrl) {
+      this.notify({ message: 'Screenshot Failed', subtext: 'Canvas not ready', icon: 'screenshot', variant: 'danger' });
+      return false;
+    }
 
     try {
       const cfg = this.getConfig();
       if (cfg?.screenshotsToLibrary) {
-        await fetch(this.getUrl(`/jellyemu/screenshot/${itemId}`), {
+        if (!dataUrl && blob) {
+          dataUrl = await new Promise<string | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string) || null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob!);
+          });
+        }
+        if (!dataUrl) throw new Error('Failed to encode screenshot');
+        const resp = await fetch(this.getUrl(`/jellyemu/screenshot/${itemId}`), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -435,15 +936,21 @@ export class PlayerBridge {
           },
           body: JSON.stringify({ dataUrl, gameName })
         });
+        if (!resp.ok) throw new Error(`Upload failed (${resp.status})`);
       } else {
+        const downloadUrl = blob ? URL.createObjectURL(blob) : dataUrl!;
         const a = document.createElement('a');
-        a.href = dataUrl;
+        a.href = downloadUrl;
         a.download = `${gameName || 'screenshot'}-${Date.now()}.png`;
+        a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        if (blob) {
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+        }
       }
-      this.notify({ message: 'Screenshot Captured', subtext: 'Saved to library', icon: 'screenshot', variant: 'success' });
+      this.notify({ message: 'Screenshot Captured', subtext: cfg?.screenshotsToLibrary ? 'Saved to library' : 'Downloaded PNG', icon: 'screenshot', variant: 'success' });
       return true;
     } catch (err) {
       console.error('[PlayerBridge] Take screenshot failed:', err);
@@ -472,9 +979,12 @@ export class PlayerBridge {
   }
 
   public static toggleCheat(cheat: CheatItem, enabled: boolean): void {
+    if (this.emu) {
+      this.emu.cheats.toggleCheat(cheat.code, enabled);
+      return;
+    }
     const e = this.getEmulator();
     if (!e) return;
-
     e.cheats = e.cheats || [];
     let idx = e.cheats.findIndex((c: any) => c.code === cheat.code);
     if (enabled) {
@@ -487,26 +997,27 @@ export class PlayerBridge {
     } else {
       if (idx !== -1) e.cheats[idx].checked = false;
     }
-
     if (typeof e.cheatChanged === 'function') {
       try { e.cheatChanged(enabled, cheat.code, idx === -1 ? 0 : idx); } catch (_) {}
-    }
-    if (typeof e.saveSettings === 'function') {
-      try { e.saveSettings(); } catch (_) {}
     }
   }
 
   public static addCustomCheat(desc: string, code: string): void {
+    if (this.emu) {
+      this.emu.cheats.addCheat({ name: desc, code, enabled: true });
+      return;
+    }
     const e = this.getEmulator();
     if (!e) return;
     e.cheats = e.cheats || [];
     e.cheats.push({ desc, code, checked: false });
-    if (typeof e.saveSettings === 'function') {
-      try { e.saveSettings(); } catch (_) {}
-    }
   }
 
   public static removeCustomCheat(code: string): void {
+    if (this.emu) {
+      this.emu.cheats.removeCheat(code);
+      return;
+    }
     const e = this.getEmulator();
     if (!e || !e.cheats) return;
     const idx = e.cheats.findIndex((c: any) => c.code === code);
@@ -515,14 +1026,15 @@ export class PlayerBridge {
         try { e.cheatChanged(false, code, idx); } catch (_) {}
       }
       e.cheats.splice(idx, 1);
-      if (typeof e.saveSettings === 'function') {
-        try { e.saveSettings(); } catch (_) {}
-      }
     }
   }
 
   // Multi-Disc
   public static nextDisc(): void {
+    if (this.emu) {
+      this.emu.discs.nextDisc();
+      return;
+    }
     const gm = this.getGameManager();
     if (gm && typeof gm.nextDisc === 'function') {
       try { gm.nextDisc(); } catch (err) { console.warn('[PlayerBridge] nextDisc failed:', err); }
@@ -530,6 +1042,10 @@ export class PlayerBridge {
   }
 
   public static selectDisc(index: number): void {
+    if (this.emu) {
+      this.emu.discs.changeDisc(index);
+      return;
+    }
     const gm = this.getGameManager();
     if (gm && typeof gm.loadDisc === 'function') {
       try { gm.loadDisc(index); } catch (err) { console.warn('[PlayerBridge] loadDisc failed:', err); }
@@ -538,7 +1054,9 @@ export class PlayerBridge {
 
   // Settings & Display
   public static applyShader(shader: string): void {
-    const e = this.getEmulator();
+    if (this.emu) {
+      this.emu.video.setShader(shader);
+    }
     const gm = this.getGameManager();
     if (gm) {
       if (shader === 'disabled' || shader === 'none') {
@@ -547,130 +1065,69 @@ export class PlayerBridge {
         if (typeof gm.enableShader === 'function') try { gm.enableShader(shader); } catch (_) {}
       }
     }
-    if (e && typeof e.changeSettingOption === 'function') {
-      try { e.changeSettingOption('shader', shader); } catch (_) {}
-    }
   }
 
   public static applyRotation(rot: number): void {
+    const degrees = (rot >= 0 && rot <= 3 ? rot * 90 : rot) % 360;
+    if (this.emu) {
+      this.emu.video.setRotation(degrees as any);
+    }
     const e = this.getEmulator();
     if (e && typeof e.changeSettingOption === 'function') {
       try { e.changeSettingOption('videoRotation', rot); } catch (_) {}
     }
   }
 
-  public static applyFastForwardRate(rate: string): void {
-    const e = this.getEmulator();
-    if (e && typeof e.changeSettingOption === 'function') {
-      try { e.changeSettingOption('ff-ratio', rate); } catch (_) {}
+  public static applyScaling(scale: string): void {
+    if (this.emu) {
+      const normalized =
+        scale === 'fit'
+          ? 'auto'
+          : scale === 'fill'
+            ? 'stretch'
+            : scale === '1' || scale === '2' || scale === '3' || scale === '4' || scale === 'integer'
+              ? 'pixel-perfect'
+              : scale;
+      this.emu.video.setAspectRatio(normalized as any);
     }
-  }
-
-  public static applySlowMotionRate(rate: string): void {
-    const e = this.getEmulator();
-    if (e && typeof e.changeSettingOption === 'function') {
-      try { e.changeSettingOption('sm-ratio', rate); } catch (_) {}
-    }
+    const cfg = this.getConfig();
+    if (cfg) (cfg as any).scale = scale;
   }
 
   public static applyFpsOverlay(mode: string): void {
     const cfg = this.getConfig();
     if (cfg) (cfg as any).showFps = mode;
-    if ((window as any).JellyEmuConfig) (window as any).JellyEmuConfig.showFps = mode;
-    if ((window as any)._globPrefs) (window as any)._globPrefs.showFps = mode;
+    localStorage.setItem('jellyemu:fps-overlay-mode', mode);
     window.dispatchEvent(new CustomEvent('jellyemu:fps-changed', { detail: { mode } }));
-    if (typeof (window as any).JellyEmuSettings?.applyLiveFps === 'function') {
-      try { (window as any).JellyEmuSettings.applyLiveFps(); } catch (_) {}
-    }
   }
 
-  public static applyScaling(scale: string): void {
-    const cfg = this.getConfig();
-    if (cfg) (cfg as any).scale = scale;
-    if ((window as any).JellyEmuConfig) (window as any).JellyEmuConfig.scale = scale;
-    if ((window as any)._globPrefs) (window as any)._globPrefs.scale = scale;
-    if (typeof (window as any).JellyEmuSettings?.applyLiveScreenSize === 'function') {
-      try { (window as any).JellyEmuSettings.applyLiveScreenSize(); } catch (_) {}
-    }
-  }
-
-  public static async fetchSystemCores(platformTag: string): Promise<Array<{ id: string; name: string }>> {
-    try {
-      const resp = await fetch(this.getUrl('/jellyemu/systems'), {
-        headers: this.getAuthHeaders()
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const pTag = (platformTag || '').toLowerCase().trim();
-        const found = (data.systems || []).find((s: any) => (s.name || '').toLowerCase() === pTag);
-        if (found && found.cores && found.cores.length > 0) {
-          return found.cores.map((c: any) => ({
-            id: c.id,
-            name: c.name || c.id
-          }));
-        }
-      }
-    } catch (err) {
-      console.warn('[PlayerBridge] fetchSystemCores failed:', err);
-    }
-    return [];
-  }
-
-  // Core Options (Libretro & Local Storage)
+  // Core Options
   public static getCoreName(): string {
     return (window as any).EJS_core || (window as any).JellyEmuConfig?.platformTag || 'default';
   }
 
-  public static loadSavedCoreOptions(coreName?: string): Record<string, string> {
-    const core = coreName || this.getCoreName();
-    const key = 'jellyemu_coreopts_' + core;
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') return parsed;
-      }
-    } catch (e) {
-      console.warn('[PlayerBridge] Failed to load core options:', e);
-    }
-    return {};
-  }
-
-  public static saveCoreOption(optKey: string, optVal: string, coreName?: string): void {
-    const core = coreName || this.getCoreName();
-    const key = 'jellyemu_coreopts_' + core;
-    try {
-      const opts = this.loadSavedCoreOptions(core);
-      opts[optKey] = optVal;
-      localStorage.setItem(key, JSON.stringify(opts));
-    } catch (e) {
-      console.warn('[PlayerBridge] Failed to save core option:', e);
-    }
-  }
-
-  public static clearSavedCoreOptions(coreName?: string): void {
-    const core = coreName || this.getCoreName();
-    const key = 'jellyemu_coreopts_' + core;
-    try {
-      localStorage.removeItem(key);
-    } catch (e) {
-      console.warn('[PlayerBridge] Failed to clear core options:', e);
-    }
-  }
-
   public static getCoreOptionsList(): { key: string; name: string; value: string; options: { value: string; label: string }[]; description?: string }[] {
+    if (this.emu) {
+      const opts = this.emu.options.getOptions();
+      if (opts && opts.length > 0) {
+        return opts.map(o => ({
+          key: o.id,
+          name: o.label || o.id,
+          value: o.currentValue,
+          description: o.description,
+          options: (o.choices || []).map((c: any) => ({ value: c.value, label: c.label || c.value }))
+        }));
+      }
+    }
+
+    // Fallback to legacy string parsing
     const gm = this.getGameManager();
     const coreName = this.getCoreName();
     const saved = this.loadSavedCoreOptions(coreName);
 
-    if (!gm || typeof gm.getCoreOptions !== 'function') {
-      return [];
-    }
-
+    if (!gm || typeof gm.getCoreOptions !== 'function') return [];
     const optsRaw = gm.getCoreOptions();
-    if (!optsRaw || typeof optsRaw !== 'string') {
-      return [];
-    }
+    if (!optsRaw || typeof optsRaw !== 'string') return [];
 
     const result: { key: string; name: string; value: string; options: { value: string; label: string }[]; description?: string }[] = [];
     const lines = optsRaw.split('\n');
@@ -686,7 +1143,6 @@ export class PlayerBridge {
       const optionList = parts[1].split('|').map((o: string) => o.trim()).filter(Boolean);
 
       if (!optKey) return;
-
       const effectiveVal = (saved && saved[optKey] !== undefined) ? saved[optKey] : currentVal;
 
       let displayKey = optKey.replace(/^[^_]+_/, '').replace(/_/g, ' ');
@@ -707,15 +1163,78 @@ export class PlayerBridge {
   }
 
   public static setCoreOption(optKey: string, optVal: string, coreName?: string): void {
+    if (this.emu) {
+      this.emu.options.setOption(optKey, optVal);
+    }
     const gm = this.getGameManager();
     if (gm && typeof gm.setVariable === 'function') {
-      try {
-        gm.setVariable(optKey, optVal);
-      } catch (e) {
-        console.warn('[PlayerBridge] setVariable failed:', e);
-      }
+      try { gm.setVariable(optKey, optVal); } catch (_) {}
     }
     this.saveCoreOption(optKey, optVal, coreName);
+  }
+
+  public static loadSavedCoreOptions(coreName?: string): Record<string, string> {
+    const core = coreName || this.getCoreName();
+    const key = 'jellyemu_coreopts_' + core;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return {};
+  }
+
+  public static saveCoreOption(optKey: string, optVal: string, coreName?: string): void {
+    const core = coreName || this.getCoreName();
+    const key = 'jellyemu_coreopts_' + core;
+    try {
+      const opts = this.loadSavedCoreOptions(core);
+      opts[optKey] = optVal;
+      localStorage.setItem(key, JSON.stringify(opts));
+
+      const cfg = this.getConfig();
+      if (cfg?.userId) {
+        const target = cfg.platformTag || core;
+        fetch(this.getUrl(`/jellyemu/prefs/${cfg.userId}`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeaders()
+          },
+          body: JSON.stringify({
+            scope: 'system',
+            targetId: target,
+            preferences: {
+              coreOptionsJson: JSON.stringify(opts)
+            }
+          })
+        }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  public static clearSavedCoreOptions(coreName?: string): void {
+    const core = coreName || this.getCoreName();
+    try { localStorage.removeItem('jellyemu_coreopts_' + core); } catch (_) {}
+  }
+
+  public static async fetchSystemCores(platformTag: string): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const resp = await fetch(this.getUrl('/jellyemu/systems'), {
+        headers: this.getAuthHeaders()
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const pTag = (platformTag || '').toLowerCase().trim();
+        const found = (data.systems || []).find((s: any) => (s.name || '').toLowerCase() === pTag);
+        if (found?.cores?.length > 0) {
+          return found.cores.map((c: any) => ({
+            id: c.id,
+            name: c.name || c.id
+          }));
+        }
+      }
+    } catch (_) {}
+    return [];
   }
 
   public static saveSystemPreferences(userId: string, platformTag: string, prefs: Record<string, any>): Promise<Response> {
@@ -748,27 +1267,7 @@ export class PlayerBridge {
     });
   }
 
-  public static async deleteCachedRom(_itemId?: string): Promise<boolean> {
-    try {
-      const e = this.getEmulator();
-      if (e && e.gameManager && typeof e.gameManager.deleteCache === 'function') {
-        e.gameManager.deleteCache();
-      }
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        for (const k of keys) {
-          if (k.includes('jellyemu') || k.includes('emulatorjs')) {
-            await caches.delete(k);
-          }
-        }
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // Input Mapping & Controls
+  // Input & Controls
   public static async fetchInputScheme(platformOrCore: string): Promise<{ hotkeys: InputButtonDefinition[]; scheme: PlatformControlScheme | null } | null> {
     try {
       const endpoint = platformOrCore ? `/jellyemu/input/schemes/${encodeURIComponent(platformOrCore)}` : '/jellyemu/input/schemes';
@@ -790,14 +1289,9 @@ export class PlayerBridge {
             if (firstKey) matchedScheme = rawSchemes[firstKey];
           }
         }
-        return {
-          hotkeys: rawHotkeys,
-          scheme: matchedScheme
-        };
+        return { hotkeys: rawHotkeys, scheme: matchedScheme };
       }
-    } catch (err) {
-      console.warn('[PlayerBridge] fetchInputScheme failed:', err);
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -825,7 +1319,6 @@ export class PlayerBridge {
         }
 
         if (parsed && typeof parsed === 'object') {
-          // Check if parsed has player indices { 0: {...}, 1: {...} } or legacy flat { 8: {...} }
           const isMultiPlayer = parsed['0'] && typeof parsed['0'] === 'object' && parsed['0'].kb1 === undefined && parsed['0'].gp1 === undefined;
           let playerBindings: Record<number, Record<number, InputBinding>> = {};
           let p0Bindings: Record<number, InputBinding> = {};
@@ -841,9 +1334,7 @@ export class PlayerBridge {
           return { bindings: p0Bindings, playerBindings };
         }
       }
-    } catch (err) {
-      console.warn('[PlayerBridge] fetchEffectiveBindings failed:', err);
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -867,12 +1358,8 @@ export class PlayerBridge {
         jeBindings: JSON.stringify(playerBindings)
       };
 
-      // Also update in-memory window._jeBindings & window._jePlayerBindings for real-time play
       (window as any)._jePlayerBindings = JSON.parse(JSON.stringify(playerBindings));
       (window as any)._jeBindings = JSON.parse(JSON.stringify(playerBindings[0] || {}));
-      if ((window as any).JellyEmuConfig) {
-        (window as any).JellyEmuConfig.customBindings = JSON.parse(JSON.stringify(playerBindings));
-      }
 
       const resp = await fetch(this.getUrl(url), {
         method: 'POST',
@@ -883,37 +1370,142 @@ export class PlayerBridge {
         body: JSON.stringify(payload)
       });
       return resp.ok;
-    } catch (err) {
-      console.warn('[PlayerBridge] saveBindings failed:', err);
+    } catch (_) {
       return false;
     }
   }
 
-  public static async syncVirtualControls(userId: string, enabled: boolean, lefty: boolean): Promise<void> {
-    const e = this.getEmulator();
-    if (e) {
-      if (typeof e.toggleVirtualGamepad === 'function') e.toggleVirtualGamepad(enabled);
-      if (typeof e.toggleVirtualGamepadLeftHanded === 'function') e.toggleVirtualGamepadLeftHanded(lefty);
+  private static keyCodeToCodes(keyCode: number): string[] {
+    if (!keyCode || keyCode <= 0) return [];
+    if (keyCode >= 65 && keyCode <= 90) return [`Key${String.fromCharCode(keyCode)}`];
+    if (keyCode >= 48 && keyCode <= 57) return [`Digit${String.fromCharCode(keyCode)}`];
+    if (keyCode >= 96 && keyCode <= 105) return [`Numpad${keyCode - 96}`];
+    if (keyCode >= 112 && keyCode <= 123) return [`F${keyCode - 111}`];
+    switch (keyCode) {
+      case 8: return ['Backspace'];
+      case 9: return ['Tab'];
+      case 13: return ['Enter', 'NumpadEnter'];
+      case 16: return ['ShiftLeft', 'ShiftRight'];
+      case 17: return ['ControlLeft', 'ControlRight'];
+      case 18: return ['AltLeft', 'AltRight'];
+      case 27: return ['Escape'];
+      case 32: return ['Space'];
+      case 37: return ['ArrowLeft'];
+      case 38: return ['ArrowUp'];
+      case 39: return ['ArrowRight'];
+      case 40: return ['ArrowDown'];
+      case 106: return ['NumpadMultiply'];
+      case 107: return ['NumpadAdd'];
+      case 109: return ['NumpadSubtract'];
+      case 110: return ['NumpadDecimal'];
+      case 111: return ['NumpadDivide'];
+      case 186: return ['Semicolon'];
+      case 187: return ['Equal'];
+      case 188: return ['Comma'];
+      case 189: return ['Minus'];
+      case 190: return ['Period'];
+      case 191: return ['Slash'];
+      case 192: return ['Backquote'];
+      case 219: return ['BracketLeft'];
+      case 220: return ['Backslash'];
+      case 221: return ['BracketRight'];
+      case 222: return ['Quote'];
+      default: return [];
     }
-    if ((window as any).JellyEmuConfig) {
-      (window as any).JellyEmuConfig.virtualGamepad = String(enabled);
-      (window as any).JellyEmuConfig.virtualGamepadLefty = String(lefty);
-    }
-    if (!userId) return;
-    try {
-      await fetch(this.getUrl(`/jellyemu/prefs/${userId}`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders()
-        },
-        body: JSON.stringify({
-          virtualGamepad: String(enabled),
-          virtualGamepadLefty: String(lefty)
-        })
-      });
-    } catch (err) {
-      console.warn('[PlayerBridge] syncVirtualControls failed:', err);
+  }
+
+  private static readonly GP_LABEL_TO_INDEX: Record<string, number> = {
+    BUTTON_1: 0,
+    BUTTON_2: 1,
+    BUTTON_3: 2,
+    BUTTON_4: 3,
+    LEFT_TOP_SHOULDER: 4,
+    RIGHT_TOP_SHOULDER: 5,
+    LEFT_BOTTOM_SHOULDER: 6,
+    RIGHT_BOTTOM_SHOULDER: 7,
+    SELECT: 8,
+    START: 9,
+    LEFT_STICK: 10,
+    RIGHT_STICK: 11,
+    DPAD_UP: 12,
+    DPAD_DOWN: 13,
+    DPAD_LEFT: 14,
+    DPAD_RIGHT: 15,
+    HOME: 16
+  };
+
+  private static readonly JE_ID_TO_BUTTON: Record<number, StandardButton> = {
+    0: 'ACTION_DOWN',
+    1: 'ACTION_LEFT',
+    2: 'SELECT',
+    3: 'START',
+    4: 'DPAD_UP',
+    5: 'DPAD_DOWN',
+    6: 'DPAD_LEFT',
+    7: 'DPAD_RIGHT',
+    8: 'ACTION_RIGHT',
+    9: 'ACTION_UP',
+    10: 'L1',
+    11: 'R1',
+    12: 'L2',
+    13: 'R2',
+    14: 'L3',
+    15: 'R3'
+  };
+
+  private static readonly JE_ID_TO_AXIS: Record<number, { axis: StandardAxis; direction: 1 | -1 }> = {
+    16: { axis: 'L_STICK_X', direction: 1 },
+    17: { axis: 'L_STICK_X', direction: -1 },
+    18: { axis: 'L_STICK_Y', direction: 1 },
+    19: { axis: 'L_STICK_Y', direction: -1 },
+    20: { axis: 'R_STICK_X', direction: 1 },
+    21: { axis: 'R_STICK_X', direction: -1 },
+    22: { axis: 'R_STICK_Y', direction: 1 },
+    23: { axis: 'R_STICK_Y', direction: -1 }
+  };
+
+  private static resolveGamepadIndex(label?: string): number | null {
+    if (!label) return null;
+    const trimmed = label.trim().toUpperCase();
+    if (trimmed in this.GP_LABEL_TO_INDEX) return this.GP_LABEL_TO_INDEX[trimmed];
+    const m = /^GAMEPAD_(\d+)$/.exec(trimmed);
+    return m ? Number(m[1]) : null;
+  }
+
+  public static applyInputBindings(playerBindings: Record<number, Record<number, InputBinding>>): void {
+    if (!this.emu?.input) return;
+    const maxP = this.emu.input.getMaxPlayers();
+    for (const [pKey, binds] of Object.entries(playerBindings)) {
+      const pIdx = Number(pKey);
+      if (Number.isNaN(pIdx) || pIdx < 0 || pIdx >= maxP || !binds) continue;
+      const channel = this.emu.input.player(pIdx);
+      channel.clearBindings();
+
+      for (const [idKey, bind] of Object.entries(binds)) {
+        const btnId = Number(idKey);
+        if (!bind || Number.isNaN(btnId) || btnId >= 24) continue;
+
+        const stdBtn = this.JE_ID_TO_BUTTON[btnId];
+        const stdAxis = this.JE_ID_TO_AXIS[btnId];
+        if (!stdBtn && !stdAxis) continue;
+
+        for (const kc of [bind.kb1, bind.kb2]) {
+          if (kc && kc > 0) {
+            for (const code of this.keyCodeToCodes(kc)) {
+              if (stdBtn) channel.setKeyBinding(stdBtn, code);
+              else if (stdAxis) channel.setKeyAxisBinding(stdAxis.axis, stdAxis.direction, code);
+            }
+          }
+        }
+
+        for (const gp of [bind.gp1, bind.gp2]) {
+          const gpIdx = this.resolveGamepadIndex(gp);
+          if (gpIdx !== null) {
+            if (stdBtn) channel.setGamepadBinding(stdBtn, gpIdx);
+            else if (stdAxis) channel.setGamepadAxisButtonBinding(stdAxis.axis, stdAxis.direction, gpIdx);
+          }
+        }
+      }
     }
   }
 
@@ -995,7 +1587,6 @@ export class PlayerBridge {
       'RIGHT_STICK_Y:+1':'R-Stick ↓','RIGHT_STICK_Y:-1':'R-Stick ↑'
     };
     if (GP_LABELS[s]) return GP_LABELS[s];
-    // Check combos without splitting :+1 analog descriptors
     const parts: string[] = [];
     let current = '';
     for (let i = 0; i < s.length; i++) {
@@ -1013,24 +1604,47 @@ export class PlayerBridge {
     return GP_LABELS[s] || s;
   }
 
-  private static ensureBinary(data: any): Blob | null {
-    if (typeof (window as any)._jeEnsureBinary === 'function') {
-      return (window as any)._jeEnsureBinary(data);
+  public static toggleFullscreen(): void {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
     }
+  }
+
+  // Audio Fanfare Chime for RetroAchievements
+  private static playAchievementSound(): void {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      // Chime: C5 -> E5 -> G5 -> C6
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.08);
+      osc.frequency.setValueAtTime(783.99, now + 0.16);
+      osc.frequency.setValueAtTime(1046.5, now + 0.24);
+
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+      osc.start(now);
+      osc.stop(now + 0.65);
+    } catch (_) {}
+  }
+
+  private static ensureBinary(data: any): Blob | null {
     if (!data) return null;
     if (data instanceof Blob) return data;
     if (data instanceof Uint8Array) return new Blob([data], { type: 'application/octet-stream' });
     if (data instanceof ArrayBuffer) return new Blob([new Uint8Array(data)], { type: 'application/octet-stream' });
-    if (typeof data === 'string') {
-      try {
-        const binary = window.atob(data);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        return new Blob([bytes], { type: 'application/octet-stream' });
-      } catch {
-        return new Blob([new TextEncoder().encode(data)], { type: 'application/octet-stream' });
-      }
-    }
     return new Blob([new TextEncoder().encode(JSON.stringify(data))], { type: 'application/octet-stream' });
   }
 }

@@ -170,9 +170,9 @@ namespace JellyEmu.Services
                         { 17, new() { Kb1 = 74, Kb2 = 0, Gp1 = "LEFT_STICK_X:-1", Gp2 = "" } },
                         { 18, new() { Kb1 = 75, Kb2 = 0, Gp1 = "LEFT_STICK_Y:+1", Gp2 = "" } },
                         { 19, new() { Kb1 = 73, Kb2 = 0, Gp1 = "LEFT_STICK_Y:-1", Gp2 = "" } },
-                        { 20, new() { Kb1 = 0,  Kb2 = 0, Gp1 = "RIGHT_STICK_X:+1", Gp2 = "" } },
-                        { 21, new() { Kb1 = 83, Kb2 = 0, Gp1 = "RIGHT_STICK_X:-1", Gp2 = "" } },
-                        { 22, new() { Kb1 = 65, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:+1", Gp2 = "" } },
+                        { 20, new() { Kb1 = 68, Kb2 = 0, Gp1 = "RIGHT_STICK_X:+1", Gp2 = "" } },
+                        { 21, new() { Kb1 = 65, Kb2 = 0, Gp1 = "RIGHT_STICK_X:-1", Gp2 = "" } },
+                        { 22, new() { Kb1 = 83, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:+1", Gp2 = "" } },
                         { 23, new() { Kb1 = 87, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:-1", Gp2 = "BUTTON_4" } }
                     }
                 },
@@ -284,6 +284,82 @@ namespace JellyEmu.Services
                         { 0, new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },
                         { 3, new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },
                         { 8, new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } }
+                    }
+                },
+                {
+                    "3ds", new()
+                    {
+                        { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } },                        // A -> Right (Xbox B / PS Circle)
+                        { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },                        // B -> Bottom (Xbox A / PS Cross)
+                        { 9,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } },                        // X -> Top (Xbox Y / PS Triangle)
+                        { 1,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } },                        // Y -> Left (Xbox X / PS Square)
+                        { 2,  new() { Kb1 = 86, Kb2 = 0, Gp1 = "SELECT", Gp2 = "" } },                          // SELECT
+                        { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },                           // START
+                        { 4,  new() { Kb1 = 38, Kb2 = 0, Gp1 = "DPAD_UP", Gp2 = "" } },                         // UP
+                        { 5,  new() { Kb1 = 40, Kb2 = 0, Gp1 = "DPAD_DOWN", Gp2 = "" } },                       // DOWN
+                        { 6,  new() { Kb1 = 37, Kb2 = 0, Gp1 = "DPAD_LEFT", Gp2 = "" } },                       // LEFT
+                        { 7,  new() { Kb1 = 39, Kb2 = 0, Gp1 = "DPAD_RIGHT", Gp2 = "" } },                      // RIGHT
+                        { 10, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_TOP_SHOULDER", Gp2 = "" } },               // L
+                        { 11, new() { Kb1 = 69, Kb2 = 0, Gp1 = "RIGHT_TOP_SHOULDER", Gp2 = "" } },              // R
+                        { 12, new() { Kb1 = 9,  Kb2 = 0, Gp1 = "LEFT_BOTTOM_SHOULDER", Gp2 = "" } },            // ZL
+                        { 13, new() { Kb1 = 82, Kb2 = 0, Gp1 = "RIGHT_BOTTOM_SHOULDER", Gp2 = "" } },           // ZR
+                        { 16, new() { Kb1 = 72, Kb2 = 0, Gp1 = "LEFT_STICK_X:+1", Gp2 = "" } },                 // CIRCLE PAD RIGHT
+                        { 17, new() { Kb1 = 70, Kb2 = 0, Gp1 = "LEFT_STICK_X:-1", Gp2 = "" } },                 // CIRCLE PAD LEFT
+                        { 18, new() { Kb1 = 71, Kb2 = 0, Gp1 = "LEFT_STICK_Y:+1", Gp2 = "" } },                 // CIRCLE PAD DOWN
+                        { 19, new() { Kb1 = 84, Kb2 = 0, Gp1 = "LEFT_STICK_Y:-1", Gp2 = "" } },                 // CIRCLE PAD UP
+                        { 20, new() { Kb1 = 76, Kb2 = 0, Gp1 = "RIGHT_STICK_X:+1", Gp2 = "" } },                // C-STICK RIGHT
+                        { 21, new() { Kb1 = 74, Kb2 = 0, Gp1 = "RIGHT_STICK_X:-1", Gp2 = "" } },                // C-STICK LEFT
+                        { 22, new() { Kb1 = 75, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:+1", Gp2 = "" } },                // C-STICK DOWN
+                        { 23, new() { Kb1 = 73, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:-1", Gp2 = "" } }                 // C-STICK UP
+                    }
+                },
+                {
+                    "dc", new()
+                    {
+                        { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },                        // A
+                        { 8,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } },                        // B
+                        { 1,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } },                        // X
+                        { 9,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } },                        // Y
+                        { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },                           // START
+                        { 4,  new() { Kb1 = 38, Kb2 = 0, Gp1 = "DPAD_UP", Gp2 = "" } },
+                        { 5,  new() { Kb1 = 40, Kb2 = 0, Gp1 = "DPAD_DOWN", Gp2 = "" } },
+                        { 6,  new() { Kb1 = 37, Kb2 = 0, Gp1 = "DPAD_LEFT", Gp2 = "" } },
+                        { 7,  new() { Kb1 = 39, Kb2 = 0, Gp1 = "DPAD_RIGHT", Gp2 = "" } },
+                        { 12, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_BOTTOM_SHOULDER", Gp2 = "LEFT_TOP_SHOULDER" } },   // L
+                        { 13, new() { Kb1 = 69, Kb2 = 0, Gp1 = "RIGHT_BOTTOM_SHOULDER", Gp2 = "RIGHT_TOP_SHOULDER" } }, // R
+                        { 16, new() { Kb1 = 72, Kb2 = 0, Gp1 = "LEFT_STICK_X:+1", Gp2 = "" } },
+                        { 17, new() { Kb1 = 70, Kb2 = 0, Gp1 = "LEFT_STICK_X:-1", Gp2 = "" } },
+                        { 18, new() { Kb1 = 71, Kb2 = 0, Gp1 = "LEFT_STICK_Y:+1", Gp2 = "" } },
+                        { 19, new() { Kb1 = 84, Kb2 = 0, Gp1 = "LEFT_STICK_Y:-1", Gp2 = "" } }
+                    }
+                },
+                {
+                    "gc", new()
+                    {
+                        { 0,  new() { Kb1 = 88, Kb2 = 0, Gp1 = "BUTTON_1", Gp2 = "" } },                        // A
+                        { 1,  new() { Kb1 = 90, Kb2 = 0, Gp1 = "BUTTON_3", Gp2 = "" } },                        // B
+                        { 8,  new() { Kb1 = 65, Kb2 = 0, Gp1 = "BUTTON_2", Gp2 = "" } },                        // X
+                        { 9,  new() { Kb1 = 83, Kb2 = 0, Gp1 = "BUTTON_4", Gp2 = "" } },                        // Y
+                        { 3,  new() { Kb1 = 13, Kb2 = 0, Gp1 = "START", Gp2 = "" } },                           // START
+                        { 11, new() { Kb1 = 82, Kb2 = 0, Gp1 = "RIGHT_TOP_SHOULDER", Gp2 = "" } },              // Z
+                        { 12, new() { Kb1 = 81, Kb2 = 0, Gp1 = "LEFT_BOTTOM_SHOULDER", Gp2 = "" } },            // L
+                        { 13, new() { Kb1 = 69, Kb2 = 0, Gp1 = "RIGHT_BOTTOM_SHOULDER", Gp2 = "" } },           // R
+                        { 16, new() { Kb1 = 72, Kb2 = 0, Gp1 = "LEFT_STICK_X:+1", Gp2 = "" } },
+                        { 17, new() { Kb1 = 70, Kb2 = 0, Gp1 = "LEFT_STICK_X:-1", Gp2 = "" } },
+                        { 18, new() { Kb1 = 71, Kb2 = 0, Gp1 = "LEFT_STICK_Y:+1", Gp2 = "" } },
+                        { 19, new() { Kb1 = 84, Kb2 = 0, Gp1 = "LEFT_STICK_Y:-1", Gp2 = "" } },
+                        { 20, new() { Kb1 = 76, Kb2 = 0, Gp1 = "RIGHT_STICK_X:+1", Gp2 = "" } },
+                        { 21, new() { Kb1 = 74, Kb2 = 0, Gp1 = "RIGHT_STICK_X:-1", Gp2 = "" } },
+                        { 22, new() { Kb1 = 75, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:+1", Gp2 = "" } },
+                        { 23, new() { Kb1 = 73, Kb2 = 0, Gp1 = "RIGHT_STICK_Y:-1", Gp2 = "" } }
+                    }
+                },
+                {
+                    "pico8", new()
+                    {
+                        { 0, new() { Kb1 = 90, Kb2 = 67, Gp1 = "BUTTON_1", Gp2 = "" } }, // O (Z / C)
+                        { 8, new() { Kb1 = 88, Kb2 = 86, Gp1 = "BUTTON_2", Gp2 = "" } }, // X (X / V)
+                        { 3, new() { Kb1 = 13, Kb2 = 80, Gp1 = "START", Gp2 = "" } }     // PAUSE
                     }
                 }
             };
@@ -515,6 +591,25 @@ namespace JellyEmu.Services
                         new() { Id = 14, Label = "COLOR" },
                         new() { Id = 15, Label = "B/W" }
                     }, new List<int>())
+                },
+                {
+                    "atari5200",
+                    ("Atari 5200", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "FIRE (BOTTOM)" },
+                        new() { Id = 8, Label = "FIRE 2 (TOP)" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 2, Label = "PAUSE" },
+                        new() { Id = 9, Label = "RESET" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 19, Label = "STICK UP" },
+                        new() { Id = 18, Label = "STICK DOWN" },
+                        new() { Id = 17, Label = "STICK LEFT" },
+                        new() { Id = 16, Label = "STICK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19 })
                 },
                 {
                     "atari7800",
@@ -762,6 +857,94 @@ namespace JellyEmu.Services
                     }, new List<int> { 16, 17, 18, 19, 20, 21, 22, 23 })
                 },
                 {
+                    "3ds",
+                    ("Nintendo 3DS", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 8, Label = "A" },
+                        new() { Id = 0, Label = "B" },
+                        new() { Id = 9, Label = "X" },
+                        new() { Id = 1, Label = "Y" },
+                        new() { Id = 2, Label = "SELECT" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 10, Label = "L" },
+                        new() { Id = 11, Label = "R" },
+                        new() { Id = 12, Label = "ZL" },
+                        new() { Id = 13, Label = "ZR" },
+                        new() { Id = 19, Label = "CIRCLE PAD UP" },
+                        new() { Id = 18, Label = "CIRCLE PAD DOWN" },
+                        new() { Id = 17, Label = "CIRCLE PAD LEFT" },
+                        new() { Id = 16, Label = "CIRCLE PAD RIGHT" },
+                        new() { Id = 23, Label = "C-STICK UP" },
+                        new() { Id = 22, Label = "C-STICK DOWN" },
+                        new() { Id = 21, Label = "C-STICK LEFT" },
+                        new() { Id = 20, Label = "C-STICK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19, 20, 21, 22, 23 })
+                },
+                {
+                    "dc",
+                    ("Sega Dreamcast", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "A" },
+                        new() { Id = 8, Label = "B" },
+                        new() { Id = 1, Label = "X" },
+                        new() { Id = 9, Label = "Y" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 12, Label = "L TRIGGER" },
+                        new() { Id = 13, Label = "R TRIGGER" },
+                        new() { Id = 19, Label = "ANALOG UP" },
+                        new() { Id = 18, Label = "ANALOG DOWN" },
+                        new() { Id = 17, Label = "ANALOG LEFT" },
+                        new() { Id = 16, Label = "ANALOG RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19 })
+                },
+                {
+                    "gc",
+                    ("Nintendo GameCube", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "A" },
+                        new() { Id = 1, Label = "B" },
+                        new() { Id = 8, Label = "X" },
+                        new() { Id = 9, Label = "Y" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 11, Label = "Z" },
+                        new() { Id = 12, Label = "L" },
+                        new() { Id = 13, Label = "R" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 19, Label = "MAIN STICK UP" },
+                        new() { Id = 18, Label = "MAIN STICK DOWN" },
+                        new() { Id = 17, Label = "MAIN STICK LEFT" },
+                        new() { Id = 16, Label = "MAIN STICK RIGHT" },
+                        new() { Id = 23, Label = "C-STICK UP" },
+                        new() { Id = 22, Label = "C-STICK DOWN" },
+                        new() { Id = 21, Label = "C-STICK LEFT" },
+                        new() { Id = 20, Label = "C-STICK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19, 20, 21, 22, 23 })
+                },
+                {
+                    "pico8",
+                    ("PICO-8", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "O" },
+                        new() { Id = 8, Label = "X" },
+                        new() { Id = 3, Label = "PAUSE" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
                     "default",
                     ("Standard Controller", new List<InputButtonDefinition>
                     {
@@ -820,13 +1003,16 @@ namespace JellyEmu.Services
             { "play", "ps2" }, { "play!", "ps2" },
             { "fbneo", "arcade" }, { "fbalpha2012_cps1", "arcade" }, { "fbalpha2012_cps2", "arcade" },
             { "same_cdi", "arcade" }, { "mame2003", "arcade" }, { "mame2003_plus", "arcade" },
-            { "a5200", "default" },
+            { "a5200", "atari5200" },
             { "puae", "default" },
-            { "vice_x64sc", "default" }, { "vice_x128", "default" }, { "vice_xpet", "default" },
+            { "vice_x64", "default" }, { "vice_x64sc", "default" }, { "vice_x128", "default" }, { "vice_xpet", "default" },
             { "vice_xplus4", "default" }, { "vice_xvic", "default" },
             { "dosbox_pure", "default" },
             { "freeintv", "default" },
-            { "azahar", "default" }
+            { "azahar", "3ds" }, { "citra", "3ds" },
+            { "flycast", "dc" }, { "reicast", "dc" },
+            { "dolphin", "gc" },
+            { "pico8", "pico8" }
         };
 
         private static readonly Dictionary<string, string> PlatformToScheme = new(StringComparer.OrdinalIgnoreCase)
@@ -845,6 +1031,7 @@ namespace JellyEmu.Services
             { "SEGA SATURN", "segaSaturn" }, { "SATURN", "segaSaturn" },
             { "3DO", "3do" },
             { "ATARI 2600", "atari2600" },
+            { "ATARI 5200", "atari5200" },
             { "ATARI 7800", "atari7800" },
             { "ATARI LYNX", "lynx" }, { "LYNX", "lynx" },
             { "ATARI JAGUAR", "jaguar" }, { "JAGUAR", "jaguar" },
@@ -856,6 +1043,11 @@ namespace JellyEmu.Services
             { "PSP", "psp" }, { "PLAYSTATION PORTABLE", "psp" },
             { "PLAYSTATION", "psx" }, { "PSX", "psx" }, { "PS1", "psx" },
             { "PLAYSTATION 2", "ps2" }, { "PLAYSTATION2", "ps2" }, { "PS2", "ps2" },
+            { "3DS", "3ds" }, { "NINTENDO 3DS", "3ds" },
+            { "DC", "dc" }, { "DREAMCAST", "dc" }, { "SEGA DREAMCAST", "dc" },
+            { "GC", "gc" }, { "GAMECUBE", "gc" }, { "NINTENDO GAMECUBE", "gc" },
+            { "PICO8", "pico8" }, { "PICO-8", "pico8" },
+            { "MASTERSYSTEM", "segaMS" }, { "WSWAN", "ws" },
             { "ARCADE", "arcade" }, { "MAME", "arcade" }, { "MAME 2003", "arcade" }
         };
 
@@ -913,6 +1105,10 @@ namespace JellyEmu.Services
             { "segaMD", 2 },
             { "segaSaturn", 2 },
             { "3do", 2 },
+            { "3ds", 1 },
+            { "dc", 4 },
+            { "gc", 4 },
+            { "pico8", 2 },
             { "arcade", 2 },
             { "default", 2 }
         };

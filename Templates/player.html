@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ game_name }} - JellyEmu</title>
+    
+    <!-- Cross-Origin Isolation ServiceWorker for SharedArrayBuffer & Multi-threading -->
+    <script src="{{ base_url }}/jellyemu/assets/coi-serviceworker.js?v={{ version }}"></script>
+    <script src="{{ base_url }}/jellyemu/assets/jellyemu.utils.js?v={{ version }}"></script>
+    
+    <!-- Player Styles -->
+    <link rel="stylesheet" href="{{ base_url }}/jellyemu/assets/dist/jellyemu.index.bundle.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base_url }}/jellyemu/assets/ejs.style.css?v={{ version }}">
+
+    <!-- Injected Game Session Data -->
+    <script>
+        window.__JELLYEMU_PLAYER_DATA__ = {
+            itemId: "{{ item_id }}",
+            userId: "{{ user_id }}",
+            gameName: "{{ game_name }}",
+            platformTag: "{{ platform_tag }}",
+            systemName: "{{ platform_tag }}",
+            core: "{{ core }}",
+            romUrl: "{{ rom_url }}",
+            biosUrl: "{{ bios_url }}",
+            dataBaseUrl: "{{ data_base_url }}",
+            availableCores: {{ available_cores_json }},
+            saveGetUrl: "{{ save_get_url }}",
+            savePostUrl: "{{ save_post_url }}",
+            activeSlot: {{ active_slot }},
+            launchSlot: {{ slot_value }},
+            isM3u: {{ is_m3u }},
+            hasNetplay: {{ has_netplay }},
+            netplayServer: "{{ netplay_server }}",
+            netplayIceServers: {{ netplay_ice_servers_json }},
+            gameId: {{ game_id }},
+            activeShader: "{{ active_shader }}",
+            scale: "{{ scale }}",
+            videoRotation: {{ video_rotation }},
+            showFps: "{{ show_fps }}",
+            volume: {{ volume }},
+            mute: {{ mute }},
+            audioEq: {{ audio_eq_json }},
+            inputScheme: {{ input_scheme_json }},
+            baseUrl: "{{ base_url }}",
+            version: "{{ version }}"
+        };
+
+        window.JellyEmu = window.JellyEmu || {};
+        window.JellyEmu.baseUrl = '{{ base_url }}';
+        window._jellyToken = (window.JellyEmu && typeof window.JellyEmu.getAuthToken === 'function')
+            ? window.JellyEmu.getAuthToken('{{ user_id }}')
+            : '{{ user_id }}';
+        window.JellyEmuConfig = window.__JELLYEMU_PLAYER_DATA__;
+    </script>
+</head>
+<body style="margin: 0; padding: 0; background-color: #000; overflow: hidden; width: 100vw; height: 100vh; position: fixed; inset: 0;">
+    <!-- Loading Screen -->
+    <div id="je-loader">
+        <div class="je-loader-anim">
+            <div class="je-pulse-ring"></div>
+            <div class="je-pulse-ring"></div>
+            <div class="je-pulse-ring"></div>
+            <div class="je-spinner"></div>
+        </div>
+        <div id="je-loader-title">{{ game_name }}</div>
+        <div id="je-loader-system">{{ platform_tag }}</div>
+        <div id="je-loader-status">Initializing RetroKit Engine…</div>
+    </div>
+
+    <!-- RetroKit Canvas Mount -->
+    <canvas id="retrokit-canvas" tabindex="0" style="display: block; width: 100vw; height: 100vh; object-fit: contain; margin: auto; background-color: #000; outline: none;"></canvas>
+
+    <!-- React Player HUD Mount Point -->
+    <div id="jellyemu-player-root" style="position: absolute; inset: 0; pointer-events: none; z-index: 40;"></div>
+
+    <!-- Unified Player Bundle -->
+    <script type="module" src="{{ base_url }}/jellyemu/assets/dist/jellyemu.player.bundle.js?v={{ version }}"></script>
+</body>
+</html>
