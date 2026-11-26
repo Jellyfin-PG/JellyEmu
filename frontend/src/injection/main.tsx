@@ -12,7 +12,7 @@ import '../index.css';
 
 initSafeWakeLock();
 
-console.log('[JellyEmu] Modern React + HeroUI Web Injection Active');
+console.log('[JellyEmu] Web Injection Active');
 
 export function initInjection() {
   // Initialize global playback interceptor

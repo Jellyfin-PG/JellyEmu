@@ -56,7 +56,7 @@ jobs:
           jq '.version = "${{ steps.version.outputs.VERSION }}"' manifest.json > publish/manifest.json
           cd publish
           zip -j ../JellyEmu_${{ steps.version.outputs.VERSION }}.zip \
-            JellyEmu.dll LiteDB.dll Scriban.dll manifest.json
+            JellyEmu.dll LiteDB.dll Scriban.dll SharpCompress.dll manifest.json
 
       - name: Compute checksums
         id: checksum

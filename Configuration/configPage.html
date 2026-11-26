@@ -25,13 +25,15 @@
                 return (base || '').replace(/\/+$/, '') + '/' + cleanPath;
             };
 
+            var cacheBust = Date.now();
+
             // Inject Stylesheet if not already added
             var cssId = 'je-config-bundle-css';
             if (!document.getElementById(cssId)) {
                 var link = document.createElement('link');
                 link.id = cssId;
                 link.rel = 'stylesheet';
-                link.href = getUrl('jellyemu/assets/dist/jellyemu.index.bundle.css');
+                link.href = getUrl('jellyemu/assets/dist/jellyemu.index.bundle.css?v=' + cacheBust);
                 document.head.appendChild(link);
             }
 
@@ -67,7 +69,7 @@
             }
 
             // Load ES Module via dynamic import()
-            var scriptUrl = getUrl('jellyemu/assets/dist/jellyemu.config.bundle.js');
+            var scriptUrl = getUrl('jellyemu/assets/dist/jellyemu.config.bundle.js?v=' + cacheBust);
             import(scriptUrl).then(function (mod) {
                 if (mod && typeof mod.mountConfigApp === 'function') {
                     mod.mountConfigApp();

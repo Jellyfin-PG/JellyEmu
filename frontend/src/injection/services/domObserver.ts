@@ -275,6 +275,9 @@ export const domObserver = {
       const itemId = urlParams.get('id') || page.getAttribute('data-itemid');
       if (!itemId) return;
 
+      // Wait until a userId is available before marking this itemId as handled
+      if (!injectionService.getCurrentUserId()) return;
+
       if (itemId !== lastItemId || !page.querySelector('.je-action-row-mounted')) {
         lastItemId = itemId;
         const buttonContainer = (page.querySelector('.mainDetailButtons') || page.querySelector('.detailButtons')) as HTMLElement;
@@ -346,8 +349,7 @@ export const domObserver = {
       });
     });
 
-    const viewContainer = document.querySelector('.view-manager') || document.body;
-    cardObserver.observe(viewContainer, { childList: true, subtree: true });
+    cardObserver.observe(document.body, { childList: true, subtree: true });
   },
 
   observeActionSheets: (): void => {

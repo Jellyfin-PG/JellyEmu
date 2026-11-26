@@ -22,7 +22,7 @@ export default defineConfig({
       },
       output: {
         entryFileNames: 'jellyemu.[name].bundle.js',
-        chunkFileNames: 'chunks/jellyemu.[name].js',
+        chunkFileNames: 'chunks/jellyemu.[name]-[hash].js',
         assetFileNames: (assetInfo) => {
           const name = assetInfo.name || (assetInfo.names && assetInfo.names[0]) || '';
           if (name.endsWith('.css')) {
