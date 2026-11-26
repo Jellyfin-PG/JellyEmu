@@ -240,6 +240,7 @@ namespace JellyEmu.Controllers
         [HttpHead("/jellyemu/bios/file")]
         [HttpGet("/jellyemu/bios/file/{*filename}")]
         [HttpHead("/jellyemu/bios/file/{*filename}")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetBiosFile([FromQuery] string? name, string? filename = null)
@@ -283,6 +284,7 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/bios/list
         /// </summary>
         [HttpGet("/jellyemu/bios/list")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetBiosList()
         {
@@ -296,6 +298,7 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/bios/status
         /// </summary>
         [HttpGet("/jellyemu/bios/status")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetBiosStatus()
         {

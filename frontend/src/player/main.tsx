@@ -63,6 +63,7 @@ export function initPlayer() {
       inputScheme: rawPlayerData.inputScheme || rawConfig.inputScheme || (window as any)._activeBackendScheme || null,
       customBindings: rawPlayerData.customBindings || rawConfig.customBindings || (window as any)._jeBindings || null,
       availableCores: (window as any).EJS_availableCores || [],
+      screenshotsToLibrary: rawPlayerData.screenshotsToLibrary ?? rawConfig.screenshotsToLibrary ?? false,
       version: rawPlayerData.version || rawConfig.version
     };
 

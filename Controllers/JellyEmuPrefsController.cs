@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -13,9 +14,10 @@ using Microsoft.Extensions.Logging;
 namespace JellyEmu.Controllers
 {
     /// <summary>
-    /// Handles user preferences (global, system, game scopes) stored in SQLite.
+    /// Handles user preferences (global, system, game scopes) stored in LiteDB.
     /// Routes: /jellyemu/prefs/*
     /// </summary>
+    [Authorize]
     [ApiController]
     public class JellyEmuPrefsController : JellyEmuBaseController
     {
@@ -37,6 +39,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetEffectivePrefs(string userId, [FromQuery] string? platform)
         {
+            if (!VerifyUser(userId)) return Forbid();
             var cacheKey = JellyEmuCacheKeys.EffectivePrefs(userId, platform);
             if (CacheService.TryGetValue<object>(cacheKey, out var cachedDto) && cachedDto != null)
             {
@@ -81,6 +84,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetScopedPrefs(string userId, [FromQuery] string? scope, [FromQuery] string? targetId)
         {
+            if (!VerifyUser(userId)) return Forbid();
             var targetScope = string.IsNullOrWhiteSpace(scope) ? "global" : scope;
             var target = targetId ?? string.Empty;
             var cacheKey = JellyEmuCacheKeys.ScopedPrefs(userId, targetScope, target);
@@ -110,6 +114,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetOverridesSummary(string userId)
         {
+            if (!VerifyUser(userId)) return Forbid();
             var cacheKey = JellyEmuCacheKeys.PrefsSummary(userId);
             if (CacheService.TryGetValue<object>(cacheKey, out var cached) && cached != null)
             {
@@ -141,6 +146,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> PostPrefs(string userId, [FromQuery] string? scope, [FromQuery] string? targetId)
         {
+            if (!VerifyUser(userId)) return Forbid();
             try
             {
                 var body = await new StreamReader(Request.Body).ReadToEndAsync();
@@ -219,6 +225,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> DeletePref(string userId, [FromQuery] string scope, [FromQuery] string targetId, [FromQuery] string? key)
         {
+            if (!VerifyUser(userId)) return Forbid();
             var success = await PreferenceService.DeletePreferenceAsync(userId, scope, targetId, key);
 
             // Evict effective, scoped, and summary caches for this user
@@ -245,6 +252,7 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> ResetPrefs(string userId)
         {
+            if (!VerifyUser(userId)) return Forbid();
             var success = await PreferenceService.ResetUserPreferencesAsync(userId);
 
             // Evict effective, scoped, and summary caches for this user

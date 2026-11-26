@@ -35,6 +35,41 @@ namespace JellyEmu.Controllers
             }
             return true;
         }
+
+        protected bool IsGameItem(MediaBrowser.Controller.Entities.BaseItem item)
+        {
+            if (item is MediaBrowser.Controller.Entities.CollectionFolder
+                || item is MediaBrowser.Controller.Entities.UserView
+                || item is MediaBrowser.Controller.Entities.Video
+                || item is MediaBrowser.Controller.Entities.Audio.Audio)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        protected bool VerifyItemAccess(MediaBrowser.Controller.Entities.BaseItem item)
+        {
+            if (!IsGameItem(item)) return false;
+
+            var userManager = HttpContext?.RequestServices?.GetService(typeof(IUserManager)) as IUserManager;
+            if (userManager != null)
+            {
+                var authUserId = User?.FindFirstValue("Jellyfin-UserId")
+                              ?? User?.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!Guid.TryParse(authUserId, out var authGuid))
+                {
+                    return false;
+                }
+                var user = userManager.GetUserById(authGuid);
+                if (user == null || !item.IsVisible(user))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
         /// <summary>
         /// Gets whether or not the browser should consider the origin trustworthy.
         /// HTTPS or localhost are trustworthy in most browsers. This is important
@@ -776,7 +811,7 @@ namespace JellyEmu.Controllers
                 "mednafen_psx" => "mednafen_psx_hw",
                 "3ds" or "citra" or "citra_canary" => "azahar",
                 "ps2" or "playstation2" or "playstation 2" or "play" => "play",
-                _ => core ?? string.Empty
+                _ => !string.IsNullOrEmpty(core) && Regex.IsMatch(core, @"^[a-zA-Z0-9_!-]+$") ? core : string.Empty
             };
         }
 

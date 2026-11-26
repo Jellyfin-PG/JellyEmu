@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace JellyEmu.Controllers
 {
-    [Authorize]
+    [Authorize(Policy = "RequiresElevation")]
     [ApiController]
     public class JellyEmuMarketplaceController : JellyEmuBaseController
     {

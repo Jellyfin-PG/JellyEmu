@@ -41,7 +41,9 @@ namespace JellyEmu.Controllers
 
         [HttpGet("/jellyemu/rom/{itemId}/{filename?}")]
         [HttpHead("/jellyemu/rom/{itemId}/{filename?}")]
+        [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Rom(string itemId, string? filename = null, [FromQuery] string? userId = null)
         {
@@ -50,6 +52,11 @@ namespace JellyEmu.Controllers
             {
                 Logger.LogWarning("[JellyEmu] Rom: item {ItemId} not found or path missing", itemId);
                 return NotFound();
+            }
+
+            if (!VerifyItemAccess(item))
+            {
+                return Forbid();
             }
 
             if (Directory.Exists(item.Path))
@@ -88,6 +95,11 @@ namespace JellyEmu.Controllers
             if (item == null || string.IsNullOrEmpty(item.Path))
             {
                 return NotFound();
+            }
+
+            if (!VerifyItemAccess(item))
+            {
+                return Forbid();
             }
 
             return await ServeDirectoryOrZipAsync(item).ConfigureAwait(false);

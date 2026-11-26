@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ namespace JellyEmu.Controllers
     ///   GET /jellyemu/retroarch/launch/{itemId}   — RetroArch deep-link redirect (Android / desktop URI)
     ///   GET /jellyemu/retroarch/info              — server info JSON for client discovery
     /// </summary>
+    [Authorize]
     [ApiController]
     public class RetroArchController : ControllerBase
     {

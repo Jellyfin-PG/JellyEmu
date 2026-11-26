@@ -132,38 +132,42 @@ namespace JellyEmu.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Error parsing Scriban template.");
             }
 
+            var safeCore = MapLegacyCore(resolvedCore);
+            if (string.IsNullOrEmpty(safeCore)) safeCore = "mgba";
+
             var html = template.Render(new
             {
                 game_name = gameName,
-                base_url = GetPathBase(),
-                item_id = itemId,
-                user_id = userId ?? string.Empty,
-                platform_tag = platformTag,
-                core = resolvedCore ?? "mgba",
-                rom_url = romUrl,
-                bios_url = biosUrl,
-                data_base_url = dataBaseUrl,
+                base_url = JsEnc(GetPathBase()),
+                item_id = JsEnc(itemId),
+                user_id = JsEnc(userId),
+                platform_tag = JsEnc(platformTag),
+                core = JsEnc(safeCore),
+                rom_url = JsEnc(romUrl),
+                bios_url = JsEnc(biosUrl),
+                data_base_url = JsEnc(dataBaseUrl),
                 available_cores_json = availableCoresJson,
                 input_scheme_json = inputSchemeJson,
-                save_get_url = saveGetUrl,
-                save_post_url = savePostUrl,
+                save_get_url = JsEnc(saveGetUrl),
+                save_post_url = JsEnc(savePostUrl),
                 active_slot = activeSlot,
                 slot_value = slot ?? 0,
                 is_m3u = isM3u,
                 has_netplay = hasNetplay,
-                netplay_server = netplayServer,
+                netplay_server = JsEnc(netplayServer),
                 netplay_ice_servers_json = netplayIceServersJson,
                 game_id = numericGameId,
-                active_shader = activeShader,
-                scale = effectivePrefs.Scale ?? "auto",
+                active_shader = JsEnc(activeShader),
+                scale = JsEnc(effectivePrefs.Scale ?? "auto"),
                 video_rotation = videoRotation,
-                show_fps = effectivePrefs.ShowFps ?? "0",
-                ffrate = effectivePrefs.FfRate ?? "3",
-                smrate = effectivePrefs.SmRate ?? "3",
-                volume = string.IsNullOrWhiteSpace(effectivePrefs.Volume) ? "1" : effectivePrefs.Volume,
-                mute = effectivePrefs.Mute ?? "0",
+                show_fps = JsEnc(effectivePrefs.ShowFps ?? "0"),
+                ffrate = JsEnc(effectivePrefs.FfRate ?? "3"),
+                smrate = JsEnc(effectivePrefs.SmRate ?? "3"),
+                volume = SafeNumericString(effectivePrefs.Volume, "1"),
+                mute = SafeBoolFlag(effectivePrefs.Mute),
                 audio_eq_json = string.IsNullOrWhiteSpace(effectivePrefs.AudioEq) ? "{}" : effectivePrefs.AudioEq,
-                version = JellyEmuVersion.Value
+                screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder),
+                version = JsEnc(JellyEmuVersion.Value)
             });
 
             ApplyCrossOriginIsolationHeaders();
@@ -475,44 +479,44 @@ namespace JellyEmu.Controllers
             var html = template.Render(new
             {
                 game_name = gameName,
-                base_url = GetPathBase(),
-                core = resolvedCore,
-                platform_tag = platformTag,
+                base_url = JsEnc(GetPathBase()),
+                core = JsEnc(MapLegacyCore(resolvedCore)),
+                platform_tag = JsEnc(platformTag),
                 input_scheme_json = inputSchemeJson,
                 custom_bindings_json = customBindingsJson,
                 available_cores_json = availableCoresJson,
-                rom_url = romUrl,
-                ejs_base = ejsBase,
-                item_id = itemId,
-                user_id = userId,
-                bios_url = biosUrl,
+                rom_url = JsEnc(romUrl),
+                ejs_base = JsEnc(ejsBase),
+                item_id = JsEnc(itemId),
+                user_id = JsEnc(userId),
+                bios_url = JsEnc(biosUrl),
                 active_slot = activeSlot,
                 slot_value = slot ?? 0,
                 has_saves = hasSaves,
-                active_shader = activeShader ?? string.Empty,
+                active_shader = JsEnc(activeShader),
                 video_rotation = videoRotation,
-                igdb_id = igdbId ?? string.Empty,
+                igdb_id = JsEnc(igdbId),
                 game_id = numericGameId,
                 has_netplay = hasNetplay,
-                netplay_server = netplayServer,
-                netplay_ice_servers = netplayIceServers,
+                netplay_server = JsEnc(netplayServer),
+                netplay_ice_servers = JsEnc(netplayIceServers),
                 netplay_ice_servers_json = netplayIceServersJson,
                 save_exists = saveExists,
-                save_get_url = saveGetUrl,
-                save_post_url = savePostUrl,
+                save_get_url = JsEnc(saveGetUrl),
+                save_post_url = JsEnc(savePostUrl),
                 is_m3u = isJ3u,
                 needs_threads = IsThreadedCore(resolvedCore),
                 rom_error_json = romError == null ? "null" : System.Text.Json.JsonSerializer.Serialize(romError),
-                virtual_gamepad = effectivePrefs.VirtualGamepad,
-                virtual_gamepad_lefty = effectivePrefs.VirtualGamepadLefty,
-                vsync = effectivePrefs.Vsync,
-                ffrate = effectivePrefs.FfRate,
-                smrate = effectivePrefs.SmRate,
-                show_fps = effectivePrefs.ShowFps,
-                scale = effectivePrefs.Scale,
-                volume = effectivePrefs.Volume ?? "1",
-                mute = effectivePrefs.Mute ?? "0",
-                version = JellyEmuVersion.Value,
+                virtual_gamepad = JsEnc(effectivePrefs.VirtualGamepad),
+                virtual_gamepad_lefty = JsEnc(effectivePrefs.VirtualGamepadLefty),
+                vsync = JsEnc(effectivePrefs.Vsync),
+                ffrate = JsEnc(effectivePrefs.FfRate),
+                smrate = JsEnc(effectivePrefs.SmRate),
+                show_fps = JsEnc(effectivePrefs.ShowFps),
+                scale = JsEnc(effectivePrefs.Scale),
+                volume = SafeNumericString(effectivePrefs.Volume, "1"),
+                mute = SafeBoolFlag(effectivePrefs.Mute),
+                version = JsEnc(JellyEmuVersion.Value),
                 screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder)
             });
 
@@ -522,6 +526,19 @@ namespace JellyEmu.Controllers
 
             return Content(html, MediaTypeNames.Text.Html);
         }
+
+        private static string JsEnc(string? value)
+            => JavaScriptEncoder.Default.Encode(value ?? string.Empty);
+
+        private static string SafeNumericString(string? value, string fallback)
+            => double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                ? parsed.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : fallback;
+
+        private static string SafeBoolFlag(string? value)
+            => string.Equals(value, "1", StringComparison.Ordinal) || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                ? "1"
+                : "0";
 
         internal const string EncryptedN3dsRomMessage =
             "This Nintendo 3DS ROM is encrypted, and the Azahar core can only run decrypted games. " +

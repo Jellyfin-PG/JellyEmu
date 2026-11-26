@@ -52,11 +52,24 @@ export class PlayerBridge {
     else if (coreLower === 'ruffle') assetSubdir = 'ruffle';
     const assetBaseUrl = coreLower === 'play' ? playBase : `${dataBase}/${assetSubdir}`;
 
+    // Ensure any WebGL/WebGL2 context created on any canvas (including replaced canvases) preserves its drawing buffer for screenshots
+    if (typeof HTMLCanvasElement !== 'undefined' && !(HTMLCanvasElement.prototype as any).__jePreserveDrawingBufferPatched) {
+      const origProtoGetContext = HTMLCanvasElement.prototype.getContext;
+      (HTMLCanvasElement.prototype as any).getContext = function (type: string, attrs?: any) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          return origProtoGetContext.call(this, type, { ...(attrs || {}), preserveDrawingBuffer: true });
+        }
+        return origProtoGetContext.call(this, type, attrs);
+      };
+      (HTMLCanvasElement.prototype as any).__jePreserveDrawingBufferPatched = true;
+    }
+
     // Instantiate RetroKit universal orchestrator with custom data directory and per-engine paths
     this.emu = new RetroKit({
       canvas,
       assetBaseUrl,
       assetPaths,
+      fetchHeaders: this.getAuthHeaders(),
       debug: false
     });
     this.emu.setCoresDirectory(assetBaseUrl);
@@ -671,8 +684,18 @@ export class PlayerBridge {
         });
         if (!resp.ok) throw new Error('Save rejected');
 
-        // Screenshot upload
-        if (record.metadata?.screenshot) {
+        // Screenshot upload (prefer direct preserved-buffer canvas capture to avoid core cmd_take_screenshot glitches)
+        const canvasShot = this.captureCanvas('image/png');
+        if (canvasShot) {
+          fetch(this.getUrl(`/jellyemu/save-screenshot/${itemId}/${userId}/${slot}`), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...this.getAuthHeaders()
+            },
+            body: JSON.stringify({ dataUrl: canvasShot })
+          }).catch(() => {});
+        } else if (record.metadata?.screenshot) {
           const shot = record.metadata.screenshot;
           if (typeof shot === 'string') {
             fetch(this.getUrl(`/jellyemu/save-screenshot/${itemId}/${userId}/${slot}`), {
@@ -891,23 +914,20 @@ export class PlayerBridge {
 
   public static async takeScreenshot(itemId: string, gameName: string): Promise<boolean> {
     let blob: Blob | null = null;
-    let dataUrl: string | null = null;
+    let dataUrl: string | null = this.captureCanvas('image/png');
 
-    if (this.emu) {
+    if (dataUrl) {
+      try {
+        const res = await fetch(dataUrl);
+        blob = await res.blob();
+      } catch (_) {}
+    }
+
+    if (!blob && this.emu) {
       try {
         blob = await this.emu.video.takeScreenshot('image/png');
       } catch (err) {
-        console.warn('[PlayerBridge] RetroKit takeScreenshot failed, falling back:', err);
-      }
-    }
-
-    if (!blob) {
-      dataUrl = this.captureCanvas('image/png');
-      if (dataUrl) {
-        try {
-          const res = await fetch(dataUrl);
-          blob = await res.blob();
-        } catch (_) {}
+        console.warn('[PlayerBridge] RetroKit takeScreenshot failed:', err);
       }
     }
 

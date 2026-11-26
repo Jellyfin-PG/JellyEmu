@@ -18,6 +18,7 @@ namespace JellyEmu.Controllers
     /// Routes: /jellyemu/save/*, /jellyemu/sram/*, /jellyemu/slot/*, /jellyemu/saves/*,
     ///         /jellyemu/save-screenshot/*
     /// </summary>
+    [Authorize]
     public class JellyEmuSaveController : JellyEmuBaseController
     {
         public JellyEmuSaveController(
@@ -44,6 +45,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             var targetSlot = slot ?? slotRoute;
             if (targetSlot.HasValue)
@@ -95,6 +97,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var cacheKey = JellyEmuCacheKeys.Save(itemId, userId, slotNum);
@@ -256,6 +259,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             var cacheKey = JellyEmuCacheKeys.SaveSlots(itemId, userId);
             if (CacheService.TryGetValue<List<object>>(cacheKey, out var cachedSlots) && cachedSlots != null)
@@ -435,6 +439,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             var slotNum = Math.Max(1, slot);
             var cacheKey = JellyEmuCacheKeys.SaveScreenshot(itemId, userId, slotNum);
@@ -599,6 +604,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var path = GetSramPath(userId, itemId, slotNum);
@@ -627,6 +633,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             var slotNum = Math.Max(1, slot ?? slotRoute ?? 1);
             var cacheKey = JellyEmuCacheKeys.Sram(itemId, userId, slotNum);
