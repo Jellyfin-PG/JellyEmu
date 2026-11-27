@@ -49,6 +49,9 @@ interface PlayerBottomDockProps {
   isM3u?: boolean;
   isPlay?: boolean;
   isPico8?: boolean;
+  supportsCheats?: boolean;
+  supportsSaveStates?: boolean;
+  supportsSram?: boolean;
   itemId?: string;
   gameName?: string;
   onOpenSaves: () => void;
@@ -78,6 +81,9 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
   isM3u = false,
   isPlay = false,
   isPico8 = false,
+  supportsCheats,
+  supportsSaveStates,
+  supportsSram,
   itemId = '',
   gameName = '',
   onOpenSaves,
@@ -212,7 +218,7 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
           <div className="w-[1px] h-5 bg-white/10 mx-0.5" />
 
           {/* Saves & States */}
-          {!isPlay && !isPico8 && (
+          {(supportsSaveStates || supportsSram || (!isPlay && !isPico8)) && (
             <Tooltip content="Saves & States" placement="top">
               <Button
                 isIconOnly
@@ -254,7 +260,7 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
           </Popover>
 
           {/* Cheats */}
-          {!isPlay && !isPico8 && (
+          {(supportsCheats ?? (!isPlay && !isPico8)) && (
             <Tooltip content="Cheats" placement="top">
               <Button
                 isIconOnly

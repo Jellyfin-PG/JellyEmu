@@ -57,15 +57,36 @@ namespace JellyEmu.Controllers
         {
             var itemId = item.Id.ToString("N");
             var platformTag = ResolvePlatformTag(item);
-            var ext = !string.IsNullOrEmpty(item.Path) ? Path.GetExtension(item.Path) : ".bin";
-            var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path) : itemId;
+            var isDirectoryItem = !string.IsNullOrEmpty(item.Path) && Directory.Exists(item.Path);
+            var isCueItem = !string.IsNullOrEmpty(item.Path) && item.Path.EndsWith(".cue", StringComparison.OrdinalIgnoreCase);
+            var isM3u = !string.IsNullOrEmpty(item.Path) && (item.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase));
+
+            var effectivePath = !string.IsNullOrEmpty(item.Path) ? RomExtensions.EffectiveRomPath(item.Path) : string.Empty;
+            var ext = !string.IsNullOrEmpty(effectivePath) && !Directory.Exists(effectivePath)
+                ? Path.GetExtension(effectivePath)
+                : ".bin";
+            if (isDirectoryItem && string.IsNullOrEmpty(Path.GetExtension(effectivePath)))
+            {
+                var fileService = HttpContext.RequestServices.GetService(typeof(JellyEmuFileService)) as JellyEmuFileService;
+                var dirFiles = fileService?.ResolveAllRomFiles(item.Path) ?? new List<string>();
+                if (dirFiles.Count > 0)
+                {
+                    var primaryDirFile = dirFiles
+                        .OrderBy(p => Path.GetExtension(p).Equals(".cue", StringComparison.OrdinalIgnoreCase) ? 0 : (PlatformResolver.AllRomExtensions.Contains(Path.GetExtension(p)) ? 1 : 2))
+                        .First();
+                    ext = Path.GetExtension(primaryDirFile);
+                }
+            }
+            if (string.IsNullOrEmpty(ext)) ext = ".bin";
+
+            var filename = !string.IsNullOrEmpty(item.Path) ? Path.GetFileNameWithoutExtension(item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) : itemId;
             var cleanFilename = CleanCosmeticFilename(filename);
             if (string.IsNullOrWhiteSpace(cleanFilename)) cleanFilename = itemId;
 
             var romUrl = ToAppUrl($"jellyemu/rom/{itemId}/{cleanFilename}{ext}");
             if (!string.IsNullOrEmpty(userId)) romUrl += $"?userId={userId}";
 
-            var isM3u = !string.IsNullOrEmpty(item.Path) && (item.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase));
+            var hasAdditionalFiles = isDirectoryItem || isCueItem || isM3u;
             var hasSaves = !string.IsNullOrEmpty(userId);
             var effectivePrefs = hasSaves
                 ? await PreferenceService.GetEffectivePreferencesAsync(userId!, platformTag)
@@ -153,6 +174,7 @@ namespace JellyEmu.Controllers
                 active_slot = activeSlot,
                 slot_value = slot ?? 0,
                 is_m3u = isM3u,
+                has_additional_files = hasAdditionalFiles,
                 has_netplay = hasNetplay,
                 netplay_server = JsEnc(netplayServer),
                 netplay_ice_servers_json = netplayIceServersJson,

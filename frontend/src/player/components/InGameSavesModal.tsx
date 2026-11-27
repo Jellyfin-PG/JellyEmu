@@ -16,6 +16,8 @@ interface InGameSavesModalProps {
   itemId: string;
   userId?: string;
   gameName: string;
+  supportsSaveStates?: boolean;
+  supportsSram?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -24,10 +26,12 @@ export const InGameSavesModal: React.FC<InGameSavesModalProps> = ({
   itemId,
   userId = '',
   gameName,
+  supportsSaveStates = true,
+  supportsSram = true,
   isOpen,
   onOpenChange
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('states');
+  const [activeTab, setActiveTab] = useState<string>(supportsSaveStates ? 'states' : 'sram');
   const [slots, setSlots] = useState<SaveSlotInfo[]>([
     { slot: 1, hasSave: false },
     { slot: 2, hasSave: false },
@@ -107,6 +111,25 @@ export const InGameSavesModal: React.FC<InGameSavesModalProps> = ({
     }
   };
 
+  const handleExportSram = async () => {
+    setStatusMessage('');
+    const ok = await PlayerBridge.exportSram(gameName);
+    setStatusMessage(ok ? 'SRAM exported successfully' : 'No SRAM data available to export');
+  };
+
+  const handleSramFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStatusMessage('');
+    const success = await PlayerBridge.importSram(file);
+    if (success) {
+      setStatusMessage('SRAM restored and game restarted');
+    } else {
+      setStatusMessage('Failed to import SRAM file');
+    }
+    e.target.value = '';
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -145,8 +168,8 @@ export const InGameSavesModal: React.FC<InGameSavesModalProps> = ({
                   tabContent: 'text-neutral-400 group-data-[selected=true]:text-white font-semibold'
                 }}
               >
-                <Tab key="states" title="Save States" />
-                <Tab key="sram" title="SRAM (Battery)" />
+                <Tab key="states" title="Save States" isDisabled={!supportsSaveStates} />
+                <Tab key="sram" title="SRAM (Battery)" isDisabled={!supportsSram} />
               </Tabs>
 
               {statusMessage && (
@@ -277,6 +300,7 @@ export const InGameSavesModal: React.FC<InGameSavesModalProps> = ({
                   <Button
                     size="sm"
                     variant="flat"
+                    onPress={handleExportSram}
                     className="h-8 text-xs bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl"
                     startContent={<Download className="w-3.5 h-3.5" />}
                   >
@@ -298,6 +322,7 @@ export const InGameSavesModal: React.FC<InGameSavesModalProps> = ({
                     <input
                       type="file"
                       ref={sramFileInputRef}
+                      onChange={handleSramFileChange}
                       accept=".sav,.srm"
                       className="hidden"
                     />

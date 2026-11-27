@@ -129,6 +129,8 @@ const BUTTON_INDEX_TO_LABEL: string[] = [
 
 const AXIS_NAMES: string[] = ['LEFT_STICK_X','LEFT_STICK_Y','RIGHT_STICK_X','RIGHT_STICK_Y'];
 
+const splitGpCombo = (gp: string): string[] => gp.split(/(?<!:)\+/).filter(Boolean);
+
 const getNativeButtons = (s: any): InputButtonDefinition[] => {
   const rawButtons = s?.buttons || s?.Buttons;
   if (Array.isArray(rawButtons) && rawButtons.length > 0) {
@@ -289,6 +291,12 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
   const [listeningGp, setListeningGp] = useState<{ playerIdx: number; id: number; field: 'gp1' | 'gp2'; initialAxes?: Record<number, number[]> } | null>(null);
   const [currentGpCombo, setCurrentGpCombo] = useState<string[]>([]);
   const gpCommitTimerRef = useRef<any>(null);
+  const comboRef = useRef<string[]>([]);
+  const playerBindingsRef = useRef(playerBindings);
+  playerBindingsRef.current = playerBindings;
+  const handleSaveRef = useRef<((updatedPlayerMap: Record<number, Record<number, InputBinding>>) => Promise<void>) | null>(null);
+  const [liveGpPressed, setLiveGpPressed] = useState<Set<string>>(() => new Set());
+  const [liveKeyPressed, setLiveKeyPressed] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -511,6 +519,7 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
     },
     [config.userId, targetPlatform]
   );
+  handleSaveRef.current = handleSavePlayerBindings;
 
   // Cycle trigger mode: Press -> Hold (5s, 3s, 2s, 1s) -> Combo
   const cycleActivation = useCallback(
@@ -671,16 +680,97 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
     };
   }, [listeningKey, playerBindings, handleSavePlayerBindings]);
 
+  // Live input indicator: highlight remap buttons when their bound key/gamepad input is pressed
+  useEffect(() => {
+    if (!isOpen || listeningKey || listeningGp) {
+      setLiveKeyPressed(new Set());
+      setLiveGpPressed(new Set());
+      return;
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e as any)._isRetroKitSynthetic) return;
+      setLiveKeyPressed((prev) => {
+        if (prev.has(e.keyCode)) return prev;
+        const next = new Set(prev);
+        next.add(e.keyCode);
+        return next;
+      });
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      setLiveKeyPressed((prev) => {
+        if (!prev.has(e.keyCode)) return prev;
+        const next = new Set(prev);
+        next.delete(e.keyCode);
+        return next;
+      });
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
+
+    let rafId: number;
+    let lastKey = '';
+    const pollLiveGp = () => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const activePads = Array.from(pads).filter((p): p is Gamepad => !!p && p.connected !== false);
+      const targetIdx = activeTab.startsWith('p') ? Math.max(0, Number(activeTab.slice(1)) || 0) : 0;
+      const targetPad = activePads[targetIdx] || activePads[0];
+      const held: string[] = [];
+
+      if (targetPad) {
+        for (let i = 0; i < (targetPad.buttons?.length || 0); i++) {
+          const b = targetPad.buttons[i];
+          const pressed = typeof b === 'object' && b !== null ? (!!b.pressed || b.value > 0.4) : b > 0.4;
+          if (pressed) {
+            held.push(i < BUTTON_INDEX_TO_LABEL.length ? BUTTON_INDEX_TO_LABEL[i] : `GAMEPAD_${i}`);
+          }
+        }
+        for (let i = 0; i < (targetPad.axes?.length || 0); i++) {
+          const v = targetPad.axes[i];
+          if (Math.abs(v) > 0.5) {
+            const axisName = i < AXIS_NAMES.length ? AXIS_NAMES[i] : `EXTRA_STICK_${i}`;
+            held.push(`${axisName}:${v > 0 ? '+1' : '-1'}`);
+          }
+        }
+      }
+
+      const key = held.join('|');
+      if (key !== lastKey) {
+        lastKey = key;
+        setLiveGpPressed(new Set(held));
+      }
+      rafId = requestAnimationFrame(pollLiveGp);
+    };
+    rafId = requestAnimationFrame(pollLiveGp);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('keyup', onKeyUp, true);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isOpen, listeningKey, listeningGp, activeTab]);
+
   // Gamepad polling & combo capture listener
   useEffect(() => {
     if (!listeningGp) return;
 
     let animFrame: number;
+    comboRef.current = [];
+
+    const onKeyCancel = (e: KeyboardEvent) => {
+      if (e.keyCode === 27) {
+        e.preventDefault();
+        e.stopPropagation();
+        setListeningGp(null);
+        setCurrentGpCombo([]);
+      }
+    };
+    window.addEventListener('keydown', onKeyCancel, true);
 
     const pollGamepadInput = () => {
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
       const activePads = Array.from(pads).filter((p): p is Gamepad => !!p && p.connected !== false);
-      const targetPad = activePads[listeningGp.playerIdx];
+      const targetPad = activePads[listeningGp.playerIdx] || activePads[0];
       if (!targetPad) {
         animFrame = requestAnimationFrame(pollGamepadInput);
         return;
@@ -722,23 +812,23 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
       }
 
       if (currentlyHeld.length > 0) {
-        setCurrentGpCombo((prev) => {
-          if (currentlyHeld.length > prev.length) {
-            return currentlyHeld.slice();
-          }
-          return prev;
-        });
+        if (currentlyHeld.length >= comboRef.current.length) {
+          comboRef.current = currentlyHeld.slice();
+          setCurrentGpCombo(comboRef.current);
+        }
 
         if (gpCommitTimerRef.current) {
           clearTimeout(gpCommitTimerRef.current);
           gpCommitTimerRef.current = null;
         }
-      } else if (currentGpCombo.length > 0 && !gpCommitTimerRef.current) {
+      } else if (comboRef.current.length > 0 && !gpCommitTimerRef.current) {
         // Released -> Commit combo after short debounce
+        const capturedCombo = comboRef.current.slice();
         gpCommitTimerRef.current = setTimeout(() => {
-          const comboStr = currentGpCombo.join('+');
+          const comboStr = capturedCombo.join('+');
           const { playerIdx, id, field } = listeningGp;
-          const currentPBinds = { ...(playerBindings[playerIdx] || {}) };
+          const latestMap = playerBindingsRef.current;
+          const currentPBinds = { ...(latestMap[playerIdx] || {}) };
           const currentBtnBind = currentPBinds[id] || { kb1: 0, kb2: 0, gp1: '', gp2: '' };
 
           const updatedPBinds: Record<number, InputBinding> = {
@@ -750,15 +840,16 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
           };
 
           const updatedPlayerMap = {
-            ...playerBindings,
+            ...latestMap,
             [playerIdx]: updatedPBinds
           };
 
-          handleSavePlayerBindings(updatedPlayerMap);
+          handleSaveRef.current?.(updatedPlayerMap);
+          comboRef.current = [];
           setListeningGp(null);
           setCurrentGpCombo([]);
           setStatusMessage(`Mapped ${PlayerBridge.getGpName(comboStr)} to P${playerIdx + 1} ${field.toUpperCase()}`);
-        }, 120);
+        }, 100);
       }
 
       animFrame = requestAnimationFrame(pollGamepadInput);
@@ -767,13 +858,14 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
     animFrame = requestAnimationFrame(pollGamepadInput);
 
     return () => {
+      window.removeEventListener('keydown', onKeyCancel, true);
       cancelAnimationFrame(animFrame);
       if (gpCommitTimerRef.current) {
         clearTimeout(gpCommitTimerRef.current);
         gpCommitTimerRef.current = null;
       }
     };
-  }, [listeningGp, currentGpCombo, playerBindings, handleSavePlayerBindings]);
+  }, [listeningGp]);
 
   // Start Gamepad Listen helper
   const startListeningGp = (playerIdx: number, id: number, field: 'gp1' | 'gp2') => {
@@ -1121,7 +1213,9 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                                     className={`w-full py-1.5 pl-2 ${bind.kb1 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
                                       listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1'
                                         ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                        : (bind.kb1 && liveKeyPressed.has(bind.kb1))
+                                          ? 'bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
+                                          : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
                                     }`}
                                   >
                                     {listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb1'
@@ -1156,7 +1250,9 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                                     className={`w-full py-1.5 pl-2 ${bind.kb2 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
                                       listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2'
                                         ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                        : (bind.kb2 && liveKeyPressed.has(bind.kb2))
+                                          ? 'bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
+                                          : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
                                     }`}
                                   >
                                     {listeningKey?.playerIdx === activePlayerIdx && listeningKey?.id === btn.id && listeningKey?.field === 'kb2'
@@ -1190,7 +1286,9 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                                     className={`w-full py-1.5 pl-2 ${bind.gp1 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
                                       listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1'
                                         ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                        : (bind.gp1 && splitGpCombo(bind.gp1).every(part => liveGpPressed.has(part)))
+                                          ? 'bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
+                                          : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
                                     }`}
                                   >
                                     {listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp1'
@@ -1222,7 +1320,9 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                                     className={`w-full py-1.5 pl-2 ${bind.gp2 ? 'pr-6' : 'px-2'} rounded-lg text-xs font-mono font-medium transition-all text-center truncate ${
                                       listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2'
                                         ? 'bg-white text-black animate-pulse shadow-lg font-bold'
-                                        : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                                        : (bind.gp2 && splitGpCombo(bind.gp2).every(part => liveGpPressed.has(part)))
+                                          ? 'bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
+                                          : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
                                     }`}
                                   >
                                     {listeningGp?.playerIdx === activePlayerIdx && listeningGp?.id === btn.id && listeningGp?.field === 'gp2'

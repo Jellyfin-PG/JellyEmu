@@ -67,6 +67,12 @@
 
         self.addEventListener('fetch', function(event) {
             var r = event.request;
+            // Only intercept same-origin requests; never hijack third-party scripts/beacons
+            try {
+                if (new URL(r.url).origin !== self.location.origin) return;
+            } catch (e) {
+                return;
+            }
             // Intercept top-level HTML document navigations as well as workers and scripts for cross-origin isolation
             if (r.mode === 'navigate' || r.destination === 'document' || r.destination === 'worker' || r.destination === 'sharedworker' || r.destination === 'script') {
                 if (r.cache === 'only-if-cached' && r.mode !== 'same-origin') return;

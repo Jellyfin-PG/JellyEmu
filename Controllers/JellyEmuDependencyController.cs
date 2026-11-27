@@ -52,6 +52,7 @@ namespace JellyEmu.Controllers
             const string contentType = "application/javascript; charset=utf-8";
             Response.ContentType = contentType;
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
+            Response.Headers["Cache-Control"] = "public, max-age=86400";
 
             if (_pico8Manager.IsReady)
             {
@@ -103,6 +104,7 @@ namespace JellyEmu.Controllers
             const string contentType = "application/javascript; charset=utf-8";
             Response.ContentType = contentType;
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
+            Response.Headers["Cache-Control"] = "public, max-age=86400";
 
             if (_threeJsManager.IsReady)
             {
@@ -143,6 +145,20 @@ namespace JellyEmu.Controllers
         /// Serves EmulatorJS assets from local cache (if downloaded) or proxies from CDN.
         /// Path: GET /jellyemu/ejs/{*path}
         /// </summary>
+        [HttpGet("/emulatorjs-cores/{channel}/data/{*path}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public Task<IActionResult> EjsCoreProxy(string channel, string path,
+            [FromServices] IHttpClientFactory httpClientFactory)
+            => EjsAsset(path, httpClientFactory);
+
+        [HttpGet("/compression/{fileName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public Task<IActionResult> EjsCompressionProxy(string fileName,
+            [FromServices] IHttpClientFactory httpClientFactory)
+            => EjsAsset($"compression/{fileName}", httpClientFactory);
+
         [HttpGet("/jellyemu/ejs/{*path}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -173,6 +189,7 @@ namespace JellyEmu.Controllers
 
             Response.ContentType = contentType;
             Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
+            Response.Headers["Cache-Control"] = "public, max-age=86400";
 
             if (path.Equals("cores/azahar-thread-legacy-wasm.data", StringComparison.OrdinalIgnoreCase) ||
                 path.Equals("cores/azahar-legacy-wasm.data", StringComparison.OrdinalIgnoreCase))
@@ -210,7 +227,24 @@ namespace JellyEmu.Controllers
                     return NotFound();
                 }
 
-                return File(await cdnResponse.Content.ReadAsByteArrayAsync(), contentType);
+                var bytes = await cdnResponse.Content.ReadAsByteArrayAsync();
+                if (!string.IsNullOrWhiteSpace(_ejsManager.LocalRoot))
+                {
+                    try
+                    {
+                        var localPath = Path.Combine(_ejsManager.LocalRoot, path.Replace('/', Path.DirectorySeparatorChar));
+                        var dir = Path.GetDirectoryName(localPath);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                        var tmpPath = $"{localPath}.{Guid.NewGuid():N}.tmp";
+                        await System.IO.File.WriteAllBytesAsync(tmpPath, bytes);
+                        System.IO.File.Move(tmpPath, localPath, overwrite: true);
+                    }
+                    catch (Exception cacheEx)
+                    {
+                        Logger.LogDebug(cacheEx, "[JellyEmu] Could not cache proxied EJS asset to disk: {Path}", path);
+                    }
+                }
+                return File(bytes, contentType);
             }
             catch (Exception ex)
             {

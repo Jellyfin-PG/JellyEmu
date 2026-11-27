@@ -20,6 +20,10 @@ interface PlayerAppProps {
 }
 
 export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
+  const [supportsCheats, setSupportsCheats] = useState<boolean | undefined>(undefined);
+  const [supportsSaveStates, setSupportsSaveStates] = useState<boolean | undefined>(undefined);
+  const [supportsSram, setSupportsSram] = useState<boolean | undefined>(undefined);
+
   useEffect(() => {
     PlayerBridge.init(initialData);
 
@@ -34,7 +38,13 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
       if (canvas && initialData.romUrl) {
         booted = true;
         try {
-          await PlayerBridge.boot(canvas, initialData);
+          const emu = await PlayerBridge.boot(canvas, initialData);
+          const caps = emu.capabilities;
+          if (caps) {
+            setSupportsCheats(caps.cheats);
+            setSupportsSaveStates(caps.saveStates);
+            setSupportsSram(caps.sram);
+          }
         } catch (err) {
           console.error('[PlayerApp] RetroKit boot error:', err);
         }
@@ -136,11 +146,14 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
     initialData.systemName?.toLowerCase().includes('pico')
   );
 
-  // Global hotkey listener for in-game shortcuts
+  // Global hotkey listener for in-game shortcuts (capture phase so it runs before RetroKit InputManager)
   useEffect(() => {
+    let activeRewindHotkey = false;
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e as any)._isRetroKitSynthetic) return;
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
         return;
       }
       if (anyModalOpen) {
@@ -155,39 +168,77 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         canvas?.focus({ preventScroll: true });
       }
 
-      // Escape -> Exit game (available across all systems)
-      if (e.key === 'Escape') {
+      const hotkeyId = PlayerBridge.matchHotkey(e);
+      if (hotkeyId !== null) {
         e.preventDefault();
-        PlayerBridge.exit();
-        return;
-      }
+        e.stopPropagation();
+        e.stopImmediatePropagation();
 
-      // Space -> Toggle Pause/Resume (available across all systems)
-      if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        e.preventDefault();
-        togglePause();
-        return;
-      }
+        if (e.repeat && hotkeyId !== 28) return;
 
-      // F4 -> Restart (available across all systems)
-      if (e.key === 'F4') {
-        e.preventDefault();
-        PlayerBridge.restart();
-        return;
-      }
-
-      // M -> Toggle Mute (available across all systems)
-      if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        e.preventDefault();
-        toggleMute();
-        return;
-      }
-
-      // F12 -> Screenshot (available across all systems)
-      if (e.key === 'F12') {
-        e.preventDefault();
-        PlayerBridge.takeScreenshot(initialData.itemId, initialData.gameName);
-        return;
+        switch (hotkeyId) {
+          case 24: {
+            const slot = PlayerBridge.getActiveSlot();
+            if (initialData.itemId && initialData.userId) {
+              PlayerBridge.saveState(initialData.itemId, initialData.userId, slot).then((ok) => {
+                PlayerBridge.notify({
+                  message: ok ? `Quick Saved (Slot ${slot})` : `Quick Save Failed (Slot ${slot})`,
+                  icon: 'save',
+                  variant: ok ? 'success' : 'danger'
+                });
+              });
+            }
+            return;
+          }
+          case 25: {
+            const slot = PlayerBridge.getActiveSlot();
+            if (initialData.itemId && initialData.userId) {
+              PlayerBridge.loadState(initialData.itemId, initialData.userId, slot).then((ok) => {
+                PlayerBridge.notify({
+                  message: ok ? `Quick Loaded (Slot ${slot})` : `No Save in Slot ${slot}`,
+                  icon: 'save',
+                  variant: ok ? 'success' : 'warning'
+                });
+              });
+            }
+            return;
+          }
+          case 26: {
+            const nextSlot = PlayerBridge.cycleActiveSlot();
+            PlayerBridge.notify({ message: `Save Slot ${nextSlot}`, icon: 'save', variant: 'accent' });
+            return;
+          }
+          case 27:
+            toggleFastForward();
+            return;
+          case 28:
+            if (!activeRewindHotkey) {
+              activeRewindHotkey = true;
+              PlayerBridge.startRewind();
+            }
+            return;
+          case 29:
+            toggleSlowMotion();
+            return;
+          case 30:
+            PlayerBridge.exit();
+            return;
+          case 31:
+            togglePause();
+            return;
+          case 32:
+            PlayerBridge.restart();
+            return;
+          case 33:
+            toggleMute();
+            return;
+          case 34:
+            PlayerBridge.takeScreenshot(initialData.itemId, initialData.gameName);
+            return;
+          case 35:
+            PlayerBridge.toggleFullscreen();
+            return;
+        }
       }
 
       // Hotkeys that shouldn't clash with PS2 letter keys
@@ -195,26 +246,37 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         // H or ? -> Open hotkeys tab in input mapping modal
         if ((e.key === 'h' || e.key === 'H' || e.key === '?') && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
           setInputMapTab('hotkeys');
           inputMapDisclosure.onOpen();
           PlayerBridge.notify({ message: 'Input Mapping', subtext: 'Hotkeys overview opened', icon: 'gamepad', variant: 'accent' });
           return;
         }
+      }
+    };
 
-        // F -> Fullscreen toggle
-        if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if ((e as any)._isRetroKitSynthetic) return;
+      if (activeRewindHotkey) {
+        const hotkeyId = PlayerBridge.matchHotkey(e);
+        if (hotkeyId === 28) {
           e.preventDefault();
-          PlayerBridge.toggleFullscreen();
-          return;
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          activeRewindHotkey = false;
+          PlayerBridge.stopRewind();
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [isPlay, anyModalOpen, inputMapDisclosure, togglePause, toggleMute, initialData]);
+  }, [isPlay, anyModalOpen, inputMapDisclosure, togglePause, toggleMute, toggleFastForward, toggleSlowMotion, initialData]);
 
   return (
     <HeroUIProvider>
@@ -257,6 +319,9 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
           isM3u={initialData.isM3u}
           isPlay={isPlay}
           isPico8={isPico8}
+          supportsCheats={supportsCheats}
+          supportsSaveStates={supportsSaveStates}
+          supportsSram={supportsSram}
           itemId={initialData.itemId}
           gameName={initialData.gameName}
           onOpenSaves={savesDisclosure.onOpen}
@@ -271,12 +336,14 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
           onOpenDiscSelect={discSelectDisclosure.onOpen}
         />
 
-        {/* Saves & States Modal (Only on systems supporting save states) */}
-        {!isPlay && !isPico8 && savesDisclosure.isOpen && (
+        {/* Saves & States Modal (Shown whenever core supports saveStates or sram) */}
+        {(supportsSaveStates || supportsSram || (!isPlay && !isPico8)) && savesDisclosure.isOpen && (
           <InGameSavesModal
             itemId={initialData.itemId}
             userId={initialData.userId}
             gameName={initialData.gameName}
+            supportsSaveStates={supportsSaveStates ?? (!isPlay && !isPico8)}
+            supportsSram={supportsSram ?? true}
             isOpen={savesDisclosure.isOpen}
             onOpenChange={savesDisclosure.onOpenChange}
           />

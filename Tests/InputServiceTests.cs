@@ -293,5 +293,31 @@ namespace JellyEmu.Tests
                 Assert.InRange(kvp.Value.MaxPlayers, 1, 2);
             }
         }
+
+        [Fact]
+        public void GetScheme_AllSchemes_ButtonsAndPlayerBindingsAreValid()
+        {
+            var all = _inputService.GetAllSchemes();
+            Assert.NotEmpty(all);
+            foreach (var kvp in all)
+            {
+                var scheme = kvp.Value;
+                Assert.NotEmpty(scheme.Buttons);
+                foreach (var btn in scheme.Buttons)
+                {
+                    Assert.InRange(btn.Id, 0, 35);
+                    Assert.False(string.IsNullOrWhiteSpace(btn.Label));
+                    Assert.True(
+                        scheme.DefaultBindings.ContainsKey(btn.Id),
+                        $"Scheme '{kvp.Key}' missing DefaultBindings for button {btn.Id} ({btn.Label})");
+                }
+                for (int p = 0; p < scheme.MaxPlayers; p++)
+                {
+                    Assert.True(
+                        scheme.PlayerDefaultBindings.ContainsKey(p),
+                        $"Scheme '{kvp.Key}' missing PlayerDefaultBindings for player {p}");
+                }
+            }
+        }
     }
 }

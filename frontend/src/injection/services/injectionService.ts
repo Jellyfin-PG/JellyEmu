@@ -86,7 +86,7 @@ export const injectionService = {
     }
     try {
       const url = jellyfinApi.getApiUrl(`Items/${itemId}?userId=${userId}`);
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: injectionService.getAuthHeaders() });
       if (!res.ok) return null;
       return await res.json();
     } catch {

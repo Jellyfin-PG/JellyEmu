@@ -13,9 +13,28 @@ export class PlayerBridge {
   private static emu: RetroKit | null = null;
   private static config: PlayerInitialData | null = null;
   private static sramSyncTimer: any = null;
+  private static _activeSlot = 1;
+  private static _boundGameCodes = new Set<string>();
+  private static _activeHotkeys: Record<number, { kb1: number; kb2: number }> = {
+    24: { kb1: 49, kb2: 0 },   // QUICK SAVE
+    25: { kb1: 50, kb2: 0 },   // QUICK LOAD
+    26: { kb1: 51, kb2: 0 },   // CHANGE SLOT
+    27: { kb1: 107, kb2: 9 },  // FAST FORWARD
+    28: { kb1: 8, kb2: 0 },    // REWIND
+    29: { kb1: 109, kb2: 0 },  // SLOW MOTION
+    30: { kb1: 27, kb2: 0 },   // EXIT GAME
+    31: { kb1: 32, kb2: 80 },  // PAUSE / RESUME
+    32: { kb1: 115, kb2: 0 },  // RESTART GAME
+    33: { kb1: 77, kb2: 0 },   // MUTE AUDIO
+    34: { kb1: 123, kb2: 0 },  // SCREENSHOT
+    35: { kb1: 70, kb2: 122 }  // FULLSCREEN
+  };
 
   public static init(config: PlayerInitialData) {
     this.config = config;
+    if (config.activeSlot && config.activeSlot > 0) {
+      this._activeSlot = config.activeSlot;
+    }
     (window as any).jeNotify = this.notify.bind(this);
     PlayerSessionTracker.init(config);
 
@@ -52,16 +71,49 @@ export class PlayerBridge {
     else if (coreLower === 'ruffle') assetSubdir = 'ruffle';
     const assetBaseUrl = coreLower === 'play' ? playBase : `${dataBase}/${assetSubdir}`;
 
-    // Ensure any WebGL/WebGL2 context created on any canvas (including replaced canvases) preserves its drawing buffer for screenshots
+    // Ensure any WebGL/WebGL2 context preserves its drawing buffer for screenshots and uses low-latency desynchronized presentation
     if (typeof HTMLCanvasElement !== 'undefined' && !(HTMLCanvasElement.prototype as any).__jePreserveDrawingBufferPatched) {
       const origProtoGetContext = HTMLCanvasElement.prototype.getContext;
       (HTMLCanvasElement.prototype as any).getContext = function (type: string, attrs?: any) {
         if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
-          return origProtoGetContext.call(this, type, { ...(attrs || {}), preserveDrawingBuffer: true });
+          return origProtoGetContext.call(this, type, {
+            desynchronized: true,
+            ...(attrs || {}),
+            preserveDrawingBuffer: true
+          });
+        }
+        if (type === '2d') {
+          return origProtoGetContext.call(this, type, {
+            desynchronized: true,
+            ...(attrs || {})
+          });
         }
         return origProtoGetContext.call(this, type, attrs);
       };
       (HTMLCanvasElement.prototype as any).__jePreserveDrawingBufferPatched = true;
+    }
+
+    // Fetch RetroAchievements credentials if user is logged in
+    let retroAchievements: { username?: string; token?: string; hardcore?: boolean } | undefined;
+    if (config.userId) {
+      try {
+        const raResp = await fetch(this.getUrl(`/jellyemu/prefs/${config.userId}?scope=ra`), {
+          headers: this.getAuthHeaders()
+        });
+        if (raResp.ok) {
+          const raData = await raResp.json();
+          const prefs = raData?.preferences || raData;
+          const username = prefs?.raUsername || prefs?.username;
+          const token = prefs?.raToken || prefs?.token;
+          if (username && token) {
+            retroAchievements = {
+              username,
+              token,
+              hardcore: prefs?.raHardcore === true || prefs?.raHardcore === 'true' || prefs?.hardcore === true
+            };
+          }
+        }
+      } catch (_) {}
     }
 
     // Instantiate RetroKit universal orchestrator with custom data directory and per-engine paths
@@ -70,6 +122,7 @@ export class PlayerBridge {
       assetBaseUrl,
       assetPaths,
       fetchHeaders: this.getAuthHeaders(),
+      retroAchievements,
       debug: false
     });
     this.emu.setCoresDirectory(assetBaseUrl);
@@ -148,6 +201,40 @@ export class PlayerBridge {
     const urlClean = (config.romUrl || '').split('?')[0];
     const ext = urlClean.includes('.') ? urlClean.split('.').pop()! : 'bin';
     const cleanGameName = (config.gameName || config.itemId || 'game').replace(/[^a-zA-Z0-9_-]/g, '_');
+    let primaryRomUrl = config.romUrl;
+    let resolvedFileName = `${cleanGameName}.${ext}`;
+    let additionalFiles: Array<{ name: string; data: Uint8Array }> | undefined;
+
+    // Fetch multi-file / folder manifest if applicable
+    if (config.hasAdditionalFiles && config.itemId) {
+      try {
+        const userQuery = config.userId ? `?userId=${encodeURIComponent(config.userId)}` : '';
+        const filesResp = await fetch(this.getUrl(`/jellyemu/rom/${config.itemId}/files${userQuery}`), {
+          headers: this.getAuthHeaders()
+        });
+        if (filesResp.ok) {
+          const manifest = await filesResp.json();
+          const fileList: Array<{ name: string; url: string }> = Array.isArray(manifest?.files) ? manifest.files : [];
+          if (manifest?.primaryFile && manifest?.primaryUrl) {
+            primaryRomUrl = this.getUrl(manifest.primaryUrl);
+            resolvedFileName = manifest.primaryFile;
+          }
+          const companions = fileList.filter((f) => f.name && f.name !== resolvedFileName && f.url);
+          if (companions.length > 0) {
+            const loaded = await Promise.all(
+              companions.map(async (f) => {
+                const r = await fetch(this.getUrl(f.url), { headers: this.getAuthHeaders() });
+                if (!r.ok) return null;
+                return { name: f.name, data: new Uint8Array(await r.arrayBuffer()) };
+              })
+            );
+            additionalFiles = loaded.filter((x): x is { name: string; data: Uint8Array } => x !== null);
+          }
+        }
+      } catch (err) {
+        console.warn('[PlayerBridge] Failed to fetch multi-file ROM manifest:', err);
+      }
+    }
 
     // Slot 1 in UI maps to index 0 in RetroArch/RetroKit
     const slotIndex = config.activeSlot && config.activeSlot > 0 ? config.activeSlot - 1 : 0;
@@ -167,15 +254,48 @@ export class PlayerBridge {
       }
     }
 
+    // Fetch cloud battery SRAM if available for this user + item
+    let initialSram: Uint8Array | Record<string, Uint8Array> | undefined;
+    if (config.itemId && config.userId) {
+      try {
+        const sramResp = await fetch(this.getUrl(`/jellyemu/sram/${config.itemId}/${config.userId}`), {
+          headers: this.getAuthHeaders(),
+          cache: 'no-store'
+        });
+        if (sramResp.ok) {
+          const contentType = sramResp.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const jsonObj = await sramResp.json();
+            if (jsonObj && typeof jsonObj === 'object') {
+              const map: Record<string, Uint8Array> = {};
+              for (const [k, v] of Object.entries(jsonObj)) {
+                if (Array.isArray(v)) map[k] = new Uint8Array(v);
+              }
+              initialSram = map;
+            }
+          } else {
+            const buf = await sramResp.arrayBuffer();
+            if (buf.byteLength > 0) {
+              initialSram = new Uint8Array(buf);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[PlayerBridge] Failed to fetch initial SRAM:', err);
+      }
+    }
+
     // Load Game via RetroKit
-    await this.emu.load(config.romUrl, {
+    await this.emu.load(primaryRomUrl, {
       core: config.core,
       system: config.platformTag,
       platformTag: config.platformTag,
-      fileName: `${cleanGameName}.${ext}`,
+      fileName: resolvedFileName,
       gameId: config.itemId,
       coresDirectory: assetBaseUrl,
       bios: biosMap,
+      additionalFiles,
+      initialSram,
       initialStateSlot: slotIndex
     });
 
@@ -884,6 +1004,55 @@ export class PlayerBridge {
     }
   }
 
+  public static async exportSram(gameName: string): Promise<boolean> {
+    if (!this.emu) return false;
+    try {
+      await this.emu.sram.flushSram();
+      const sramData = await this.emu.sram.getSram();
+      if (!sramData) return false;
+
+      let blob: Blob;
+      let ext = 'sav';
+      if (sramData instanceof Uint8Array) {
+        if (sramData.byteLength === 0) return false;
+        blob = new Blob([sramData], { type: 'application/octet-stream' });
+      } else {
+        blob = new Blob([JSON.stringify(sramData)], { type: 'application/json' });
+        ext = 'json';
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(gameName || 'save').replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (err) {
+      console.error('[PlayerBridge] Export SRAM failed:', err);
+      return false;
+    }
+  }
+
+  public static async importSram(file: File): Promise<boolean> {
+    if (!this.emu) return false;
+    try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      if (bytes.byteLength === 0) return false;
+      const ok = await this.emu.sram.setSram(bytes, { restart: true });
+      if (ok) {
+        await this.flushSramImmediate();
+      }
+      return ok;
+    } catch (err) {
+      console.error('[PlayerBridge] Import SRAM failed:', err);
+      return false;
+    }
+  }
+
   // Screenshots
   public static captureCanvas(format = 'image/jpeg', quality = 0.9): string | null {
     try {
@@ -1484,6 +1653,29 @@ export class PlayerBridge {
     23: { axis: 'R_STICK_Y', direction: -1 }
   };
 
+  private static resolveGamepadAxis(label?: string): { gpAxisIndex: number; gpDir: 1 | -1 } | null {
+    if (!label) return null;
+    const trimmed = label.trim().toUpperCase();
+    const axisMap: Record<string, number> = {
+      LEFT_STICK_X: 0,
+      LEFT_STICK_Y: 1,
+      RIGHT_STICK_X: 2,
+      RIGHT_STICK_Y: 3
+    };
+    const m = /^([A-Z0-9_]+):([+-]?1)$/.exec(trimmed);
+    if (!m) return null;
+    const name = m[1];
+    const dir: 1 | -1 = m[2] === '-1' ? -1 : 1;
+    if (name in axisMap) {
+      return { gpAxisIndex: axisMap[name], gpDir: dir };
+    }
+    const extra = /^EXTRA_STICK_(\d+)$/.exec(name);
+    if (extra) {
+      return { gpAxisIndex: Number(extra[1]), gpDir: dir };
+    }
+    return null;
+  }
+
   private static resolveGamepadIndex(label?: string): number | null {
     if (!label) return null;
     const trimmed = label.trim().toUpperCase();
@@ -1492,7 +1684,70 @@ export class PlayerBridge {
     return m ? Number(m[1]) : null;
   }
 
+  public static getActiveSlot(): number {
+    return this._activeSlot;
+  }
+
+  public static cycleActiveSlot(): number {
+    this._activeSlot = (this._activeSlot % 5) + 1;
+    return this._activeSlot;
+  }
+
+  public static startRewind(): void {
+    if (this.emu?.timing?.isRewindSupported()) {
+      this.emu.timing.startRewind();
+    }
+  }
+
+  public static stopRewind(): void {
+    if (this.emu?.timing?.isRewindSupported()) {
+      this.emu.timing.stopRewind();
+    }
+  }
+
+  public static matchHotkey(e: KeyboardEvent): number | null {
+    if (e.ctrlKey || e.altKey || e.metaKey) return null;
+    // Do not hijack a key that is actively bound to a Player 1 game button
+    if (e.code && this._boundGameCodes.has(e.code)) {
+      return null;
+    }
+    for (const [idStr, bind] of Object.entries(this._activeHotkeys)) {
+      const id = Number(idStr);
+      for (const kc of [bind.kb1, bind.kb2]) {
+        if (!kc || kc <= 0) continue;
+        if (e.keyCode === kc) return id;
+        const codes = this.keyCodeToCodes(kc);
+        if (e.code && codes.includes(e.code)) return id;
+      }
+    }
+    return null;
+  }
+
   public static applyInputBindings(playerBindings: Record<number, Record<number, InputBinding>>): void {
+    // Update active keyboard hotkeys from Player 1's bindings (IDs 24-35); gamepad actions stay unmapped
+    const p0Binds = playerBindings[0];
+    this._boundGameCodes.clear();
+    if (p0Binds) {
+      for (const [idKey, bind] of Object.entries(p0Binds)) {
+        const btnId = Number(idKey);
+        if (!bind || Number.isNaN(btnId)) continue;
+        if (btnId >= 24 && btnId <= 35) {
+          this._activeHotkeys[btnId] = {
+            kb1: Number(bind.kb1) || 0,
+            kb2: Number(bind.kb2) || 0
+          };
+        } else if (btnId < 24) {
+          for (const kc of [bind.kb1, bind.kb2]) {
+            if (kc && kc > 0) {
+              for (const code of this.keyCodeToCodes(kc)) {
+                this._boundGameCodes.add(code);
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (!this.emu?.input) return;
     const maxP = this.emu.input.getMaxPlayers();
     for (const [pKey, binds] of Object.entries(playerBindings)) {
@@ -1519,10 +1774,30 @@ export class PlayerBridge {
         }
 
         for (const gp of [bind.gp1, bind.gp2]) {
-          const gpIdx = this.resolveGamepadIndex(gp);
-          if (gpIdx !== null) {
-            if (stdBtn) channel.setGamepadBinding(stdBtn, gpIdx);
-            else if (stdAxis) channel.setGamepadAxisButtonBinding(stdAxis.axis, stdAxis.direction, gpIdx);
+          if (!gp || !gp.trim()) continue;
+          const parts = gp.split(/(?<!:)\+/).filter(Boolean);
+          for (const part of parts) {
+            const gpIdx = this.resolveGamepadIndex(part);
+            if (gpIdx !== null) {
+              if (stdBtn) channel.setGamepadBinding(stdBtn, gpIdx);
+              else if (stdAxis) channel.setGamepadAxisButtonBinding(stdAxis.axis, stdAxis.direction, gpIdx);
+              continue;
+            }
+            const gpAxis = this.resolveGamepadAxis(part);
+            if (gpAxis) {
+              if (stdBtn) {
+                channel.setGamepadAxisToButtonBinding(gpAxis.gpAxisIndex, gpAxis.gpDir, stdBtn);
+              } else if (stdAxis) {
+                const isDefaultSameAxis =
+                  (stdAxis.axis === 'L_STICK_X' && gpAxis.gpAxisIndex === 0 && gpAxis.gpDir === stdAxis.direction) ||
+                  (stdAxis.axis === 'L_STICK_Y' && gpAxis.gpAxisIndex === 1 && gpAxis.gpDir === stdAxis.direction) ||
+                  (stdAxis.axis === 'R_STICK_X' && gpAxis.gpAxisIndex === 2 && gpAxis.gpDir === stdAxis.direction) ||
+                  (stdAxis.axis === 'R_STICK_Y' && gpAxis.gpAxisIndex === 3 && gpAxis.gpDir === stdAxis.direction);
+                if (!isDefaultSameAxis) {
+                  channel.setGamepadAxisToAxisBinding(gpAxis.gpAxisIndex, gpAxis.gpDir, stdAxis.axis, stdAxis.direction);
+                }
+              }
+            }
           }
         }
       }

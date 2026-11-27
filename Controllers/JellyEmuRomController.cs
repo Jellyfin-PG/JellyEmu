@@ -85,6 +85,164 @@ namespace JellyEmu.Controllers
             return File(stream, "application/octet-stream", enableRangeProcessing: true);
         }
 
+        [HttpGet("/jellyemu/rom/{itemId}/files")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult ListRomFiles(string itemId, [FromQuery] string? userId = null)
+        {
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null || string.IsNullOrEmpty(item.Path))
+                return NotFound();
+
+            if (!VerifyItemAccess(item))
+                return Forbid();
+
+            var (primaryPath, allFiles) = ResolveItemFilesWithPrimary(item, userId);
+            if (allFiles.Count == 0 || string.IsNullOrEmpty(primaryPath))
+                return NotFound();
+
+            var baseDir = Directory.Exists(item.Path)
+                ? item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : (Path.GetDirectoryName(item.Path) ?? string.Empty);
+
+            string ToRel(string p)
+            {
+                if (!string.IsNullOrEmpty(baseDir))
+                {
+                    var rel = Path.GetRelativePath(baseDir, p).Replace('\\', '/');
+                    if (!rel.StartsWith("..", StringComparison.Ordinal))
+                        return rel;
+                }
+                return Path.GetFileName(p);
+            }
+
+            string ToFileUrl(string relName)
+            {
+                var encoded = string.Join("/", relName.Split('/').Select(Uri.EscapeDataString));
+                return ToAppUrl($"jellyemu/rom/{itemId}/file/{encoded}");
+            }
+
+            var primaryRel = ToRel(primaryPath);
+            var entries = allFiles.Select(p =>
+            {
+                var rel = ToRel(p);
+                return new
+                {
+                    name = rel,
+                    url = ToFileUrl(rel),
+                    size = new FileInfo(p).Length
+                };
+            }).ToList();
+
+            return Ok(new
+            {
+                primaryFile = primaryRel,
+                primaryUrl = ToFileUrl(primaryRel),
+                files = entries
+            });
+        }
+
+        [HttpGet("/jellyemu/rom/{itemId}/file/{*filePath}")]
+        [HttpHead("/jellyemu/rom/{itemId}/file/{*filePath}")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetRomCompanionFile(string itemId, string filePath, [FromQuery] string? userId = null)
+        {
+            var item = LibraryManager.GetItemById(itemId);
+            if (item == null || string.IsNullOrEmpty(item.Path) || string.IsNullOrEmpty(filePath))
+                return NotFound();
+
+            if (!VerifyItemAccess(item))
+                return Forbid();
+
+            var (_, allFiles) = ResolveItemFilesWithPrimary(item, userId);
+            var baseDir = Directory.Exists(item.Path)
+                ? item.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : (Path.GetDirectoryName(item.Path) ?? string.Empty);
+
+            var targetNorm = Uri.UnescapeDataString(filePath).Replace('\\', '/').TrimStart('/');
+            string? matched = null;
+            foreach (var p in allFiles)
+            {
+                var rel = (!string.IsNullOrEmpty(baseDir)
+                    ? Path.GetRelativePath(baseDir, p).Replace('\\', '/')
+                    : Path.GetFileName(p));
+                if (string.Equals(rel, targetNorm, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFileName(p), targetNorm, StringComparison.OrdinalIgnoreCase))
+                {
+                    matched = p;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(matched) || !System.IO.File.Exists(matched))
+                return NotFound();
+
+            var stream = OpenRomStream(matched);
+            var name = Path.GetFileName(matched);
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{name}\"";
+            return File(stream, "application/octet-stream", enableRangeProcessing: true);
+        }
+
+        private (string? PrimaryPath, List<string> AllFiles) ResolveItemFilesWithPrimary(BaseItem item, string? userId)
+        {
+            var files = new List<string>();
+            if (Directory.Exists(item.Path))
+            {
+                files = _fileService.ResolveAllRomFiles(item.Path);
+            }
+            else
+            {
+                var activePath = _fileService.ResolveActiveRomPath(item.Path, userId, item.Id.ToString("N")) ?? item.Path;
+                if (System.IO.File.Exists(activePath))
+                    files.Add(activePath);
+
+                if (activePath.EndsWith(".cue", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var refFile in CueParser.GetReferencedFiles(activePath))
+                    {
+                        if (System.IO.File.Exists(refFile) && !files.Contains(refFile, StringComparer.OrdinalIgnoreCase))
+                            files.Add(refFile);
+                    }
+                }
+                else if (item.Path.EndsWith(".j3u", StringComparison.OrdinalIgnoreCase) || item.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var refFile in _fileService.ResolveAllRomFiles(item.Path))
+                    {
+                        if (System.IO.File.Exists(refFile) && !files.Contains(refFile, StringComparer.OrdinalIgnoreCase))
+                            files.Add(refFile);
+                    }
+                }
+            }
+
+            if (files.Count == 0)
+                return (null, files);
+
+            static int Priority(string p)
+            {
+                var ext = Path.GetExtension(p).ToLowerInvariant();
+                return ext switch
+                {
+                    ".m3u" or ".j3u" => 0,
+                    ".cue" => 1,
+                    ".chd" or ".iso" or ".pbp" or ".cso" or ".gcz" or ".rvz" or ".wbfs" => 2,
+                    _ when PlatformResolver.AllRomExtensions.Contains(ext) => 3,
+                    _ => 4
+                };
+            }
+
+            var primary = files
+                .OrderBy(Priority)
+                .ThenBy(p => p.Length)
+                .First();
+
+            return (primary, files);
+        }
+
         [HttpGet("/jellyemu/rom/download-zip/{itemId}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]

@@ -18,6 +18,7 @@ export interface PlayerInitialData {
   netplayIceServers?: string[];
   gameId?: number;
   isM3u?: boolean;
+  hasAdditionalFiles?: boolean;
   activeShader?: string;
   videoRotation?: number;
   vsync?: string;
