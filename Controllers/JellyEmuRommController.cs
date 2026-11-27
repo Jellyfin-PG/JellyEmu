@@ -2,6 +2,7 @@ using System.Net.Mime;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,7 @@ namespace JellyEmu.Controllers
     /// playtime reporting, screenshot push, and collection sync.
     /// Routes: /jellyemu/romm/*
     /// </summary>
+    [Authorize]
     public class JellyEmuRommController : JellyEmuBaseController
     {
         public JellyEmuRommController(
@@ -29,6 +31,7 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/romm/health
         /// </summary>
         [HttpGet("/jellyemu/romm/health")]
+        [Authorize(Policy = "RequiresElevation")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> RommHealth()
@@ -79,6 +82,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { status = "Disabled" });
@@ -144,6 +148,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return StatusCode(503, new { error = "Romm save sync disabled" });
@@ -195,6 +200,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return StatusCode(503, new { error = "Romm save sync disabled" });
@@ -264,6 +270,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { pulled = false, reason = "disabled" });
@@ -341,6 +348,7 @@ namespace JellyEmu.Controllers
         {
             if (!IsValidId(itemId) || !IsValidId(userId))
                 return BadRequest("Invalid item or user ID.");
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommSaveSyncEnabled == true))
                 return Ok(new { pushed = false, reason = "disabled" });
@@ -391,6 +399,7 @@ namespace JellyEmu.Controllers
             {
                 return BadRequest("Invalid itemId or userId format.");
             }
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommPlaytimeReportEnabled == true))
                 return Ok(new { reported = false, reason = "disabled" });
@@ -441,6 +450,7 @@ namespace JellyEmu.Controllers
         /// Path: GET /jellyemu/romm/collections
         /// </summary>
         [HttpGet("/jellyemu/romm/collections")]
+        [Authorize(Policy = "RequiresElevation")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
@@ -554,6 +564,7 @@ namespace JellyEmu.Controllers
         /// Path: POST /jellyemu/romm/sync-collections/{userId}
         /// </summary>
         [HttpPost("/jellyemu/romm/sync-collections/{userId}")]
+        [Authorize(Policy = "RequiresElevation")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
@@ -620,6 +631,7 @@ namespace JellyEmu.Controllers
             {
                 return BadRequest("Invalid itemId or userId format.");
             }
+            if (!VerifyUser(userId)) return Forbid();
 
             if (!RommEnabled || !(Plugin.Instance?.Configuration.RommScreenshotPushEnabled == true))
                 return StatusCode(503, new { error = "Romm screenshot push disabled" });

@@ -2,6 +2,7 @@ using System.Net.Mime;
 using JellyEmu.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ namespace JellyEmu.Controllers
     /// Manages Jellyfin playback sessions so games appear in the Active Sessions dashboard.
     /// Routes: /jellyemu/session/*
     /// </summary>
+    [Authorize]
     public class JellyEmuSessionController : JellyEmuBaseController
     {
         public JellyEmuSessionController(
@@ -31,9 +33,11 @@ namespace JellyEmu.Controllers
         [HttpPost("/jellyemu/session/start/{itemId}/{userId}")]
         [Produces(MediaTypeNames.Application.Json)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> SessionStart(string itemId, string userId)
         {
+            if (!VerifyUser(userId)) return Forbid();
             if (LibraryManager.GetItemById(itemId) == null) return NotFound();
 
             var remoteIp  = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -52,9 +56,11 @@ namespace JellyEmu.Controllers
         /// </summary>
         [HttpPost("/jellyemu/session/ping/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> SessionPing(string itemId, string userId, [FromQuery] long? seconds = null, [FromQuery] bool isPaused = false)
         {
+            if (!VerifyUser(userId)) return Forbid();
             await SessionService.PingSessionAsync(userId, itemId, seconds, isPaused).ConfigureAwait(false);
             return Ok(new { alive = true });
         }
@@ -65,8 +71,10 @@ namespace JellyEmu.Controllers
         /// </summary>
         [HttpPost("/jellyemu/session/stop/{itemId}/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> SessionStop(string itemId, string userId, [FromQuery] long? seconds = null)
         {
+            if (!VerifyUser(userId)) return Forbid();
             await SessionService.StopSessionAsync(userId, itemId, seconds).ConfigureAwait(false);
             return Ok(new { stopped = true });
         }
