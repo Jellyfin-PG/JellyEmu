@@ -1150,6 +1150,16 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                     </>
                   )}
 
+                  {/* Keyboard / Mouse Passthrough Banner for Computer Systems */}
+                  {['dos', 'amiga', 'c64', 'computer', 'mac', 'scummvm', 'flash', 'love', 'ti83', 'palmos', 'fps'].includes((scheme.id || '').toLowerCase()) && (
+                    <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-xs text-sky-200">
+                      <Keyboard className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span>
+                        <strong>Keyboard &amp; Mouse Passthrough Active:</strong> Type and use your mouse directly in-game. The bindings below map optional joystick/gamepad controls.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Hotkeys Quick Link Banner */}
                   {!isPlay && (
                     <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">

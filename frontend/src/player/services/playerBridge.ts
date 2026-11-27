@@ -15,6 +15,7 @@ export class PlayerBridge {
   private static sramSyncTimer: any = null;
   private static _activeSlot = 1;
   private static _boundGameCodes = new Set<string>();
+  private static _activeButtonIds: Set<number> | null = null;
   private static _activeHotkeys: Record<number, { kb1: number; kb2: number }> = {
     24: { kb1: 49, kb2: 0 },   // QUICK SAVE
     25: { kb1: 50, kb2: 0 },   // QUICK LOAD
@@ -55,9 +56,11 @@ export class PlayerBridge {
 
     // Determine custom data directory in JellyEmu for WASM cores and engine assets
     const dataBase = (config.dataBaseUrl || this.getUrl('/jellyemu/data')).replace(/\/$/, '');
+    const ejsBase = this.getUrl('/jellyemu/ejs/cores').replace(/\/$/, '');
     const playBase = this.getUrl('/jellyemu/play/runtime').replace(/\/$/, '');
     const assetPaths = {
       libretro: `${dataBase}/cores`,
+      emulatorjs: ejsBase,
       play: playBase,
       pico8: `${dataBase}/pico8`,
       love: `${dataBase}/love`,
@@ -125,7 +128,6 @@ export class PlayerBridge {
       retroAchievements,
       debug: false
     });
-    this.emu.setCoresDirectory(assetBaseUrl);
     (window as any).emu = this.emu;
 
     // Core Lifecycle Event Listeners
@@ -292,7 +294,6 @@ export class PlayerBridge {
       platformTag: config.platformTag,
       fileName: resolvedFileName,
       gameId: config.itemId,
-      coresDirectory: assetBaseUrl,
       bios: biosMap,
       additionalFiles,
       initialSram,
@@ -363,6 +364,9 @@ export class PlayerBridge {
     ])
       .then(([schemeRes, savedRes]) => {
         const merged: Record<number, Record<number, InputBinding>> = {};
+        if (Array.isArray(schemeRes?.scheme?.buttons)) {
+          this._activeButtonIds = new Set(schemeRes.scheme.buttons.map((b: any) => Number(b.id)).filter((n: number) => !Number.isNaN(n) && n < 24));
+        }
         const defaults = schemeRes?.scheme?.playerDefaultBindings;
         if (defaults) {
           for (const [pKey, binds] of Object.entries(defaults)) {
@@ -1736,7 +1740,7 @@ export class PlayerBridge {
             kb1: Number(bind.kb1) || 0,
             kb2: Number(bind.kb2) || 0
           };
-        } else if (btnId < 24) {
+        } else if (btnId < 24 && (!this._activeButtonIds || this._activeButtonIds.has(btnId))) {
           for (const kc of [bind.kb1, bind.kb2]) {
             if (kc && kc > 0) {
               for (const code of this.keyCodeToCodes(kc)) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { HeroUIProvider, useDisclosure } from '@heroui/react';
 import { PlayerInitialData } from '../types/player';
 import { usePlayerHUD } from './hooks/usePlayerHUD';
@@ -146,7 +146,28 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
     initialData.systemName?.toLowerCase().includes('pico')
   );
 
-  // Global hotkey listener for in-game shortcuts (capture phase so it runs before RetroKit InputManager)
+  // Global hotkey listener for in-game shortcuts (registered once in capture phase so it stays ahead of RetroKit InputManager)
+  const hotkeyCtxRef = useRef({
+    isPlay,
+    anyModalOpen,
+    inputMapDisclosure,
+    togglePause,
+    toggleMute,
+    toggleFastForward,
+    toggleSlowMotion,
+    initialData
+  });
+  hotkeyCtxRef.current = {
+    isPlay,
+    anyModalOpen,
+    inputMapDisclosure,
+    togglePause,
+    toggleMute,
+    toggleFastForward,
+    toggleSlowMotion,
+    initialData
+  };
+
   useEffect(() => {
     let activeRewindHotkey = false;
 
@@ -156,7 +177,8 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
         return;
       }
-      if (anyModalOpen) {
+      const ctx = hotkeyCtxRef.current;
+      if (ctx.anyModalOpen) {
         return;
       }
 
@@ -179,8 +201,8 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         switch (hotkeyId) {
           case 24: {
             const slot = PlayerBridge.getActiveSlot();
-            if (initialData.itemId && initialData.userId) {
-              PlayerBridge.saveState(initialData.itemId, initialData.userId, slot).then((ok) => {
+            if (ctx.initialData.itemId && ctx.initialData.userId) {
+              PlayerBridge.saveState(ctx.initialData.itemId, ctx.initialData.userId, slot).then((ok) => {
                 PlayerBridge.notify({
                   message: ok ? `Quick Saved (Slot ${slot})` : `Quick Save Failed (Slot ${slot})`,
                   icon: 'save',
@@ -192,8 +214,8 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
           }
           case 25: {
             const slot = PlayerBridge.getActiveSlot();
-            if (initialData.itemId && initialData.userId) {
-              PlayerBridge.loadState(initialData.itemId, initialData.userId, slot).then((ok) => {
+            if (ctx.initialData.itemId && ctx.initialData.userId) {
+              PlayerBridge.loadState(ctx.initialData.itemId, ctx.initialData.userId, slot).then((ok) => {
                 PlayerBridge.notify({
                   message: ok ? `Quick Loaded (Slot ${slot})` : `No Save in Slot ${slot}`,
                   icon: 'save',
@@ -209,7 +231,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
             return;
           }
           case 27:
-            toggleFastForward();
+            ctx.toggleFastForward();
             return;
           case 28:
             if (!activeRewindHotkey) {
@@ -218,22 +240,22 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
             }
             return;
           case 29:
-            toggleSlowMotion();
+            ctx.toggleSlowMotion();
             return;
           case 30:
             PlayerBridge.exit();
             return;
           case 31:
-            togglePause();
+            ctx.togglePause();
             return;
           case 32:
             PlayerBridge.restart();
             return;
           case 33:
-            toggleMute();
+            ctx.toggleMute();
             return;
           case 34:
-            PlayerBridge.takeScreenshot(initialData.itemId, initialData.gameName);
+            PlayerBridge.takeScreenshot(ctx.initialData.itemId, ctx.initialData.gameName);
             return;
           case 35:
             PlayerBridge.toggleFullscreen();
@@ -242,14 +264,14 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
       }
 
       // Hotkeys that shouldn't clash with PS2 letter keys
-      if (!isPlay) {
+      if (!ctx.isPlay) {
         // H or ? -> Open hotkeys tab in input mapping modal
         if ((e.key === 'h' || e.key === 'H' || e.key === '?') && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
           setInputMapTab('hotkeys');
-          inputMapDisclosure.onOpen();
+          ctx.inputMapDisclosure.onOpen();
           PlayerBridge.notify({ message: 'Input Mapping', subtext: 'Hotkeys overview opened', icon: 'gamepad', variant: 'accent' });
           return;
         }
@@ -276,7 +298,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [isPlay, anyModalOpen, inputMapDisclosure, togglePause, toggleMute, toggleFastForward, toggleSlowMotion, initialData]);
+  }, []);
 
   return (
     <HeroUIProvider>

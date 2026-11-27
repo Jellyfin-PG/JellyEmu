@@ -361,6 +361,13 @@ namespace JellyEmu.Services
                         { 8, new() { Kb1 = 88, Kb2 = 86, Gp1 = "BUTTON_2", Gp2 = "" } }, // X (X / V)
                         { 3, new() { Kb1 = 13, Kb2 = 80, Gp1 = "START", Gp2 = "" } }     // PAUSE
                     }
+                },
+                {
+                    "arcade", new()
+                    {
+                        { 2, new() { Kb1 = 86, Kb2 = 53, Gp1 = "SELECT", Gp2 = "" } }, // INSERT COIN: V or 5 / Select
+                        { 3, new() { Kb1 = 13, Kb2 = 0,  Gp1 = "START",  Gp2 = "" } }  // START: Enter / Start
+                    }
                 }
             };
 
@@ -945,6 +952,364 @@ namespace JellyEmu.Services
                     }, new List<int>())
                 },
                 {
+                    "dos",
+                    ("MS-DOS (Keyboard / Mouse)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "JOYSTICK BTN 1" },
+                        new() { Id = 8, Label = "JOYSTICK BTN 2" },
+                        new() { Id = 1, Label = "JOYSTICK BTN 3" },
+                        new() { Id = 9, Label = "JOYSTICK BTN 4" },
+                        new() { Id = 2, Label = "ON-SCREEN KEYBOARD" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 10, Label = "L" },
+                        new() { Id = 11, Label = "R" },
+                        new() { Id = 19, Label = "JOYSTICK UP" },
+                        new() { Id = 18, Label = "JOYSTICK DOWN" },
+                        new() { Id = 17, Label = "JOYSTICK LEFT" },
+                        new() { Id = 16, Label = "JOYSTICK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19 })
+                },
+                {
+                    "amiga",
+                    ("Commodore Amiga (Keyboard / Mouse / Joystick)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "FIRE / RED" },
+                        new() { Id = 8, Label = "BLUE" },
+                        new() { Id = 1, Label = "YELLOW" },
+                        new() { Id = 9, Label = "GREEN" },
+                        new() { Id = 2, Label = "VIRTUAL KEYBOARD" },
+                        new() { Id = 3, Label = "PLAY / PAUSE" },
+                        new() { Id = 4, Label = "JOYSTICK UP" },
+                        new() { Id = 5, Label = "JOYSTICK DOWN" },
+                        new() { Id = 6, Label = "JOYSTICK LEFT" },
+                        new() { Id = 7, Label = "JOYSTICK RIGHT" },
+                        new() { Id = 10, Label = "REWIND (L)" },
+                        new() { Id = 11, Label = "FORWARD (R)" }
+                    }, new List<int>())
+                },
+                {
+                    "c64",
+                    ("Commodore 64 / 8-Bit (Keyboard / Joystick)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "FIRE" },
+                        new() { Id = 8, Label = "FIRE 2" },
+                        new() { Id = 2, Label = "VIRTUAL KEYBOARD" },
+                        new() { Id = 3, Label = "STATUS BAR" },
+                        new() { Id = 4, Label = "JOYSTICK UP" },
+                        new() { Id = 5, Label = "JOYSTICK DOWN" },
+                        new() { Id = 6, Label = "JOYSTICK LEFT" },
+                        new() { Id = 7, Label = "JOYSTICK RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "computer",
+                    ("Home Computer (Keyboard / Mouse / Joystick)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "FIRE 1" },
+                        new() { Id = 8, Label = "FIRE 2" },
+                        new() { Id = 2, Label = "VIRTUAL KEYBOARD" },
+                        new() { Id = 3, Label = "MENU / START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "mac",
+                    ("Macintosh II (Keyboard / Mouse)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "MOUSE CLICK" },
+                        new() { Id = 8, Label = "RETURN" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "palmos",
+                    ("Palm OS (Stylus / Hardware Buttons)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "DATE BOOK" },
+                        new() { Id = 8, Label = "ADDRESS" },
+                        new() { Id = 1, Label = "TO DO" },
+                        new() { Id = 9, Label = "MEMO PAD" },
+                        new() { Id = 2, Label = "FIND / CALC" },
+                        new() { Id = 3, Label = "POWER" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "ti83",
+                    ("TI-83 Calculator (Keypad)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "2ND" },
+                        new() { Id = 8, Label = "ALPHA" },
+                        new() { Id = 1, Label = "MODE" },
+                        new() { Id = 9, Label = "DEL" },
+                        new() { Id = 2, Label = "CLEAR" },
+                        new() { Id = 3, Label = "ENTER" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "scummvm",
+                    ("ScummVM (Mouse / Keyboard)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "LEFT CLICK" },
+                        new() { Id = 8, Label = "RIGHT CLICK" },
+                        new() { Id = 2, Label = "VIRTUAL KEYBOARD" },
+                        new() { Id = 3, Label = "GAME MENU (F5)" },
+                        new() { Id = 4, Label = "CURSOR UP" },
+                        new() { Id = 5, Label = "CURSOR DOWN" },
+                        new() { Id = 6, Label = "CURSOR LEFT" },
+                        new() { Id = 7, Label = "CURSOR RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "flash",
+                    ("Adobe Flash (Keyboard / Mouse)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "SPACE" },
+                        new() { Id = 8, Label = "ENTER" },
+                        new() { Id = 1, Label = "Z" },
+                        new() { Id = 9, Label = "X" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "love",
+                    ("LÖVE / ChaiLove / Lutro", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "B" },
+                        new() { Id = 8, Label = "A" },
+                        new() { Id = 1, Label = "Y" },
+                        new() { Id = 9, Label = "X" },
+                        new() { Id = 2, Label = "SELECT" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 10, Label = "L" },
+                        new() { Id = 11, Label = "R" }
+                    }, new List<int>())
+                },
+                {
+                    "intellivision",
+                    ("Intellivision", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "BOTTOM ACTION" },
+                        new() { Id = 8, Label = "TOP-LEFT ACTION" },
+                        new() { Id = 1, Label = "TOP-RIGHT ACTION" },
+                        new() { Id = 2, Label = "CLEAR" },
+                        new() { Id = 3, Label = "ENTER" },
+                        new() { Id = 4, Label = "DISC UP" },
+                        new() { Id = 5, Label = "DISC DOWN" },
+                        new() { Id = 6, Label = "DISC LEFT" },
+                        new() { Id = 7, Label = "DISC RIGHT" },
+                        new() { Id = 10, Label = "KEYPAD 1" },
+                        new() { Id = 11, Label = "KEYPAD 2" },
+                        new() { Id = 12, Label = "KEYPAD 3" },
+                        new() { Id = 13, Label = "KEYPAD 0" }
+                    }, new List<int>())
+                },
+                {
+                    "vectrex",
+                    ("Vectrex", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 1, Label = "BUTTON 1" },
+                        new() { Id = 0, Label = "BUTTON 2" },
+                        new() { Id = 8, Label = "BUTTON 3" },
+                        new() { Id = 9, Label = "BUTTON 4" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" },
+                        new() { Id = 19, Label = "STICK UP" },
+                        new() { Id = 18, Label = "STICK DOWN" },
+                        new() { Id = 17, Label = "STICK LEFT" },
+                        new() { Id = 16, Label = "STICK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19 })
+                },
+                {
+                    "channelf",
+                    ("Fairchild Channel F", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "PUSH" },
+                        new() { Id = 8, Label = "PULL" },
+                        new() { Id = 10, Label = "TWIST LEFT" },
+                        new() { Id = 11, Label = "TWIST RIGHT" },
+                        new() { Id = 2, Label = "MODE" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "odyssey2",
+                    ("Magnavox Odyssey²", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "ACTION" },
+                        new() { Id = 2, Label = "VIRTUAL KEYBOARD" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "cdi",
+                    ("Philips CD-i", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "BUTTON 1" },
+                        new() { Id = 8, Label = "BUTTON 2" },
+                        new() { Id = 9, Label = "BUTTON 1+2" },
+                        new() { Id = 3, Label = "PAUSE / MENU" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "neocd",
+                    ("SNK Neo Geo CD", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "A" },
+                        new() { Id = 8, Label = "B" },
+                        new() { Id = 1, Label = "C" },
+                        new() { Id = 9, Label = "D" },
+                        new() { Id = 2, Label = "SELECT" },
+                        new() { Id = 3, Label = "START" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "tamagotchi",
+                    ("Tamagotchi P1", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 1, Label = "A (LEFT)" },
+                        new() { Id = 0, Label = "B (MIDDLE)" },
+                        new() { Id = 8, Label = "C (RIGHT)" }
+                    }, new List<int>())
+                },
+                {
+                    "gw",
+                    ("Game & Watch", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 8, Label = "A / RIGHT ACTION" },
+                        new() { Id = 0, Label = "B / LEFT ACTION" },
+                        new() { Id = 2, Label = "GAME B" },
+                        new() { Id = 3, Label = "GAME A" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "fantasy2btn",
+                    ("2-Button Handheld / Fantasy Console", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 8, Label = "A / X" },
+                        new() { Id = 0, Label = "B / Z" },
+                        new() { Id = 2, Label = "SELECT" },
+                        new() { Id = 3, Label = "START / PAUSE" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "tic80",
+                    ("TIC-80", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 0, Label = "A (Z)" },
+                        new() { Id = 8, Label = "B (X)" },
+                        new() { Id = 1, Label = "X (A)" },
+                        new() { Id = 9, Label = "Y (S)" },
+                        new() { Id = 4, Label = "UP" },
+                        new() { Id = 5, Label = "DOWN" },
+                        new() { Id = 6, Label = "LEFT" },
+                        new() { Id = 7, Label = "RIGHT" }
+                    }, new List<int>())
+                },
+                {
+                    "chip8",
+                    ("CHIP-8 (Hex Keypad)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 4, Label = "UP (2)" },
+                        new() { Id = 5, Label = "DOWN (8)" },
+                        new() { Id = 6, Label = "LEFT (4)" },
+                        new() { Id = 7, Label = "RIGHT (6)" },
+                        new() { Id = 0, Label = "ACTION (5)" },
+                        new() { Id = 8, Label = "KEY A" },
+                        new() { Id = 1, Label = "KEY B" },
+                        new() { Id = 9, Label = "KEY C" },
+                        new() { Id = 2, Label = "KEY 1" },
+                        new() { Id = 3, Label = "KEY 3" }
+                    }, new List<int>())
+                },
+                {
+                    "fps",
+                    ("FPS Port (Keyboard / Mouse / RetroPad)", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 8, Label = "USE / OPEN" },
+                        new() { Id = 0, Label = "FIRE" },
+                        new() { Id = 1, Label = "RUN / JUMP" },
+                        new() { Id = 9, Label = "CROUCH / SWIM" },
+                        new() { Id = 10, Label = "STRAFE LEFT / PREV" },
+                        new() { Id = 11, Label = "STRAFE RIGHT / NEXT" },
+                        new() { Id = 12, Label = "PREV WEAPON" },
+                        new() { Id = 13, Label = "NEXT WEAPON" },
+                        new() { Id = 2, Label = "MAP" },
+                        new() { Id = 3, Label = "MENU" },
+                        new() { Id = 4, Label = "FORWARD" },
+                        new() { Id = 5, Label = "BACKWARD" },
+                        new() { Id = 6, Label = "TURN LEFT" },
+                        new() { Id = 7, Label = "TURN RIGHT" },
+                        new() { Id = 19, Label = "MOVE UP" },
+                        new() { Id = 18, Label = "MOVE DOWN" },
+                        new() { Id = 17, Label = "STRAFE LEFT" },
+                        new() { Id = 16, Label = "STRAFE RIGHT" },
+                        new() { Id = 23, Label = "LOOK UP" },
+                        new() { Id = 22, Label = "LOOK DOWN" },
+                        new() { Id = 21, Label = "LOOK LEFT" },
+                        new() { Id = 20, Label = "LOOK RIGHT" }
+                    }, new List<int> { 16, 17, 18, 19, 20, 21, 22, 23 })
+                },
+                {
+                    "media",
+                    ("Audio / Media Player", new List<InputButtonDefinition>
+                    {
+                        new() { Id = 3, Label = "PLAY / PAUSE" },
+                        new() { Id = 6, Label = "PREV TRACK" },
+                        new() { Id = 7, Label = "NEXT TRACK" }
+                    }, new List<int>())
+                },
+                {
                     "default",
                     ("Standard Controller", new List<InputButtonDefinition>
                     {
@@ -984,7 +1349,7 @@ namespace JellyEmu.Services
             { "mupen64plus_next", "n64" }, { "parallel_n64", "n64" }, { "n64", "n64" },
             { "mgba", "gba" }, { "vba_next", "gba" },
             { "melonds", "nds" }, { "desmume", "nds" }, { "desmume2015", "nds" },
-            { "beetle_vb", "vb" },
+            { "beetle_vb", "vb" }, { "mednafen_vb", "vb" },
             { "genesis_plus_gx", "segaMD" }, { "genesis_plus_gx_wide", "segaMD" }, { "picodrive", "segaMD" },
             { "smsplus", "segaMS" },
             { "yabause", "segaSaturn" },
@@ -1002,13 +1367,39 @@ namespace JellyEmu.Services
             { "pcsx_rearmed", "psx" }, { "mednafen_psx_hw", "psx" },
             { "play", "ps2" }, { "play!", "ps2" },
             { "fbneo", "arcade" }, { "fbalpha2012_cps1", "arcade" }, { "fbalpha2012_cps2", "arcade" },
-            { "same_cdi", "arcade" }, { "mame2003", "arcade" }, { "mame2003_plus", "arcade" },
+            { "same_cdi", "cdi" }, { "mame2003", "arcade" }, { "mame2003_plus", "arcade" },
             { "a5200", "atari5200" },
-            { "puae", "default" },
-            { "vice_x64", "default" }, { "vice_x64sc", "default" }, { "vice_x128", "default" }, { "vice_xpet", "default" },
-            { "vice_xplus4", "default" }, { "vice_xvic", "default" },
-            { "dosbox_pure", "default" },
-            { "freeintv", "default" },
+            { "puae", "amiga" },
+            { "vice_x64", "c64" }, { "vice_x64sc", "c64" }, { "vice_x128", "c64" }, { "vice_xpet", "c64" },
+            { "vice_xplus4", "c64" }, { "vice_xvic", "c64" }, { "vice_xscpu64", "c64" },
+            { "dosbox_pure", "dos" },
+            { "freeintv", "intellivision" },
+            { "ruffle", "flash" },
+            { "love", "love" }, { "chailove", "love" }, { "lutro", "love" },
+            { "scummvm", "scummvm" },
+            { "vecx", "vectrex" },
+            { "freechaf", "channelf" },
+            { "o2em", "odyssey2" },
+            { "neocd", "neocd" },
+            { "quasi88", "computer" }, { "theodore", "computer" }, { "x1", "computer" },
+            { "bk", "computer" }, { "galaksija", "computer" }, { "m2000", "computer" },
+            { "minivmac", "mac" },
+            { "mu", "palmos" },
+            { "numero", "ti83" },
+            { "tamalibretro", "tamagotchi" },
+            { "gw", "gw" },
+            { "gam4980", "fantasy2btn" }, { "wasm4", "fantasy2btn" },
+            { "ardens", "fantasy2btn" }, { "arduous", "fantasy2btn" },
+            { "lowresnx", "fantasy2btn" }, { "uw8", "fantasy2btn" }, { "vaporspec", "fantasy2btn" },
+            { "uzem", "snes" },
+            { "tic80", "tic80" },
+            { "jaxe", "chip8" },
+            { "prboom", "fps" }, { "tyrquake", "fps" },
+            { "vitaquake2", "fps" }, { "vitaquake2-rogue", "fps" }, { "vitaquake2-xatrix", "fps" }, { "vitaquake2-zaero", "fps" },
+            { "ecwolf", "fps" }, { "anarch", "fps" }, { "craft", "fps" },
+            { "nxengine", "fantasy2btn" }, { "xrick", "fantasy2btn" }, { "mrboom", "fantasy2btn" },
+            { "gong", "fantasy2btn" }, { "2048", "fantasy2btn" },
+            { "gme", "media" }, { "pocketcdg", "media" },
             { "azahar", "3ds" }, { "citra", "3ds" },
             { "flycast", "dc" }, { "reicast", "dc" },
             { "dolphin", "gc" },
@@ -1023,7 +1414,7 @@ namespace JellyEmu.Services
             { "N64", "n64" }, { "NINTENDO 64", "n64" },
             { "GAME BOY ADVANCE", "gba" }, { "GBA", "gba" },
             { "NINTENDO DS", "nds" }, { "NDS", "nds" }, { "DS", "nds" },
-            { "VIRTUAL BOY", "vb" }, { "VB", "vb" },
+            { "VIRTUAL BOY", "vb" }, { "VIRTUALBOY", "vb" }, { "VB", "vb" },
             { "SEGA GENESIS", "segaMD" }, { "GENESIS", "segaMD" }, { "MEGA DRIVE", "segaMD" }, { "MD", "segaMD" },
             { "SEGA CD", "segaMD" }, { "SEGA 32X", "segaMD" }, { "32X", "segaMD" },
             { "MASTER SYSTEM", "segaMS" }, { "SMS", "segaMS" },
@@ -1048,7 +1439,37 @@ namespace JellyEmu.Services
             { "GC", "gc" }, { "GAMECUBE", "gc" }, { "NINTENDO GAMECUBE", "gc" },
             { "PICO8", "pico8" }, { "PICO-8", "pico8" },
             { "MASTERSYSTEM", "segaMS" }, { "WSWAN", "ws" },
-            { "ARCADE", "arcade" }, { "MAME", "arcade" }, { "MAME 2003", "arcade" }
+            { "ARCADE", "arcade" }, { "MAME", "arcade" }, { "MAME 2003", "arcade" },
+            { "NEOGEO", "arcade" }, { "NEO GEO", "arcade" }, { "FBNEO", "arcade" }, { "FINALBURN NEO", "arcade" },
+            { "CPS1", "arcade" }, { "CPS2", "arcade" }, { "CPS3", "arcade" },
+            { "DOS", "dos" }, { "MS-DOS", "dos" }, { "MSDOS", "dos" },
+            { "COMMODORE AMIGA", "amiga" }, { "AMIGA", "amiga" },
+            { "COMMODORE 64", "c64" }, { "C64", "c64" },
+            { "INTELLIVISION", "intellivision" },
+            { "FLASH", "flash" }, { "ADOBE FLASH", "flash" },
+            { "LOVE", "love" }, { "LÖVE", "love" }, { "CHAILOVE", "love" }, { "LUTRO", "love" },
+            { "SCUMMVM", "scummvm" },
+            { "VECTREX", "vectrex" },
+            { "CHANNEL F", "channelf" }, { "CHANNELF", "channelf" }, { "FAIRCHILD CHANNEL F", "channelf" },
+            { "ODYSSEY2", "odyssey2" }, { "ODYSSEY 2", "odyssey2" },
+            { "CDI", "cdi" }, { "CD-I", "cdi" }, { "PHILIPS CD-I", "cdi" },
+            { "NEOCD", "neocd" }, { "NEO GEO CD", "neocd" },
+            { "PC88", "computer" }, { "PC-88", "computer" }, { "X1", "computer" },
+            { "THOMSON", "computer" }, { "BK", "computer" }, { "GALAKSIJA", "computer" }, { "P2000", "computer" },
+            { "MAC", "mac" }, { "MACINTOSH", "mac" },
+            { "PALMOS", "palmos" }, { "PALM OS", "palmos" },
+            { "TI83", "ti83" }, { "TI-83", "ti83" },
+            { "TAMAGOTCHI", "tamagotchi" },
+            { "GW", "gw" }, { "GAME & WATCH", "gw" },
+            { "TIC80", "tic80" }, { "TIC-80", "tic80" },
+            { "CHIP8", "chip8" }, { "CHIP-8", "chip8" },
+            { "WASM4", "fantasy2btn" }, { "ARDUBOY", "fantasy2btn" }, { "LOWRESNX", "fantasy2btn" },
+            { "MICROW8", "fantasy2btn" }, { "VAPORSPEC", "fantasy2btn" }, { "GAM4980", "fantasy2btn" },
+            { "CAVESTORY", "fantasy2btn" }, { "XRICK", "fantasy2btn" }, { "MRBOOM", "fantasy2btn" },
+            { "GONG", "fantasy2btn" }, { "2048", "fantasy2btn" },
+            { "UZEBOX", "snes" },
+            { "DOOM", "fps" }, { "QUAKE", "fps" }, { "QUAKE2", "fps" }, { "ECWOLF", "fps" }, { "ANARCH", "fps" }, { "CRAFT", "fps" },
+            { "GME", "media" }, { "POCKETCDG", "media" }
         };
 
         public static string ResolveSchemeKey(string? platformOrCoreOrScheme)
