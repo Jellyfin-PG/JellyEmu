@@ -36,40 +36,6 @@ namespace JellyEmu.Controllers
             return true;
         }
 
-        protected bool IsGameItem(MediaBrowser.Controller.Entities.BaseItem item)
-        {
-            if (item is MediaBrowser.Controller.Entities.CollectionFolder
-                || item is MediaBrowser.Controller.Entities.UserView
-                || item is MediaBrowser.Controller.Entities.Video
-                || item is MediaBrowser.Controller.Entities.Audio.Audio)
-            {
-                return false;
-            }
-            return true;
-        }
-
-        protected bool VerifyItemAccess(MediaBrowser.Controller.Entities.BaseItem item)
-        {
-            if (!IsGameItem(item)) return false;
-
-            var userManager = HttpContext?.RequestServices?.GetService(typeof(IUserManager)) as IUserManager;
-            if (userManager != null)
-            {
-                var authUserId = User?.FindFirstValue("Jellyfin-UserId")
-                              ?? User?.FindFirstValue(ClaimTypes.NameIdentifier);
-                if (!Guid.TryParse(authUserId, out var authGuid))
-                {
-                    return false;
-                }
-                var user = userManager.GetUserById(authGuid);
-                if (user == null || !item.IsVisible(user))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
         /// <summary>
         /// Gets whether or not the browser should consider the origin trustworthy.
         /// HTTPS or localhost are trustworthy in most browsers. This is important
@@ -496,6 +462,28 @@ namespace JellyEmu.Controllers
         public static bool IsValidId(string? id)
         {
             return !string.IsNullOrWhiteSpace(id) && SafeIdRegex.IsMatch(id);
+        }
+
+        /// <summary>
+        /// True when the item is a JellyEmu ROM (a "JellyEmu"-tagged Book) that the user may see
+        /// under their library access and parental settings.
+        /// </summary>
+        [NonAction]
+        public static bool IsAccessibleRom(MediaBrowser.Controller.Entities.BaseItem? item, Jellyfin.Database.Implementations.Entities.User? user)
+        {
+            return item is MediaBrowser.Controller.Entities.Book
+                && user != null
+                && item.Tags != null
+                && item.Tags.Contains("JellyEmu", StringComparer.OrdinalIgnoreCase)
+                && item.IsVisible(user);
+        }
+
+        /// <summary>Returns the authenticated Jellyfin user id, or Guid.Empty.</summary>
+        [NonAction]
+        public static Guid GetAuthenticatedUserId(ClaimsPrincipal principal)
+        {
+            var raw = principal.FindFirstValue("Jellyfin-UserId") ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            return Guid.TryParse(raw, out var id) ? id : Guid.Empty;
         }
 
         [NonAction]

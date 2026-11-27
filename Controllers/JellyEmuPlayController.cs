@@ -347,7 +347,7 @@ namespace JellyEmu.Controllers
 
         /// <summary>
         /// Returns a standalone EmulatorJS HTML page for the given item.
-        /// No authentication required — the ROM is fetched via /jellyemu/rom/{itemId}.
+        /// The page itself is unauthenticated; the ROM fetch from /jellyemu/rom/{itemId} carries the user's token.
         /// 
         /// Path: GET /jellyemu/play/{itemId}
         /// Parameters: 

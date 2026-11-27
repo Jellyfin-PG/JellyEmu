@@ -23,6 +23,7 @@ namespace JellyEmu.Controllers
     {
         private readonly PlatformResolver _platformResolver;
         private readonly JellyEmuFileService _fileService;
+        private readonly IUserManager _userManager;
 
         public JellyEmuRomController(
             ILibraryManager libraryManager,
@@ -32,31 +33,38 @@ namespace JellyEmu.Controllers
             JellyEmuSessionService sessionService,
             IHttpClientFactory httpClientFactory,
             PlatformResolver platformResolver,
-            JellyEmuFileService fileService)
+            JellyEmuFileService fileService,
+            IUserManager userManager)
             : base(libraryManager, appPaths, logger, ejsManager, sessionService, httpClientFactory)
         {
             _platformResolver = platformResolver;
             _fileService = fileService;
+            _userManager = userManager;
+        }
+
+        /// <summary>
+        /// Returns the item only if it is a ROM the authenticated user can see; otherwise null
+        /// (callers answer 404 so item existence is not revealed).
+        /// </summary>
+        private BaseItem? GetAccessibleRom(string itemId)
+        {
+            var item = LibraryManager.GetItemById(itemId);
+            var user = _userManager.GetUserById(GetAuthenticatedUserId(User));
+            return IsAccessibleRom(item, user) && !string.IsNullOrEmpty(item!.Path) ? item : null;
         }
 
         [HttpGet("/jellyemu/rom/{itemId}/{filename?}")]
         [HttpHead("/jellyemu/rom/{itemId}/{filename?}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Rom(string itemId, string? filename = null, [FromQuery] string? userId = null)
         {
-            var item = LibraryManager.GetItemById(itemId);
-            if (item == null || string.IsNullOrEmpty(item.Path))
+            var item = GetAccessibleRom(itemId);
+            if (item == null)
             {
-                Logger.LogWarning("[JellyEmu] Rom: item {ItemId} not found or path missing", itemId);
+                Logger.LogWarning("[JellyEmu] Rom: item {ItemId} not found, not a ROM, or not accessible", SanitizeForLog(itemId));
                 return NotFound();
-            }
-
-            if (!VerifyItemAccess(item))
-            {
-                return Forbid();
             }
 
             if (Directory.Exists(item.Path))
@@ -91,15 +99,10 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DownloadZip(string itemId)
         {
-            var item = LibraryManager.GetItemById(itemId);
-            if (item == null || string.IsNullOrEmpty(item.Path))
+            var item = GetAccessibleRom(itemId);
+            if (item == null)
             {
                 return NotFound();
-            }
-
-            if (!VerifyItemAccess(item))
-            {
-                return Forbid();
             }
 
             return await ServeDirectoryOrZipAsync(item).ConfigureAwait(false);

@@ -519,7 +519,7 @@
     var canvas = document.getElementById('canvas');
     Module = {};
     Module.canvas = canvas;
-    Module.arguments = ['{{ cart_url }}'];
+    Module.arguments = [window.JellyEmu.withApiKey('{{ cart_url }}', window.JellyEmu.getAuthToken('{{ user_id }}'))];
 
     Module.onRuntimeInitialized = function() {
         // Show canvas, dismiss loader

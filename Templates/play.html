@@ -262,7 +262,7 @@
                 statusEl.textContent = 'Fetching ROM data…';
                 console.log('[JellyEmu Play!] Fetching ROM from:', JELLYEMU_CONFIG.romUrl);
 
-                const romResponse = await fetch(JELLYEMU_CONFIG.romUrl);
+                const romResponse = await fetch(JELLYEMU_CONFIG.romUrl, { headers: window.JellyEmu.getAuthHeaders(JELLYEMU_CONFIG.token) });
                 if (!romResponse.ok) throw new Error('Failed to download ROM from server.');
                 const romBlob = await romResponse.blob();
 
