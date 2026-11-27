@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using JellyEmu.Controllers;
 using JellyEmu.Services;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using JellyfinUser = Jellyfin.Database.Implementations.Entities.User;
 
 namespace JellyEmu.Tests
 {
@@ -32,6 +34,9 @@ namespace JellyEmu.Tests
             var platformResolver = new PlatformResolver(NullLogger<PlatformResolver>.Instance);
             var fileService = new JellyEmuFileService(libraryManagerMock.Object, appPathsMock.Object, NullLogger<JellyEmuFileService>.Instance);
 
+            var userManagerMock = new Mock<IUserManager>();
+            userManagerMock.Setup(u => u.GetUserById(TestUser.Id)).Returns(TestUser);
+
             var controller = new JellyEmuRomController(
                 libraryManagerMock.Object,
                 appPathsMock.Object,
@@ -40,14 +45,31 @@ namespace JellyEmu.Tests
                 null!,
                 httpClientFactoryMock.Object,
                 platformResolver,
-                fileService);
+                fileService,
+                userManagerMock.Object);
 
             controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext()
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        new[] { new Claim("Jellyfin-UserId", TestUser.Id.ToString()) }, "Test"))
+                }
             };
 
             return (controller, libraryManagerMock, tempDir);
+        }
+
+        private static readonly JellyfinUser TestUser = new JellyfinUser("player", "default", "default");
+
+        /// <summary>A JellyEmu-tagged Book visible to <see cref="TestUser"/> unless <paramref name="visible"/> is false.</summary>
+        private static Mock<Book> RomItem(string path, bool visible = true, string[]? tags = null)
+        {
+            var mock = new Mock<Book>();
+            mock.Setup(i => i.Path).Returns(path);
+            mock.Setup(i => i.IsVisible(It.IsAny<JellyfinUser>(), It.IsAny<bool>())).Returns(visible);
+            mock.Object.Tags = tags ?? new[] { "JellyEmu", "Game" };
+            return mock;
         }
 
         [Fact]
@@ -63,8 +85,7 @@ namespace JellyEmu.Tests
                 await File.WriteAllBytesAsync(zipPath, new byte[] { 0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
 
                 var itemId = Guid.NewGuid();
-                var mockItem = new Mock<BaseItem>();
-                mockItem.Setup(i => i.Path).Returns(gameDir);
+                var mockItem = RomItem(gameDir);
                 libraryManagerMock.Setup(l => l.GetItemById(itemId)).Returns(mockItem.Object);
 
                 var result = await controller.Rom(itemId.ToString("N"));
@@ -99,8 +120,7 @@ namespace JellyEmu.Tests
                 await File.WriteAllTextAsync(datPath, "MOCK_DATA");
 
                 var itemId = Guid.NewGuid();
-                var mockItem = new Mock<BaseItem>();
-                mockItem.Setup(i => i.Path).Returns(gameDir);
+                var mockItem = RomItem(gameDir);
                 libraryManagerMock.Setup(l => l.GetItemById(itemId)).Returns(mockItem.Object);
 
                 var result = await controller.Rom(itemId.ToString("N"));
@@ -137,8 +157,7 @@ namespace JellyEmu.Tests
                 await File.WriteAllBytesAsync(romPath, image);
 
                 var itemId = Guid.NewGuid();
-                var mockItem = new Mock<BaseItem>();
-                mockItem.Setup(i => i.Path).Returns(romPath);
+                var mockItem = RomItem(romPath);
                 libraryManagerMock.Setup(l => l.GetItemById(itemId)).Returns(mockItem.Object);
 
                 var result = await controller.Rom(itemId.ToString("N"));
@@ -179,6 +198,42 @@ namespace JellyEmu.Tests
                 var result = await controller.DownloadZip(missingId.ToString("N"));
 
                 Assert.IsType<NotFoundResult>(result);
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("hidden")]   // user lacks library access / parental block
+        [InlineData("untagged")] // not a JellyEmu ROM
+        [InlineData("anonymous")]
+        public async Task Rom_And_DownloadZip_ReturnNotFound_WhenNotAccessible(string scenario)
+        {
+            var (controller, libraryManagerMock, tempDir) = CreateController();
+            try
+            {
+                var gameDir = Path.Combine(tempDir, "Secret");
+                Directory.CreateDirectory(gameDir);
+                await File.WriteAllTextAsync(Path.Combine(gameDir, "a.bin"), "A");
+                await File.WriteAllTextAsync(Path.Combine(gameDir, "b.bin"), "B");
+
+                var itemId = Guid.NewGuid();
+                var mockItem = RomItem(gameDir,
+                    visible: scenario != "hidden",
+                    tags: scenario == "untagged" ? new[] { "Book" } : null);
+                libraryManagerMock.Setup(l => l.GetItemById(itemId)).Returns(mockItem.Object);
+                if (scenario == "anonymous")
+                {
+                    controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+                }
+
+                Assert.IsType<NotFoundResult>(await controller.Rom(itemId.ToString("N")));
+                Assert.IsType<NotFoundResult>(await controller.DownloadZip(itemId.ToString("N")));
             }
             finally
             {

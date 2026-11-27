@@ -154,6 +154,19 @@
     };
 
     /**
+     * Appends the auth token as an ApiKey query param, for loaders that cannot send headers
+     * (EmulatorJS, the PICO-8 runtime).
+     * @param {string} url
+     * @param {string} [token]
+     * @returns {string}
+     */
+    JE.withApiKey = function (url, token) {
+        var t = token || JE.getAuthToken();
+        if (!url || !t) return url;
+        return url + (url.indexOf('?') === -1 ? '?' : '&') + 'ApiKey=' + encodeURIComponent(t);
+    };
+
+    /**
      * Constructs authorization headers for Jellyfin API endpoints.
      * @param {string} [token]
      * @param {Object} [customHeaders]

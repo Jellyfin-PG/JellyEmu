@@ -1118,7 +1118,7 @@
     </script>
     <script>
         window.EJS_player = '#game';
-        window.EJS_gameUrl = '{{ rom_url }}';
+        window.EJS_gameUrl = window.JellyEmu.withApiKey('{{ rom_url }}', window._jellyToken);
         window.EJS_gameName = '{{ game_name }}';
         window.EJS_pathtodata = '{{ ejs_base }}/';
         window.EJS_startOnLoaded = true;

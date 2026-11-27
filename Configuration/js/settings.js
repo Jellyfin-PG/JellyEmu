@@ -550,7 +550,9 @@
                 }
                 statusEl.textContent = 'Checking…';
                 statusEl.style.color = '#aaa';
-                fetch(window.JellyEmu.getUrl('jellyemu/romm/health'))
+                fetch(window.JellyEmu.getUrl('jellyemu/romm/health'), {
+                    headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' }
+                })
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
                         if (d.reachable) {

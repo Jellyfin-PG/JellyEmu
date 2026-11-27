@@ -301,6 +301,14 @@
         }
     }
 
+    // Room names, player names and session IDs are chosen by other (possibly anonymous)
+    // netplay clients, so escape them before building HTML strings.
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     function getPingClass(ms) {
         if (ms === null || ms === undefined || ms < 0) return 'je-np-ping-measuring';
         if (ms <= 60) return 'je-np-ping-good';
@@ -1959,11 +1967,11 @@
 
             card.innerHTML = '<div class="je-np-room-info">' +
                 '<div class="je-np-room-title-wrap">' +
-                '<span class="je-np-room-title">' + (room.room_name || 'Room #' + sessionId.substring(0, 5)) + '</span>' +
+                '<span class="je-np-room-title">' + escapeHtml(room.room_name || 'Room #' + sessionId.substring(0, 5)) + '</span>' +
                 (isLocked ? '<span class="material-icons" style="font-size:14px;color:#f5a623;vertical-align:middle;margin-left:4px;" title="Password Protected">lock</span>' : '') +
                 '</div>' +
                 '<div class="je-np-room-meta">' +
-                '<span class="je-np-room-host">Host: ' + (room.player_name || 'Player') + '</span>' +
+                '<span class="je-np-room-host">Host: ' + escapeHtml(room.player_name || 'Player') + '</span>' +
                 '<span class="je-np-room-count ' + (isFull ? 'je-np-full' : '') + '">' + current + ' / ' + max + ' Players</span>' +
                 '</div>' +
                 '</div>' +
@@ -2527,12 +2535,12 @@
                     row.className = 'je-netplay-player-row';
                     row.innerHTML = '<div style="display:flex;align-items:center;gap:10px;">' +
                         '<span class="je-np-player-num">P' + (idx + 1) + '</span>' +
-                        '<span class="je-np-player-name">' + (p.player_name || 'Player ' + (idx + 1)) + '</span>' +
+                        '<span class="je-np-player-name">' + escapeHtml(p.player_name || 'Player ' + (idx + 1)) + '</span>' +
                         (isHostPlayer ? '<span class="je-badge je-badge-host">Host</span>' : '') +
                         (isMe ? '<span class="je-badge" style="background:rgba(255,255,255,0.08);color:#aaa;font-size:10px;padding:2px 6px;">You</span>' : '') +
                         '</div>' +
-                        '<div id="' + badgeId + '" class="je-np-ping-badge ' + pingClass + '" title="' + pingTitle + '">' +
-                        '<span class="je-np-ping-val">' + pingText + '</span>' +
+                        '<div id="' + badgeId + '" class="je-np-ping-badge ' + pingClass + '" title="' + escapeHtml(pingTitle) + '">' +
+                        '<span class="je-np-ping-val">' + escapeHtml(pingText) + '</span>' +
                         '</div>';
                     playersContainer.appendChild(row);
                 });

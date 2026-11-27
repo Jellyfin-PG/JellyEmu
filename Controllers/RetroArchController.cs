@@ -1,4 +1,5 @@
 using System.Net.Mime;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using MediaBrowser.Controller.Entities;
@@ -17,12 +18,13 @@ namespace JellyEmu.Controllers
     ///   GET /jellyemu/retroarch/launch/{itemId}   — RetroArch deep-link redirect (Android / desktop URI)
     ///   GET /jellyemu/retroarch/info              — server info JSON for client discovery
     /// </summary>
-    [Authorize]
     [ApiController]
+    [Authorize]
     public class RetroArchController : ControllerBase
     {
         private readonly ILibraryManager _libraryManager;
         private readonly ILogger<RetroArchController> _logger;
+        private readonly IUserManager _userManager;
 
         // Maps the platform tag stored on each ROM item to the RetroArch core filename.
         // These are the canonical libretro core names used in .lpl playlists.
@@ -55,10 +57,24 @@ namespace JellyEmu.Controllers
 
         public RetroArchController(
             ILibraryManager libraryManager,
-            ILogger<RetroArchController> logger)
+            ILogger<RetroArchController> logger,
+            IUserManager userManager)
         {
             _libraryManager = libraryManager;
             _logger = logger;
+            _userManager = userManager;
+        }
+
+        private Jellyfin.Database.Implementations.Entities.User? CurrentUser() =>
+            _userManager.GetUserById(JellyEmuBaseController.GetAuthenticatedUserId(User));
+
+        // RetroArch cannot send auth headers, so ROM links carry the caller's own token,
+        // the same way Jellyfin builds stream URLs for external players.
+        private string RomUrl(Guid itemId)
+        {
+            var url = $"{ServerBase()}/jellyemu/rom/{itemId:N}";
+            var token = User.FindFirstValue("Jellyfin-Token");
+            return string.IsNullOrEmpty(token) ? url : $"{url}?ApiKey={Uri.EscapeDataString(token)}";
         }
 
         private string ServerBase()
@@ -80,14 +96,18 @@ namespace JellyEmu.Controllers
 
         private IEnumerable<BaseItem> GetRomItems(string? systemFilter = null)
         {
-            var query = new MediaBrowser.Controller.Entities.InternalItemsQuery
+            var user = CurrentUser();
+            if (user == null) return Enumerable.Empty<BaseItem>();
+
+            // Passing the user scopes the query to the libraries/parental rating they can access.
+            var query = new MediaBrowser.Controller.Entities.InternalItemsQuery(user)
             {
                 IncludeItemTypes = new[] { Jellyfin.Data.Enums.BaseItemKind.Book },
                 Recursive = true,
             };
 
             var items = _libraryManager.GetItemList(query)
-                .Where(i => i.Tags != null && i.Tags.Contains("JellyEmu", StringComparer.OrdinalIgnoreCase));
+                .Where(i => JellyEmuBaseController.IsAccessibleRom(i, user));
 
             if (!string.IsNullOrWhiteSpace(systemFilter))
                 items = items.Where(i =>
@@ -120,7 +140,7 @@ namespace JellyEmu.Controllers
 
             var entries = items.Select(item =>
             {
-                var romUrl = $"{ServerBase()}/jellyemu/rom/{item.Id}";
+                var romUrl = RomUrl(item.Id);
                 var coreName = ResolveCoreFile(item);
                 return new
                 {
@@ -173,18 +193,18 @@ namespace JellyEmu.Controllers
         public IActionResult Launch(string itemId, [FromQuery] string? client = "redirect")
         {
             var item = _libraryManager.GetItemById(itemId);
-            if (item == null)
+            if (!JellyEmuBaseController.IsAccessibleRom(item, CurrentUser()))
             {
-                _logger.LogWarning("[JellyEmu/RetroArch] Launch: item {ItemId} not found", itemId);
+                _logger.LogWarning("[JellyEmu/RetroArch] Launch: item {ItemId} not found or not accessible", JellyEmuBaseController.SanitizeForLog(itemId));
                 return NotFound();
             }
 
-            var romUrl = $"{ServerBase()}/jellyemu/rom/{itemId}";
+            var romUrl = RomUrl(item!.Id);
             var coreName = ResolveCoreFile(item);
 
             var deepLink = $"retroarch://load?content={Uri.EscapeDataString(romUrl)}&core={Uri.EscapeDataString(coreName)}";
 
-            _logger.LogInformation("[JellyEmu/RetroArch] Launch deep-link for {ItemId}: {Link}", itemId, deepLink);
+            _logger.LogInformation("[JellyEmu/RetroArch] Launch deep-link for {ItemId}", item.Id);
 
             if (string.Equals(client, "json", StringComparison.OrdinalIgnoreCase))
             {
