@@ -36,6 +36,9 @@ interface InGameInputMapModalProps {
   onOpenChange: (open: boolean) => void;
   config: PlayerInitialData;
   initialTab?: string;
+  virtualEnabled: boolean;
+  virtualLefty: boolean;
+  onVirtualControlsChange: (enabled: boolean, lefty: boolean) => void;
 }
 
 export const DEFAULT_HOTKEYS: InputButtonDefinition[] = [
@@ -270,7 +273,10 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
   isOpen,
   onOpenChange,
   config,
-  initialTab = 'p0'
+  initialTab = 'p0',
+  virtualEnabled,
+  virtualLefty,
+  onVirtualControlsChange
 }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [inputSubMode, setInputSubMode] = useState<'kb' | 'gp'>('kb');
@@ -278,12 +284,6 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
   const [hotkeys, setHotkeys] = useState<InputButtonDefinition[]>(DEFAULT_HOTKEYS);
   const [playerBindings, setPlayerBindings] = useState<Record<number, Record<number, InputBinding>>>({ 0: {} });
   const [gamepadDetails, setGamepadDetails] = useState<GamepadDetails | null>(null);
-  const [enableVirtual, setEnableVirtual] = useState<boolean>(
-    config.inputScheme?.virtualGamepad === 'true' || (window as any).JellyEmuConfig?.virtualGamepad === 'true'
-  );
-  const [leftyMode, setLeftyMode] = useState<boolean>(
-    config.inputScheme?.virtualGamepadLefty === 'true' || (window as any).JellyEmuConfig?.virtualGamepadLefty === 'true'
-  );
   const [statusMessage, setStatusMessage] = useState<string>('');
 
   // Interactive listening state
@@ -912,21 +912,6 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
     setStatusMessage('All player controls reset to platform scheme defaults');
   };
 
-  // Virtual Gamepad toggle handlers
-  const handleVirtualToggle = (val: boolean) => {
-    setEnableVirtual(val);
-    if (config.userId) {
-      PlayerBridge.syncVirtualControls(config.userId, val, leftyMode);
-    }
-  };
-
-  const handleLeftyToggle = (val: boolean) => {
-    setLeftyMode(val);
-    if (config.userId) {
-      PlayerBridge.syncVirtualControls(config.userId, enableVirtual, val);
-    }
-  };
-
   const nativeButtons = getNativeButtons(scheme);
   const hotkeyButtonsList = isPlay ? [] : getHotkeyButtons(hotkeys, scheme);
   const maxPlayers = isPlay ? 1 : Math.max(1, Math.min(2, scheme.maxPlayers || 2));
@@ -1502,8 +1487,9 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                     </div>
                     <Switch
                       size="sm"
-                      isSelected={enableVirtual}
-                      onValueChange={handleVirtualToggle}
+                      aria-label="Enable Virtual Touch Overlay"
+                      isSelected={virtualEnabled}
+                      onValueChange={(enabled) => onVirtualControlsChange(enabled, virtualLefty)}
                       classNames={{
                         wrapper: 'bg-white/20 group-data-[selected=true]:bg-white',
                         thumb: 'bg-black'
@@ -1520,8 +1506,9 @@ export const InGameInputMapModal: React.FC<InGameInputMapModalProps> = ({
                     </div>
                     <Switch
                       size="sm"
-                      isSelected={leftyMode}
-                      onValueChange={handleLeftyToggle}
+                      aria-label="Left-Handed Virtual Controller"
+                      isSelected={virtualLefty}
+                      onValueChange={(lefty) => onVirtualControlsChange(virtualEnabled, lefty)}
                       classNames={{
                         wrapper: 'bg-white/20 group-data-[selected=true]:bg-white',
                         thumb: 'bg-black'

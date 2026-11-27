@@ -653,7 +653,28 @@ export class PlayerBridge {
     }
   }
 
-  public static async syncVirtualControls(userId: string, enabled: boolean, lefty: boolean): Promise<void> {
+  public static sendVirtualInput(id: number, pressed: boolean, held: ReadonlySet<number>): void {
+    const input = this.emu?.input;
+    if (!input) return;
+
+    const button = this.JE_ID_TO_BUTTON[id];
+    if (button) {
+      input.sendButton(0, button, pressed);
+      return;
+    }
+
+    const direction = this.JE_ID_TO_AXIS[id];
+    if (direction) {
+      let value = 0;
+      for (const heldId of held) {
+        const heldDirection = this.JE_ID_TO_AXIS[heldId];
+        if (heldDirection?.axis === direction.axis) value += heldDirection.direction;
+      }
+      input.sendAxis(0, direction.axis, value);
+    }
+  }
+
+  public static async syncVirtualControls(userId: string | undefined, enabled: boolean, lefty: boolean): Promise<void> {
     const e = this.getEmulator();
     if (e) {
       if (typeof e.toggleVirtualGamepad === 'function') e.toggleVirtualGamepad(enabled);
