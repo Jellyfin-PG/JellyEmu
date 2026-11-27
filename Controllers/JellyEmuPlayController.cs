@@ -165,7 +165,7 @@ namespace JellyEmu.Controllers
                 smrate = JsEnc(effectivePrefs.SmRate ?? "3"),
                 volume = SafeNumericString(effectivePrefs.Volume, "1"),
                 mute = SafeBoolFlag(effectivePrefs.Mute),
-                audio_eq_json = string.IsNullOrWhiteSpace(effectivePrefs.AudioEq) ? "{}" : effectivePrefs.AudioEq,
+                audio_eq_json = SafeJsonObject(effectivePrefs.AudioEq, "{}"),
                 screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder),
                 version = JsEnc(JellyEmuVersion.Value)
             });
@@ -216,9 +216,7 @@ namespace JellyEmu.Controllers
                 ? await PreferenceService.GetEffectivePreferencesAsync(userId!, platformTag)
                 : JellyEmuPreferenceService.SystemDefaults;
 
-            var customBindingsJson = !string.IsNullOrWhiteSpace(effectivePrefs.Controls) && effectivePrefs.Controls.Trim().StartsWith("{")
-                ? effectivePrefs.Controls.Trim()
-                : "null";
+            var customBindingsJson = SafeJsonObject(effectivePrefs.Controls, "null");
 
             var gameName = HtmlEncoder.Default.Encode(item.Name);
 
@@ -472,9 +470,7 @@ namespace JellyEmu.Controllers
                 ? System.Text.Json.JsonSerializer.Serialize(inputScheme, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase })
                 : "null";
 
-            var customBindingsJson = !string.IsNullOrWhiteSpace(effectivePrefs.Controls) && effectivePrefs.Controls.Trim().StartsWith("{")
-                ? effectivePrefs.Controls.Trim()
-                : "null";
+            var customBindingsJson = SafeJsonObject(effectivePrefs.Controls, "null");
 
             var html = template.Render(new
             {
@@ -534,6 +530,27 @@ namespace JellyEmu.Controllers
             => double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
                 ? parsed.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 : fallback;
+
+        /// <summary>
+        /// Re-serializes a stored JSON object for output inside a script block. The default
+        /// encoder escapes &lt; &gt; &amp; and quotes, so "&lt;/script&gt;" cannot close the block.
+        /// Anything that is not a JSON object yields <paramref name="fallback"/>.
+        /// </summary>
+        internal static string SafeJsonObject(string? value, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return fallback;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(value);
+                return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    ? System.Text.Json.JsonSerializer.Serialize(doc.RootElement)
+                    : fallback;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return fallback;
+            }
+        }
 
         private static string SafeBoolFlag(string? value)
             => string.Equals(value, "1", StringComparison.Ordinal) || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
