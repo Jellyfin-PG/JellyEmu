@@ -19,6 +19,30 @@ interface PlayerAppProps {
   initialData: PlayerInitialData;
 }
 
+const KEYBOARD_PASSTHROUGH_SYSTEMS = new Set([
+  'dos',
+  'amiga',
+  'c64',
+  'pc88',
+  'x1',
+  'thomson',
+  'mac',
+  'palmos',
+  'ti83',
+  'bk',
+  'galaksija',
+  'p2000',
+  'scummvm',
+  'flash',
+  'love',
+  'chailove',
+  'craft',
+  'doom',
+  'quake',
+  'quake2',
+  'ecwolf'
+]);
+
 export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
   const [supportsCheats, setSupportsCheats] = useState<boolean | undefined>(undefined);
   const [supportsSaveStates, setSupportsSaveStates] = useState<boolean | undefined>(undefined);
@@ -190,7 +214,18 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         canvas?.focus({ preventScroll: true });
       }
 
-      const hotkeyId = PlayerBridge.matchHotkey(e);
+      const sysTag = (ctx.initialData.platformTag || '').toLowerCase();
+      const isKeyboardPassthrough = KEYBOARD_PASSTHROUGH_SYSTEMS.has(sysTag);
+      const isPlainTypingKey =
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.metaKey &&
+        (e.key.length === 1 || e.code === 'Space' || e.code === 'Backspace');
+
+      const hotkeyId =
+        isKeyboardPassthrough && isPlainTypingKey
+          ? null
+          : PlayerBridge.matchHotkey(e);
       if (hotkeyId !== null) {
         e.preventDefault();
         e.stopPropagation();
@@ -263,8 +298,8 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         }
       }
 
-      // Hotkeys that shouldn't clash with PS2 letter keys
-      if (!ctx.isPlay) {
+      // Hotkeys that shouldn't clash with PS2 or computer/DOS letter keys
+      if (!ctx.isPlay && !isKeyboardPassthrough) {
         // H or ? -> Open hotkeys tab in input mapping modal
         if ((e.key === 'h' || e.key === 'H' || e.key === '?') && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault();
