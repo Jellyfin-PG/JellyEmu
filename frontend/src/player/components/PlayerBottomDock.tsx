@@ -280,6 +280,7 @@ export const PlayerBottomDock: React.FC<PlayerBottomDockProps> = ({
               isIconOnly
               size="sm"
               variant="light"
+              aria-label="Input Mapping"
               onPress={onOpenInputMap}
               className="w-9 h-9 min-w-9 text-neutral-300 hover:text-white hover:bg-white/10 rounded-xl"
             >

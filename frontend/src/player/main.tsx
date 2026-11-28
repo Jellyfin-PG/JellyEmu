@@ -60,6 +60,8 @@ export function initPlayer() {
       scale: rawPlayerData.scale || rawConfig.scale,
       volume: rawPlayerData.volume || rawConfig.volume,
       mute: rawPlayerData.mute || rawConfig.mute,
+      virtualGamepad: rawConfig.virtualGamepad,
+      virtualGamepadLefty: rawConfig.virtualGamepadLefty,
       inputScheme: rawPlayerData.inputScheme || rawConfig.inputScheme || (window as any)._activeBackendScheme || null,
       customBindings: rawPlayerData.customBindings || rawConfig.customBindings || (window as any)._jeBindings || null,
       availableCores: (window as any).EJS_availableCores || [],

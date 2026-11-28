@@ -188,6 +188,8 @@ namespace JellyEmu.Controllers
                 volume = SafeNumericString(effectivePrefs.Volume, "1"),
                 mute = SafeBoolFlag(effectivePrefs.Mute),
                 audio_eq_json = SafeJsonObject(effectivePrefs.AudioEq, "{}"),
+                virtual_gamepad = JsEnc(effectivePrefs.VirtualGamepad),
+                virtual_gamepad_lefty = JsEnc(effectivePrefs.VirtualGamepadLefty),
                 screenshots_to_library = !string.IsNullOrWhiteSpace(Plugin.Instance?.Configuration.ScreenshotsFolder),
                 version = JsEnc(JellyEmuVersion.Value)
             });

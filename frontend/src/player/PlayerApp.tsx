@@ -14,6 +14,7 @@ import { InGameDiscSelectModal } from './components/InGameDiscSelectModal';
 import { PlayerNotification } from './components/PlayerNotification';
 import { PlayerPerformanceOverlay } from './components/PlayerPerformanceOverlay';
 import { PlayerBridge } from './services/playerBridge';
+import { VirtualGamepad } from './components/VirtualGamepad';
 
 interface PlayerAppProps {
   initialData: PlayerInitialData;
@@ -47,6 +48,14 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
   const [supportsCheats, setSupportsCheats] = useState<boolean | undefined>(undefined);
   const [supportsSaveStates, setSupportsSaveStates] = useState<boolean | undefined>(undefined);
   const [supportsSram, setSupportsSram] = useState<boolean | undefined>(undefined);
+  const [engineReady, setEngineReady] = useState(false);
+  const isRetroKit = Boolean(document.getElementById('retrokit-canvas'));
+  const [virtualEnabled, setVirtualEnabled] = useState(
+    initialData.virtualGamepad === 'true' || initialData.virtualGamepad === '1'
+  );
+  const [virtualLefty, setVirtualLefty] = useState(
+    initialData.virtualGamepadLefty === 'true' || initialData.virtualGamepadLefty === '1'
+  );
 
   useEffect(() => {
     PlayerBridge.init(initialData);
@@ -63,6 +72,7 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
         booted = true;
         try {
           const emu = await PlayerBridge.boot(canvas, initialData);
+          setEngineReady(true);
           const caps = emu.capabilities;
           if (caps) {
             setSupportsCheats(caps.cheats);
@@ -357,6 +367,10 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
           isArSupported={isArSupported}
         />
 
+        {isRetroKit && engineReady && virtualEnabled && !isPlay && !anyModalOpen && (
+          <VirtualGamepad buttons={initialData.inputScheme?.buttons ?? []} lefty={virtualLefty} />
+        )}
+
         {/* Bottom Dock */}
         <PlayerBottomDock
           visible={visible && !anyModalOpen}
@@ -431,6 +445,13 @@ export const PlayerApp: React.FC<PlayerAppProps> = ({ initialData }) => {
             isOpen={inputMapDisclosure.isOpen}
             onOpenChange={inputMapDisclosure.onOpenChange}
             initialTab={inputMapTab}
+            virtualEnabled={virtualEnabled}
+            virtualLefty={virtualLefty}
+            onVirtualControlsChange={(enabled, lefty) => {
+              setVirtualEnabled(enabled);
+              setVirtualLefty(lefty);
+              void PlayerBridge.syncVirtualControls(initialData.userId, enabled, lefty);
+            }}
           />
         )}
 
