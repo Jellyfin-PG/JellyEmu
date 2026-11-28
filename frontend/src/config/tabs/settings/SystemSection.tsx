@@ -22,40 +22,6 @@ export const SystemSection: React.FC<SystemSectionProps> = ({ config, onUpdate }
   const [customGamesPathMode, setCustomGamesPathMode] = useState<boolean>(false);
   const [customScreenshotsMode, setCustomScreenshotsMode] = useState<boolean>(false);
 
-  const [redownloadingEjs, setRedownloadingEjs] = useState<boolean>(false);
-  const [redownloadMessage, setRedownloadMessage] = useState<string | null>(null);
-  const [redownloadError, setRedownloadError] = useState<boolean>(false);
-
-  const handleRedownloadEjs = async () => {
-    try {
-      setRedownloadingEjs(true);
-      setRedownloadMessage(null);
-      setRedownloadError(false);
-
-      const url = jellyfinApi.getApiUrl('jellyemu/ejs/redownload');
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...jellyfinApi.getAuthHeaders()
-        }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setRedownloadMessage(data?.message || 'Started re-downloading EmulatorJS assets in background!');
-        setRedownloadError(false);
-      } else {
-        setRedownloadMessage(data?.message || `Failed with status ${res.status}`);
-        setRedownloadError(true);
-      }
-    } catch (err: any) {
-      setRedownloadMessage(err?.message || 'Network error triggering re-download');
-      setRedownloadError(true);
-    } finally {
-      setRedownloadingEjs(false);
-    }
-  };
-
   const fetchFolders = async () => {
     setLoadingFolders(true);
     const list: LibraryFolder[] = [];
@@ -139,7 +105,7 @@ export const SystemSection: React.FC<SystemSectionProps> = ({ config, onUpdate }
           System, Storage & Core Runtime
         </h3>
         <p className="text-sm text-slate-400">
-          Configure library paths, screenshot destination, UI injectors, and EmulatorJS channels.
+          Configure library paths, screenshot destination, and UI injectors.
         </p>
       </div>
 
@@ -286,32 +252,6 @@ export const SystemSection: React.FC<SystemSectionProps> = ({ config, onUpdate }
               <Layers className="w-4 h-4 text-primary" />
               Runtime & UI Options
             </h4>
-
-            {/* Runtime & UI Integration */}
-            <div className="space-y-2">
-              <div className="pt-1 flex flex-col sm:flex-row sm:items-center gap-2.5">
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="primary"
-                  startContent={<RefreshCw className={`w-3.5 h-3.5 ${redownloadingEjs ? 'animate-spin' : ''}`} />}
-                  isLoading={redownloadingEjs}
-                  onPress={handleRedownloadEjs}
-                  className="font-semibold text-xs"
-                >
-                  Force Re-download EmulatorJS Assets
-                </Button>
-                {redownloadMessage && (
-                  <span
-                    className={`text-[11px] font-medium animate-in fade-in duration-200 ${
-                      redownloadError ? 'text-danger-400' : 'text-success-400'
-                    }`}
-                  >
-                    {redownloadMessage}
-                  </span>
-                )}
-              </div>
-            </div>
 
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
