@@ -28,7 +28,9 @@ export const biosService = {
   scanBiosFiles: async (): Promise<SystemBiosGroup[]> => {
     try {
       const url = jellyfinApi.getApiUrl('jellyemu/bios/status');
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: { ...jellyfinApi.getAuthHeaders() }
+      });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
       return Array.isArray(data?.systems) ? data.systems : (Array.isArray(data) ? data : []);
@@ -43,7 +45,10 @@ export const biosService = {
       const url = jellyfinApi.getApiUrl('jellyemu/bios/active');
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...jellyfinApi.getAuthHeaders()
+        },
         body: JSON.stringify({ system, relativePath })
       });
       return res.ok;

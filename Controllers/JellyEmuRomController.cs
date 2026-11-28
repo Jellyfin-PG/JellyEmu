@@ -100,12 +100,9 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult ListRomFiles(string itemId, [FromQuery] string? userId = null)
         {
-            var item = LibraryManager.GetItemById(itemId);
+            var item = GetAccessibleRom(itemId);
             if (item == null || string.IsNullOrEmpty(item.Path))
                 return NotFound();
-
-            if (!VerifyItemAccess(item))
-                return Forbid();
 
             var (primaryPath, allFiles) = ResolveItemFilesWithPrimary(item, userId);
             if (allFiles.Count == 0 || string.IsNullOrEmpty(primaryPath))
@@ -160,12 +157,12 @@ namespace JellyEmu.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetRomCompanionFile(string itemId, string filePath, [FromQuery] string? userId = null)
         {
-            var item = LibraryManager.GetItemById(itemId);
-            if (item == null || string.IsNullOrEmpty(item.Path) || string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrEmpty(filePath))
                 return NotFound();
 
-            if (!VerifyItemAccess(item))
-                return Forbid();
+            var item = GetAccessibleRom(itemId);
+            if (item == null || string.IsNullOrEmpty(item.Path))
+                return NotFound();
 
             var (_, allFiles) = ResolveItemFilesWithPrimary(item, userId);
             var baseDir = Directory.Exists(item.Path)
