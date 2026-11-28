@@ -287,23 +287,8 @@ export const SystemSection: React.FC<SystemSectionProps> = ({ config, onUpdate }
               Runtime & UI Options
             </h4>
 
-            {/* EmulatorJS Core Channel Dropdown */}
+            {/* Runtime & UI Integration */}
             <div className="space-y-2">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 block">EmulatorJS Core Channel</label>
-                <CustomSelect
-                  value={config.EjsChannel || 'stable'}
-                  onChange={(val) => onUpdate('EjsChannel', val as any)}
-                  options={[
-                    { value: 'stable', label: 'Stable (Recommended)' },
-                    { value: 'latest', label: 'Latest' },
-                    { value: 'nightly', label: 'Nightly (Experimental)' }
-                  ]}
-                  size="sm"
-                />
-                <p className="text-[11px] text-slate-400">Select release channel for WASM emulation cores.</p>
-              </div>
-
               <div className="pt-1 flex flex-col sm:flex-row sm:items-center gap-2.5">
                 <Button
                   size="sm"
